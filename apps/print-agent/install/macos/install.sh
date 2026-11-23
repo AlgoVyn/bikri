@@ -34,6 +34,10 @@ cat > "$plist" <<EOF
 </plist>
 EOF
 
+# launchd requires the job file to be owned by the user and not group/world
+# writable; the heredoc honours the umask, which may be 0002 or 0000.
+chmod 0644 "$plist"
+
 # bootstrap/bootout replace the deprecated unload/load pair and reload an
 # upgraded binary instead of leaving the old launchd job running.
 launchctl bootout "gui/$(id -u)" "$plist" >/dev/null 2>&1 || true

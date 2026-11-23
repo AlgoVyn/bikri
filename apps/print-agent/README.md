@@ -147,7 +147,7 @@ The user must be allowed to print by CUPS policy; no udev rule or root is needed
 ## Security
 
 - Bind `127.0.0.1` only; no LAN listener or firewall rule.
-- Origin allowlist (`https://algovyn.com`; local-development origins are stripped when the config is saved), Host check for DNS rebinding, CORS/PNA preflight headers.
+- Origin allowlist (`https://algovyn.com`; local-development origins are stripped when the config is saved), Host check for DNS rebinding, CORS/PNA preflight headers on `/v1` only (the local page is never a CORS resource).
 - 6-digit pairing code with a 2-minute TTL and 5 attempts; 32-byte bearer token stored hashed.
 - 5 MiB body limit, job timeout, idempotency and in-memory retention.
 - No receipt contents in logs. Logs go to the log directory (`agent.log`, plus `crash.log`), metadata only.

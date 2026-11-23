@@ -66,3 +66,63 @@ func gdiTargetSize(width, height, paperMm, dpiX, dpiY, horizRes int) (int, int) 
 	}
 	return targetWidth, targetHeight
 }
+
+// gdiBand is one printed page: the contiguous slice of the source bitmap it
+// carries and the height in device pixels it occupies on the page.
+type gdiBand struct {
+	SrcTop     int
+	SrcHeight  int
+	DestHeight int
+}
+
+// gdiBands splits a source bitmap into page-high bands. StretchDIBits clips a
+// DIB taller than the driver's VERTRES, so a long receipt is printed as several
+// pages; the source rows must form a contiguous, gap-free partition or the
+// receipt prints out of order and loses scanlines at the seams.
+//
+// GDI measures ySrc from the bottom of a DIB even when biHeight is negative, so
+// every band is drawn from its own top-down DIB with ySrc = 0 instead of slicing
+// one full-height DIB.
+//
+// The boundaries are computed in int64 so a large receipt cannot overflow, and
+// each band is non-empty: when an extreme upscale maps a page to less than one
+// source row, the page grows until it covers a row instead of emitting an
+// invalid zero-height DIB.
+func gdiBands(height, destHeight, pageHeight int) []gdiBand {
+	if height < 1 || destHeight < 1 || pageHeight < 1 {
+		return nil
+	}
+	if pageHeight > destHeight {
+		pageHeight = destHeight
+	}
+	bands := make([]gdiBand, 0, (destHeight+pageHeight-1)/pageHeight)
+	srcTop := 0
+	for destTop := 0; destTop < destHeight; {
+		if srcTop >= height {
+			// Defensive: never emit an empty band. Absorb the remaining device
+			// rows in the last page so the total still equals destHeight.
+			bands[len(bands)-1].DestHeight += destHeight - destTop
+			break
+		}
+		bandTop := destTop
+		var srcBottom int
+		for {
+			destTop += min(pageHeight, destHeight-destTop)
+			srcBottom = int(int64(destTop) * int64(height) / int64(destHeight))
+			if srcBottom > srcTop || destTop >= destHeight {
+				break
+			}
+		}
+		if srcBottom <= srcTop {
+			srcBottom = srcTop + 1
+		}
+		srcBottom = min(srcBottom, height)
+		bands = append(bands, gdiBand{
+			SrcTop:     srcTop,
+			SrcHeight:  srcBottom - srcTop,
+			DestHeight: destTop - bandTop,
+		})
+		srcTop = srcBottom
+	}
+	return bands
+}

@@ -37,26 +37,16 @@ func main() {
 		return
 	}
 
-	configPath := *configFlag
-	if configPath == "" {
-		path, err := agent.DefaultPath()
-		if err != nil {
-			fmt.Fprintln(os.Stderr, "config path:", err)
-			os.Exit(1)
-		}
-		configPath = path
-	}
-	cfg, err := agent.LoadConfig(configPath)
-	if err != nil {
-		fmt.Fprintln(os.Stderr, "load config:", err)
+	// Create the durable log sink before anything can fail. A Windows
+	// -H=windowsgui build has no stderr, so a config error written with
+	// fmt.Fprintln(os.Stderr) was invisible and the agent exited silently.
+	logPath := agent.DefaultLogPath()
+	logger, closeLog := newLogger(logPath)
+	defer closeLog()
+
+	cfg, configPath, ok := startupConfig(logger, *configFlag, *portFlag)
+	if !ok {
 		os.Exit(1)
-	}
-	if *portFlag != 0 {
-		if *portFlag < 1 || *portFlag > 65535 {
-			fmt.Fprintln(os.Stderr, "port must be between 1 and 65535")
-			os.Exit(1)
-		}
-		cfg.Port = *portFlag
 	}
 	for _, origin := range strings.Split(*allowOrigin, ",") {
 		origin = strings.TrimSpace(origin)
@@ -67,9 +57,6 @@ func main() {
 		}
 	}
 
-	logPath := agent.DefaultLogPath()
-	logger, closeLog := newLogger(logPath)
-	defer closeLog()
 	var crashLog *os.File
 	// Append: systemd (Restart=on-failure) and launchd (KeepAlive) restart the
 	// agent immediately after a panic, and O_TRUNC erased the stack trace of the
@@ -147,6 +134,35 @@ func main() {
 			logger.Warn("shutdown timed out waiting for the HTTP server")
 		}
 	}
+}
+
+// startupConfig resolves the config path, loads it and applies the -port
+// override. It takes the logger as an argument so startup errors are always
+// written to the durable log (and stderr when it exists), even in a Windows GUI
+// build where fmt.Fprintln(os.Stderr, …) goes nowhere.
+func startupConfig(logger *slog.Logger, configFlag string, portFlag int) (*agent.Config, string, bool) {
+	configPath := configFlag
+	if configPath == "" {
+		path, err := agent.DefaultPath()
+		if err != nil {
+			logger.Error("config path", "error", err)
+			return nil, "", false
+		}
+		configPath = path
+	}
+	cfg, err := agent.LoadConfig(configPath)
+	if err != nil {
+		logger.Error("load config", "path", configPath, "error", err)
+		return nil, "", false
+	}
+	if portFlag != 0 {
+		if portFlag < 1 || portFlag > 65535 {
+			logger.Error("port must be between 1 and 65535", "port", portFlag)
+			return nil, "", false
+		}
+		cfg.Port = portFlag
+	}
+	return cfg, configPath, true
 }
 
 func newLogger(logPath string) (*slog.Logger, func()) {

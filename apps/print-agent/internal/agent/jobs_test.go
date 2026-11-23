@@ -23,8 +23,16 @@ type fakeBackend struct {
 	statusErr   error
 	statusHook  func()
 	cancelErr   error
+	cancelCalls int
+	canceledIDs []string
 	printers    []backend.Printer
 	printersErr error
+
+	// Channels let a test interleave Cancel/Submit/Get deterministically.
+	printEntered  chan struct{}
+	printRelease  chan struct{}
+	cancelEntered chan struct{}
+	cancelRelease chan struct{}
 }
 
 func (f *fakeBackend) ListPrinters(context.Context) ([]backend.Printer, error) {
@@ -46,7 +54,15 @@ func (f *fakeBackend) Print(context.Context, backend.Job) (string, error) {
 	}
 	delay := f.printDelay
 	printErr := f.printErr
+	spoolID := f.spoolID
+	entered, release := f.printEntered, f.printRelease
 	f.mu.Unlock()
+	if entered != nil {
+		close(entered)
+	}
+	if release != nil {
+		<-release
+	}
 	if delay > 0 {
 		time.Sleep(delay)
 	}
@@ -56,7 +72,7 @@ func (f *fakeBackend) Print(context.Context, backend.Job) (string, error) {
 	if printErr != nil {
 		return "", printErr
 	}
-	return f.spoolID, nil
+	return spoolID, nil
 }
 
 func (f *fakeBackend) Status(context.Context, string, string) (backend.Status, error) {
@@ -70,8 +86,20 @@ func (f *fakeBackend) Status(context.Context, string, string) (backend.Status, e
 	return status, err
 }
 
-func (f *fakeBackend) Cancel(context.Context, string, string) error {
-	return f.cancelErr
+func (f *fakeBackend) Cancel(_ context.Context, _ string, spoolID string) error {
+	f.mu.Lock()
+	f.cancelCalls++
+	f.canceledIDs = append(f.canceledIDs, spoolID)
+	err := f.cancelErr
+	entered, release := f.cancelEntered, f.cancelRelease
+	f.mu.Unlock()
+	if entered != nil {
+		close(entered)
+	}
+	if release != nil {
+		<-release
+	}
+	return err
 }
 
 func validRequest() JobRequest {
@@ -408,5 +436,197 @@ func TestManagerRejectsInvalidPNGBeforeTheBackend(t *testing.T) {
 	}
 	if fake.printCalls != 0 {
 		t.Fatalf("unvalidated PNG reached the backend (%d prints)", fake.printCalls)
+	}
+}
+
+func (f *fakeBackend) cancelSnapshot() (int, []string) {
+	f.mu.Lock()
+	defer f.mu.Unlock()
+	return f.cancelCalls, append([]string(nil), f.canceledIDs...)
+}
+
+// A DELETE that lands while the backend is still spooling sees no spool id. The
+// job is marked canceled immediately, and Submit must cancel the OS job that
+// appears once Print returns instead of printing a dropped receipt (PRT-H4).
+func TestManagerCancelDuringPrintCancelsTheSpooledJob(t *testing.T) {
+	fake := &fakeBackend{
+		spoolID:      "42",
+		printEntered: make(chan struct{}),
+		printRelease: make(chan struct{}),
+	}
+	manager := NewManager(fake)
+	submitted := make(chan *JobStatus, 1)
+	go func() {
+		job, err := submitJob(manager, validRequest())
+		if err != nil {
+			t.Errorf("submit: %v", err)
+		}
+		submitted <- job
+	}()
+	<-fake.printEntered
+
+	job, found, err := manager.Cancel(context.Background(), "job-1")
+	if err != nil || !found {
+		t.Fatalf("cancel = %v, %v", found, err)
+	}
+	if job.Status != "canceled" {
+		t.Fatalf("cancel returned %q, want canceled", job.Status)
+	}
+	// Nothing was spooled yet, so there was nothing to cancel at the OS level.
+	if calls, _ := fake.cancelSnapshot(); calls != 0 {
+		t.Fatalf("pre-spool cancel called the backend %d times", calls)
+	}
+
+	close(fake.printRelease)
+	result := <-submitted
+	if result == nil || result.Status != "canceled" {
+		t.Fatalf("submit after cancel = %+v, want canceled", result)
+	}
+	calls, cancelled := fake.cancelSnapshot()
+	if calls != 1 || len(cancelled) != 1 || cancelled[0] != "42" {
+		t.Fatalf("spooled job cancel = %d calls %v, want [42]", calls, cancelled)
+	}
+	status, ok := manager.GetNoPoll("job-1")
+	if !ok || status.Status != "canceled" {
+		t.Fatalf("stored status = %+v, ok = %v", status, ok)
+	}
+}
+
+// If backend.Print fails after a cancel, update() must not turn the canceled job
+// into "failed".
+func TestManagerCancelDuringPrintSurvivesAPrintFailure(t *testing.T) {
+	fake := &fakeBackend{
+		printErr:     &backend.Error{Code: "PAPER_OUT", Message: "load paper"},
+		printEntered: make(chan struct{}),
+		printRelease: make(chan struct{}),
+	}
+	manager := NewManager(fake)
+	submitted := make(chan *JobStatus, 1)
+	go func() {
+		job, err := submitJob(manager, validRequest())
+		if err != nil {
+			t.Errorf("submit: %v", err)
+		}
+		submitted <- job
+	}()
+	<-fake.printEntered
+	if _, found, err := manager.Cancel(context.Background(), "job-1"); err != nil || !found {
+		t.Fatalf("cancel = %v, %v", found, err)
+	}
+	close(fake.printRelease)
+	if result := <-submitted; result == nil || result.Status != "canceled" {
+		t.Fatalf("submit after cancel = %+v, want canceled", result)
+	}
+	status, _ := manager.GetNoPoll("job-1")
+	if status.Status != "canceled" || status.Error != "" {
+		t.Fatalf("print failure overwrote the canceled job: %+v", status)
+	}
+}
+
+// Cancel must not mark a retry attempt canceled when backend.Cancel replaces
+// the record underneath it, and it must return the current record (PRT-H4).
+func TestManagerCancelDoesNotTouchAReplacementRecord(t *testing.T) {
+	fake := &fakeBackend{
+		spoolID:       "7",
+		status:        backend.Status{State: "failed", Error: "PAPER_OUT"},
+		cancelEntered: make(chan struct{}),
+		cancelRelease: make(chan struct{}),
+	}
+	manager := NewManager(fake)
+	if _, err := submitJob(manager, validRequest()); err != nil {
+		t.Fatal(err)
+	}
+
+	type cancelResult struct {
+		job *JobStatus
+		err error
+	}
+	cancelled := make(chan cancelResult, 1)
+	go func() {
+		job, _, err := manager.Cancel(context.Background(), "job-1")
+		cancelled <- cancelResult{job: job, err: err}
+	}()
+	<-fake.cancelEntered
+
+	// The spooler reports a failure while Cancel is talking to the OS, then the
+	// till retries the same print-job id and Submit replaces the record.
+	if job, ok := manager.Get(context.Background(), "job-1"); !ok || job.Status != "failed" {
+		t.Fatalf("polled job = %+v, ok = %v", job, ok)
+	}
+	fake.mu.Lock()
+	fake.spoolID = "99"
+	fake.mu.Unlock()
+	retry, err := submitJob(manager, validRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if retry.Status != "spooled" {
+		t.Fatalf("retry = %+v", retry)
+	}
+
+	close(fake.cancelRelease)
+	result := <-cancelled
+	if result.err != nil {
+		t.Fatal(result.err)
+	}
+	if result.job == nil || result.job.Status != "spooled" {
+		t.Fatalf("cancel returned %+v, want the replacement's spooled status", result.job)
+	}
+	status, _ := manager.GetNoPoll("job-1")
+	if status.Status != "spooled" {
+		t.Fatalf("replacement was marked %q by the stale cancel", status.Status)
+	}
+	calls, canceledIDs := fake.cancelSnapshot()
+	if calls != 1 || len(canceledIDs) != 1 || canceledIDs[0] != "7" {
+		t.Fatalf("cancelled ids = %v (%d calls), want only the old spool job", canceledIDs, calls)
+	}
+}
+
+// A status poll that returns an error after the record was replaced must not
+// write the old attempt's error detail onto the retry.
+func TestManagerGetErrorDoesNotOverwriteARetriedRecord(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	fake := &fakeBackend{spoolID: "7", statusErr: errors.New("spooler down")}
+	fake.statusHook = func() {
+		close(entered)
+		<-release
+	}
+	manager := NewManager(fake)
+	if _, err := submitJob(manager, validRequest()); err != nil {
+		t.Fatal(err)
+	}
+
+	polled := make(chan *JobStatus, 1)
+	go func() {
+		job, ok := manager.Get(context.Background(), "job-1")
+		if !ok {
+			polled <- nil
+			return
+		}
+		polled <- job
+	}()
+	<-entered
+	if _, found, err := manager.Cancel(context.Background(), "job-1"); err != nil || !found {
+		t.Fatalf("cancel = %v, %v", found, err)
+	}
+	fake.mu.Lock()
+	fake.spoolID = "99"
+	fake.statusHook = nil
+	fake.mu.Unlock()
+	retry, err := submitJob(manager, validRequest())
+	if err != nil {
+		t.Fatal(err)
+	}
+	if retry.Status != "spooled" {
+		t.Fatalf("retry = %+v", retry)
+	}
+	close(release)
+	if got := <-polled; got == nil || got.Status != "spooled" || got.Detail != "" {
+		t.Fatalf("polled status = %+v, want the new spooled record without the old error", got)
+	}
+	status, _ := manager.GetNoPoll("job-1")
+	if status.Status != "spooled" || status.Detail != "" {
+		t.Fatalf("stored job = %+v, want spooled without detail", status)
 	}
 }

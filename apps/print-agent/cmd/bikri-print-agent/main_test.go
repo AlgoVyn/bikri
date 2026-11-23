@@ -3,8 +3,10 @@ package main
 import (
 	"bytes"
 	"errors"
+	"log/slog"
 	"os"
 	"path/filepath"
+	"strings"
 	"testing"
 )
 
@@ -110,5 +112,58 @@ func TestRotatingWriterReopensAfterATransientFailure(t *testing.T) {
 	}
 	if string(stored) != "first\nsecond\n" {
 		t.Fatalf("agent.log = %q", stored)
+	}
+}
+
+// A corrupt config.json used to exit through fmt.Fprintln(os.Stderr, …), which
+// a Windows -H=windowsgui build does not have. The error must reach agent.log.
+func TestStartupConfigErrorsReachTheLogFile(t *testing.T) {
+	dir := t.TempDir()
+	logPath := filepath.Join(dir, "logs", "agent.log")
+	logger, closeLog := newLogger(logPath)
+	defer closeLog()
+	configPath := filepath.Join(dir, "config.json")
+	if err := os.WriteFile(configPath, []byte("{not json"), 0o600); err != nil {
+		t.Fatal(err)
+	}
+	cfg, gotPath, ok := startupConfig(logger, configPath, 0)
+	if ok || cfg != nil || gotPath != "" {
+		t.Fatalf("corrupt config was accepted: cfg=%+v path=%q ok=%v", cfg, gotPath, ok)
+	}
+	logged, err := os.ReadFile(logPath)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if !bytes.Contains(logged, []byte("load config")) || !bytes.Contains(logged, []byte(configPath)) {
+		t.Fatalf("agent.log does not contain the config error: %s", logged)
+	}
+}
+
+func TestStartupConfigRejectsAnOutOfRangePort(t *testing.T) {
+	var logs bytes.Buffer
+	logger := slog.New(slog.NewTextHandler(&logs, nil))
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	for _, port := range []int{-1, 65536, 70000} {
+		if _, _, ok := startupConfig(logger, configPath, port); ok {
+			t.Fatalf("port %d was accepted", port)
+		}
+	}
+	if !strings.Contains(logs.String(), "between 1 and 65535") {
+		t.Fatalf("port errors were not logged: %s", logs.String())
+	}
+}
+
+func TestStartupConfigAppliesThePortOverride(t *testing.T) {
+	logger := slog.New(slog.NewTextHandler(&bytes.Buffer{}, nil))
+	configPath := filepath.Join(t.TempDir(), "config.json")
+	cfg, gotPath, ok := startupConfig(logger, configPath, 18500)
+	if !ok || cfg == nil {
+		t.Fatal("valid startup config was rejected")
+	}
+	if cfg.Port != 18500 {
+		t.Fatalf("port = %d, want 18500", cfg.Port)
+	}
+	if gotPath != configPath {
+		t.Fatalf("config path = %q, want %q", gotPath, configPath)
 	}
 }

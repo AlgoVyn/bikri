@@ -115,15 +115,67 @@ func TestCupsEnvForcesCLocale(t *testing.T) {
 }
 
 func TestSpoolIDPatternRejectsOptions(t *testing.T) {
-	for _, id := range []string{"-a", "--all", "Bixolon", "Bixolon-x", "Bixolon-1;rm"} {
+	for _, id := range []string{
+		"-a", "--all", "-1", "-queue-1", "Bixolon", "Bixolon-x", "Bixolon-1;rm",
+		"Bixolon-", "-", "", "Bixolon-1\n",
+	} {
 		if spoolIDPattern.MatchString(id) {
 			t.Fatalf("unsafe spool id accepted: %q", id)
 		}
 	}
-	for _, id := range []string{"Bixolon-42", "Office_1-7", "queue.name-123"} {
+	for _, id := range []string{"Bixolon-42", "Office_1-7", "queue.name-123", ".hidden-9", "a-1"} {
 		if !spoolIDPattern.MatchString(id) {
 			t.Fatalf("valid spool id rejected: %q", id)
 		}
+	}
+}
+
+// OpenPrinting/Apple CUPS `cancel` has no `--` end-of-options marker: `cancel --
+// Bixolon-42` fails with "unknown option '-'", so every DELETE /v1/jobs/{id} on
+// Linux and macOS returned 502 before this fix.
+func TestCancelPassesTheSpoolIDWithoutAnOptionTerminator(t *testing.T) {
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "cancel-args")
+	script := filepath.Join(dir, "cancel")
+	body := "#!/bin/sh\nfor arg in \"$@\"; do printf '%s\\n' \"$arg\"; done > " + argsFile + "\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	cupsEnvOnce = sync.Once{}
+	cupsEnvCache = nil
+
+	b := &cupsBackend{}
+	if err := b.Cancel(context.Background(), "Bixolon", "Bixolon-42"); err != nil {
+		t.Fatal(err)
+	}
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if got := strings.TrimSpace(string(data)); got != "Bixolon-42" {
+		t.Fatalf("cancel arguments = %q, want just the spool id", got)
+	}
+}
+
+// An id that starts with a hyphen must be rejected before any command runs.
+func TestCancelRejectsAnOptionLikeSpoolID(t *testing.T) {
+	dir := t.TempDir()
+	marker := filepath.Join(dir, "cancel-ran")
+	script := filepath.Join(dir, "cancel")
+	if err := os.WriteFile(script, []byte("#!/bin/sh\n: > "+marker+"\n"), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir)
+	cupsEnvOnce = sync.Once{}
+	cupsEnvCache = nil
+
+	b := &cupsBackend{}
+	if err := b.Cancel(context.Background(), "Bixolon", "-a"); err == nil {
+		t.Fatal("an option-like spool id was accepted")
+	}
+	if _, err := os.Stat(marker); !os.IsNotExist(err) {
+		t.Fatal("cancel ran with an unsafe spool id")
 	}
 }
 

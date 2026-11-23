@@ -4,7 +4,7 @@
 
 #define AppName "Bikri Print Agent"
 #ifndef MyAppVersion
-  #define MyAppVersion "0.1.8"
+  #define MyAppVersion "0.1.9"
 #endif
 #define AppPublisher "Algovyn"
 #define AppExe "bikri-print-agent.exe"
@@ -60,7 +60,9 @@ Root: HKCU; Subkey: "Software\Microsoft\Windows\CurrentVersion\Run"; ValueType: 
 Filename: "{app}\{#AppExe}"; Description: "Start Bikri Print Agent now"; Flags: nowait postinstall
 
 [UninstallRun]
-Filename: "{sys}\taskkill.exe"; Parameters: "/IM {#AppExe} /F"; Flags: runhidden; RunOnceId: "StopAgent"
+; Only this user's agent: another user on a shared PC may run their own copy on
+; a different port, and taskkill without the filter fails or needs admin rights.
+Filename: "{cmd}"; Parameters: "/C taskkill /IM {#AppExe} /F /FI ""USERNAME eq %USERNAME%"""; Flags: runhidden; RunOnceId: "StopAgent"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{app}\logs"
@@ -71,7 +73,11 @@ function StopAgent(): Boolean;
 var
   ResultCode: Integer;
 begin
-  Exec(ExpandConstant('{sys}\taskkill.exe'), '/IM {#AppExe} /F', '', SW_HIDE,
+  // Run through cmd so %USERNAME% expands: taskkill does not resolve it inside a
+  // filter, and stopping every user's agent on a shared PC is both wrong and
+  // denied to a per-user install.
+  Exec(ExpandConstant('{cmd}'),
+    '/C taskkill /IM {#AppExe} /F /FI "USERNAME eq %USERNAME%"', '', SW_HIDE,
     ewWaitUntilTerminated, ResultCode);
   Result := True;
 end;

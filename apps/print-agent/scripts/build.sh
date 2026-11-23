@@ -2,7 +2,7 @@
 set -euo pipefail
 cd "$(dirname "$0")/.."
 
-version="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.1.8)}"
+version="${VERSION:-$(git describe --tags --always --dirty 2>/dev/null || echo 0.1.9)}"
 mkdir -p dist
 rm -rf dist/windows-amd64 dist/linux-amd64 dist/linux-arm64 \
   dist/darwin-amd64 dist/darwin-arm64
@@ -69,18 +69,32 @@ done
 
 python3 - <<'PY'
 from pathlib import Path
-from zipfile import ZIP_DEFLATED, ZipFile
+from zipfile import ZIP_DEFLATED, ZipFile, ZipInfo
 
+# Reproducible archive: fixed timestamps, sorted names and fixed permissions, so
+# the same source tree produces the same zip (and SHA256SUMS) on every run.
+# archive.write() embeds each file's current mtime and mode otherwise.
+STAMP = (1980, 1, 1, 0, 0, 0)
 root = Path("dist/windows-amd64")
 with ZipFile("dist/bikri-print-agent-windows-amd64.zip", "w", ZIP_DEFLATED) as archive:
     for path in sorted(root.iterdir()):
-        archive.write(path, path.name)
+        info = ZipInfo(path.name, STAMP)
+        info.compress_type = ZIP_DEFLATED
+        info.external_attr = 0o644 << 16
+        archive.writestr(info, path.read_bytes())
 PY
 
-tar -czf dist/bikri-print-agent-linux-amd64.tar.gz -C dist/linux-amd64 .
-tar -czf dist/bikri-print-agent-linux-arm64.tar.gz -C dist/linux-arm64 .
-tar -czf dist/bikri-print-agent-darwin-amd64.tar.gz -C dist/darwin-amd64 .
-tar -czf dist/bikri-print-agent-darwin-arm64.tar.gz -C dist/darwin-arm64 .
+# --sort/--mtime/--owner/--numeric-owner strip the build machine's mtimes,
+# user names and uids from the tarball. Keep the file mode meaningful (the
+# binary and scripts stay executable); the source tree is not shipped.
+tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
+  -czf dist/bikri-print-agent-linux-amd64.tar.gz -C dist/linux-amd64 .
+tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
+  -czf dist/bikri-print-agent-linux-arm64.tar.gz -C dist/linux-arm64 .
+tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
+  -czf dist/bikri-print-agent-darwin-amd64.tar.gz -C dist/darwin-amd64 .
+tar --sort=name --mtime=@0 --owner=0 --group=0 --numeric-owner \
+  -czf dist/bikri-print-agent-darwin-arm64.tar.gz -C dist/darwin-arm64 .
 
 (
   cd dist

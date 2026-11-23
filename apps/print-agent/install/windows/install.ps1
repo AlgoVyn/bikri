@@ -4,7 +4,14 @@ $source = Join-Path $PSScriptRoot 'bikri-print-agent.exe'
 $dest = Join-Path $env:LOCALAPPDATA 'Bikri\PrintAgent'
 $exe = Join-Path $dest 'bikri-print-agent.exe'
 
-Get-Process 'bikri-print-agent' -ErrorAction SilentlyContinue | Stop-Process -Force
+# Stop only this user's copy: another user on a shared PC may run their own
+# agent on a different port, and taskkill without the filter needs admin rights
+# for it. PowerShell expands $env:USERNAME; taskkill itself does not.
+try {
+  & (Join-Path $env:SystemRoot 'System32\taskkill.exe') /IM 'bikri-print-agent.exe' /F /FI "USERNAME eq $env:USERNAME" 2>$null | Out-Null
+} catch {
+  # No running agent, or it belongs to another account.
+}
 Get-Process 'bikri-print-agent' -ErrorAction SilentlyContinue | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
 Copy-Item -Force $source $exe

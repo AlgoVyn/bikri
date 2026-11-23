@@ -37,7 +37,10 @@ const cupsRefreshTimeout = 15 * time.Second
 
 var (
 	requestIDPattern = regexp.MustCompile(`request id is (\S+)`)
-	spoolIDPattern   = regexp.MustCompile(`^[A-Za-z0-9._-]+-[0-9]+$`)
+	// CUPS `cancel` has no end-of-options marker (`cancel -- id` fails with
+	// "unknown option '-'"), so the id itself must never look like an option:
+	// the first character cannot be a hyphen.
+	spoolIDPattern = regexp.MustCompile(`^[A-Za-z0-9._][A-Za-z0-9._-]*-[0-9]+$`)
 )
 
 func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
@@ -294,7 +297,10 @@ func (b *cupsBackend) Cancel(ctx context.Context, printer, spoolID string) error
 	if !ValidPrinterName(printer) || !spoolIDPattern.MatchString(spoolID) {
 		return &Error{Code: "CANCEL_FAILED", Message: "invalid printer or job id"}
 	}
-	if _, err := run(ctx, "cancel", "--", spoolID); err != nil {
+	// OpenPrinting and Apple CUPS both reject `cancel -- <id>` ("unknown option
+	// '-'"), so the validated id is passed directly. spoolIDPattern guarantees
+	// it cannot be parsed as an option.
+	if _, err := run(ctx, "cancel", spoolID); err != nil {
 		return &Error{Code: "CANCEL_FAILED", Message: err.Error()}
 	}
 	return nil

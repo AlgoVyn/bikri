@@ -89,23 +89,34 @@ func (s *Server) security(next http.Handler) http.Handler {
 			return
 		}
 		origin := r.Header.Get("Origin")
-		if origin != "" && !s.allowedOrigin(origin, r.Host) {
-			writeError(w, http.StatusForbidden, "FORBIDDEN_ORIGIN", "origin is not allowed")
-			return
-		}
-		if origin != "" {
-			w.Header().Set("Access-Control-Allow-Origin", origin)
-			w.Header().Set("Access-Control-Allow-Private-Network", "true")
-			w.Header().Set("Vary", "Origin")
-		}
-		if r.Method == http.MethodOptions {
-			w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
-			w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key")
-			w.Header().Set("Access-Control-Max-Age", "600")
-			w.WriteHeader(http.StatusNoContent)
-			return
-		}
-		if strings.HasPrefix(r.URL.Path, "/v1/") {
+		api := strings.HasPrefix(r.URL.Path, "/v1/")
+		if !api {
+			// The local page is not a CORS resource. It carries the CSRF nonce,
+			// the printer list and the log path, so a script on an allowed API
+			// origin must not be able to read it. Only the loopback page itself
+			// may send a non-empty Origin here, and no CORS header is ever
+			// emitted.
+			if origin != "" && !sameLoopbackOrigin(origin, r.Host) {
+				writeError(w, http.StatusForbidden, "FORBIDDEN_ORIGIN", "origin is not allowed")
+				return
+			}
+		} else {
+			if origin != "" && !s.allowedOrigin(origin, r.Host) {
+				writeError(w, http.StatusForbidden, "FORBIDDEN_ORIGIN", "origin is not allowed")
+				return
+			}
+			if origin != "" {
+				w.Header().Set("Access-Control-Allow-Origin", origin)
+				w.Header().Set("Access-Control-Allow-Private-Network", "true")
+				w.Header().Set("Vary", "Origin")
+			}
+			if r.Method == http.MethodOptions {
+				w.Header().Set("Access-Control-Allow-Methods", "GET, POST, DELETE, OPTIONS")
+				w.Header().Set("Access-Control-Allow-Headers", "Authorization, Content-Type, Idempotency-Key")
+				w.Header().Set("Access-Control-Max-Age", "600")
+				w.WriteHeader(http.StatusNoContent)
+				return
+			}
 			w.Header().Set("Content-Type", "application/json")
 		}
 		next.ServeHTTP(w, r)
@@ -429,7 +440,7 @@ func (s *Server) ui(w http.ResponseWriter, r *http.Request) {
 		printerErr = err.Error()
 	}
 	w.Header().Set("Content-Type", "text/html; charset=utf-8")
-	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; base-uri 'none'; frame-ancestors 'none'")
+	w.Header().Set("Content-Security-Policy", "default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'")
 	w.Header().Set("X-Frame-Options", "DENY")
 	data := uiData{
 		Paired:       s.auth.Paired(),
