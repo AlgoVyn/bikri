@@ -652,6 +652,23 @@ async function loadHistoryRefs(
   const purchaseById = new Map<string, SyncedRow>();
   for (const purchase of purchases)
     if (purchase) purchaseById.set(String(purchase.id), purchase);
+  // A purchase's supplier screen shows "Not found" for a missing or soft-deleted row,
+  // so do not link to it at all (POS-L3).
+  const supplierIds = [
+    ...new Set(
+      [...purchaseById.values()]
+        .map((purchase) => purchase.supplier_id)
+        .filter((id): id is string => typeof id === 'string' && id !== ''),
+    ),
+  ];
+  const suppliers = new Set(
+    (await db.suppliers.bulkGet(supplierIds))
+      .filter(
+        (supplier): supplier is MasterRow =>
+          supplier !== undefined && !supplier.deleted_at,
+      )
+      .map((supplier) => String(supplier.id)),
+  );
   // A refund/void movement points at the refund/void, which points at the bill.
   const linkedSaleIds = [
     ...new Set(
@@ -693,7 +710,11 @@ async function loadHistoryRefs(
       continue;
     }
     const purchase = purchaseById.get(seed.id);
-    if (purchase && typeof purchase.supplier_id === 'string')
+    if (
+      purchase &&
+      typeof purchase.supplier_id === 'string' &&
+      suppliers.has(purchase.supplier_id)
+    )
       refs.set(seed.movementId, {
         kind: 'purchase',
         purchaseId: seed.id,

@@ -5,6 +5,7 @@ import { addCategory, ledgerContext, saveNewProduct } from './catalog.ts';
 import {
   autoMap,
   errorsCsv,
+  MAX_NAME,
   previewImport,
   runImport,
   TEMPLATE_COLUMNS,
@@ -332,5 +333,81 @@ describe('import spreadsheet (screens/08)', () => {
       price: 100,
     });
     expect(await b.db.outbox.where('tbl').equals('products').count()).toBe(1);
+  });
+});
+
+describe('import spreadsheet text caps (POS-M2)', () => {
+  // One cell per field that must be rejected in preview: the Worker's
+  // `TEXT_CAPS.products` would otherwise reject the whole 50-row chunk.
+  const row = (index: number, extra: Record<number, string> = {}) => {
+    const cells = [
+      `Product ${index}`,
+      `مصنوع ${index}`,
+      'Cables',
+      'Anker',
+      `89012345${String(index).padStart(5, '0')}`,
+      `SKU-${index}`,
+      '450',
+      '300',
+      '20',
+      'pc',
+      '5',
+      'yes',
+    ];
+    for (const [at, value] of Object.entries(extra)) cells[Number(at)] = value;
+    return cells;
+  };
+
+  it('reports one over-length cell per field instead of passing the row', async () => {
+    const { db } = await shop('import-caps');
+    const g = [
+      [...TEMPLATE_COLUMNS],
+      row(0, { 1: 'x'.repeat(MAX_NAME + 1) }),
+      row(1, { 3: 'x'.repeat(41) }),
+      row(2, { 5: 'x'.repeat(41) }),
+      row(3, { 9: 'x'.repeat(17) }),
+    ];
+    const preview = await previewImport(db, g, autoMap(g[0] as string[]));
+    expect(preview.summary).toEqual({ new: 0, updates: 0, errors: 4 });
+    expect(preview.rows[0]?.errors).toContainEqual({
+      field: 'name_ur',
+      code: 'name_too_long',
+    });
+    expect(preview.rows[1]?.errors).toContainEqual({
+      field: 'brand',
+      code: 'brand_too_long',
+    });
+    expect(preview.rows[2]?.errors).toContainEqual({
+      field: 'sku',
+      code: 'sku_too_long',
+    });
+    expect(preview.rows[3]?.errors).toContainEqual({
+      field: 'unit',
+      code: 'unit_too_long',
+    });
+    expect(preview.rows.every((r) => r.action === 'error')).toBe(true);
+  });
+
+  it('keeps a 50-row chunk importable when one row has an over-length cell', async () => {
+    const { db, ctx } = await shop('import-chunk');
+    const g = [
+      [...TEMPLATE_COLUMNS],
+      ...Array.from({ length: 50 }, (_, i) => row(i)),
+      row(50, { 3: 'b'.repeat(41) }),
+      row(51, { 5: 's'.repeat(41) }),
+      row(52, { 1: 'z'.repeat(MAX_NAME + 1) }),
+      row(53, { 9: 'u'.repeat(17) }),
+    ];
+    const preview = await previewImport(db, g, autoMap(g[0] as string[]));
+    expect(preview.summary).toEqual({ new: 50, updates: 0, errors: 4 });
+    const result = await runImport(db, preview, ctx, { now: NOW });
+    expect(result).toMatchObject({ created: 50, updated: 0, skipped: 4 });
+    expect(await db.products.count()).toBe(50);
+    const names = (await db.products.toArray()).map((p) => String(p.name_en));
+    expect(names).not.toContain('Product 50');
+    expect(names).not.toContain('Product 53');
+    // The valid rows landed whole: no row was lost to a rejected chunk.
+    expect(names).toContain('Product 0');
+    expect(names).toContain('Product 49');
   });
 });

@@ -28,7 +28,6 @@ import {
   addOverride,
   addProduct,
   addQuickSale,
-  approversFor,
   bundleListPriceOf,
   bundleQtyOf,
   CART_IDS,
@@ -47,9 +46,11 @@ import {
   overrideMatches,
   parseQtyPrefix,
   paymentChecks,
+  qtyRejectsFraction,
   removeBundle,
   removeLine,
   resumeHeld,
+  saleApprovers,
   setBundleDiscount,
   updateBundlePrice,
   updateBundleQty,
@@ -58,6 +59,7 @@ import {
 import { loadBundleRecipe } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
+import { belowCataloguePrices } from '../data/sale.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { loadDevicePrefs } from '../shell/devicePrefs.ts';
 import { composing, flushFocusedField, useHotkey } from '../shell/hotkeys.ts';
@@ -208,6 +210,17 @@ export function SellPage() {
   const add = (product: MasterRow, qty?: number) => {
     const qtyMilli = qty ?? nextQty ?? 1000;
     setNextQty(null);
+    const unit = String(product.unit ?? 'pc');
+    // `1.5*` typed for a whole-unit product (pc, box, pack…) would put half a piece in
+    // the cart and a fractional stock movement on the wire (UI-H6).
+    if (qtyRejectsFraction(unit, qtyMilli)) {
+      toast.push(
+        t('sell.qty_whole_only', { unit: t(`unit.${unit}`) }),
+        'error',
+      );
+      focusSearch();
+      return;
+    }
     beep();
     if (product.kind === 'bundle') {
       void (async () => {
@@ -327,25 +340,16 @@ export function SellPage() {
   };
 
   // --- overrides (05 §4.1) ---
+  // The sale's permission checks run against the attributed seller (the cashier on a
+  // backdated bill), so the approver list excludes that seller — not the recorder. An
+  // owner may approve their own hard-limit override, or a single-owner shop deadlocks
+  // (UI-H7).
   const approvers = (permission: OverridePermission, roles?: Role[]) =>
-    approversFor(allStaff, (s) => {
-      if (roles !== undefined && !roles.includes(s.role as Role)) return false;
-      if (permission === 'udhaar.hard_limit')
-        return (
-          s.id !== staff?.id && (s.role === 'owner' || s.role === 'manager')
-        );
-      if (s.id === staff?.id) return false;
-      const ok = canDo(
-        s.role as Role,
-        String(s.permissions_json ?? '{}'),
-        permission,
-      );
-      if (permission !== 'sale.discount') return ok;
-      return (
-        ok &&
-        (s.role === 'owner' ||
-          Number(s.max_discount_bp ?? 0) >= manualDiscountBp(cart, totals))
-      );
+    saleApprovers(allStaff, {
+      permission,
+      roles,
+      sellerId: cart.backdate?.staff_id ?? staff?.id ?? null,
+      manualDiscountBp: manualDiscountBp(cart, totals),
     });
 
   const verify = async (pin: string, profileId: string) => {
@@ -384,60 +388,39 @@ export function SellPage() {
             permission,
           ),
       );
-    // A backdated price below today's catalogue price needs a line-bound catalog.edit
-    // approval for the attributed seller. The recorder may not have catalog.edit either;
-    // ask for another approver before opening Pay.
+    // Every sale — a held bill, an open cart, a reissue or a backdate — is checked
+    // against today's catalogue before Pay opens. The attributed seller decides: the
+    // Worker rejects a price below the current catalogue without their `catalog.edit`
+    // (POS-H2).
     let priceApproval: { key: string; price: number } | null = null;
-    if (
-      current.backdate &&
-      !can('catalog.edit') &&
-      !sellerCan('catalog.edit')
-    ) {
+    if (!sellerCan('catalog.edit')) {
+      const db = getDb();
       const productIds = [
         ...new Set(
-          current.lines
-            .map((line) => line.product_id)
-            .filter((id): id is string => id !== null),
+          current.lines.flatMap((line) =>
+            [line.product_id, line.bundle_id].filter(
+              (id): id is string => typeof id === 'string' && id !== null,
+            ),
+          ),
         ),
       ];
-      const products = await getDb().products.bulkGet(productIds);
-      for (const line of current.lines) {
-        // Bundle component prices are derived by priceBundle, not overrides.
-        if (!line.product_id || line.bundle_id) continue;
-        const product = products.find((row) => row?.id === line.product_id);
-        if (!product || line.unit_price >= Number(product.price ?? 0)) continue;
-        if (
-          overrideMatches(current, 'catalog.edit', {
-            line: line.key,
-            price: line.unit_price,
-          })
-        )
-          continue;
-        priceApproval = { key: line.key, price: line.unit_price };
-        break;
-      }
-      if (!priceApproval) {
-        const seen = new Set<string>();
-        for (const line of current.lines) {
-          if (!line.bundle_group) continue;
-          const group = line.bundle_group;
-          if (seen.has(group)) continue;
-          seen.add(group);
-          const price = Number(
-            line.bundle_base_price ?? line.bundle_price ?? 0,
-          );
-          if (price >= bundleListPriceOf(current, group)) continue;
-          if (
-            overrideMatches(current, 'catalog.edit', {
-              line: line.key,
-              price,
-            })
-          )
-            continue;
-          priceApproval = { key: line.key, price };
-          break;
-        }
-      }
+      const catalogue = new Map<string, MasterRow>();
+      for (const product of await db.products.bulkGet(productIds))
+        if (product) catalogue.set(product.id, product);
+      const replaced = current.reissue
+        ? await db.sale_lines
+            .where('sale_id')
+            .equals(current.reissue.sale_id)
+            .toArray()
+        : [];
+      priceApproval =
+        belowCataloguePrices(current, catalogue, replaced).find(
+          (overrun) =>
+            !overrideMatches(current, 'catalog.edit', {
+              line: overrun.key,
+              price: overrun.price,
+            }),
+        ) ?? null;
     }
     const manualDiscount = manualDiscountBp(current, now);
     if (manualDiscount > 0 && !sellerCan('sale.discount')) {

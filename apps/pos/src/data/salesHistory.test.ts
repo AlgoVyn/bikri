@@ -248,6 +248,12 @@ describe('sales history (screens/10)', () => {
       withNotes?.lines.find((l) => l.line.name_snapshot === 'Earbuds')?.note,
     ).toBe('SN-123');
     expect(withNotes?.sale.note).toBe('Deliver after 6 pm');
+    // A whitespace-only line note is not a note (POS-L2).
+    await db.sale_lines.update(buds?.line.id ?? '', { serial: '   ' });
+    const blankNote = await billDetail(db, firstId);
+    expect(
+      blankNote?.lines.find((l) => l.line.name_snapshot === 'Earbuds')?.note,
+    ).toBe('');
 
     await db.sync_conflicts.put({
       id: 'conflict-1',

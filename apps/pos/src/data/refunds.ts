@@ -187,6 +187,9 @@ export async function computeRefund(
     if (group.some((line) => (requested.get(line.id)?.qtyMilli ?? 0) <= 0))
       throw new RefundNotAllowedError('bundle');
     let bundles = 0;
+    // `restock` is per refund line, but a bundle group is one return: every component
+    // must restock or none may (Worker checks/refunds.ts, POS-L1).
+    let restock: boolean | null = null;
     for (const line of group) {
       const request = requested.get(line.id);
       const perBundle = n(line.bundle_component_qty_milli);
@@ -201,6 +204,10 @@ export async function computeRefund(
       if (k <= 0) throw new RefundNotAllowedError('bundle');
       if (bundles === 0) bundles = k;
       else if (k !== bundles) throw new RefundNotAllowedError('bundle');
+      const restockValue = request?.restock !== false;
+      if (restock === null) restock = restockValue;
+      else if (restockValue !== restock)
+        throw new RefundNotAllowedError('bundle');
     }
   }
   const planLines: RefundPlanLine[] = [];

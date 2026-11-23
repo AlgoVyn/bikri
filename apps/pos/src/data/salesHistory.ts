@@ -843,7 +843,7 @@ export async function billDetail(
         product: product && !product.deleted_at ? product : null,
         bundleProduct:
           bundleProduct && !bundleProduct.deleted_at ? bundleProduct : null,
-        note: line.serial ? String(line.serial) : '',
+        note: String(line.serial ?? '').trim(),
       };
     }),
     refunds: refunds.map((refund) => ({

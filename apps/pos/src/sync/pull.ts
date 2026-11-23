@@ -18,6 +18,7 @@ import {
 } from '../data/search.ts';
 import { clearSoldCache } from '../state/catalogue.ts';
 import { SyncHttpError, tillAuth, tillRequest } from './client.ts';
+import { withSyncLock } from './lock.ts';
 import { mergeRows, mergeScope, type ServerRow } from './merge.ts';
 import { applyStatus, type StatusPayload } from './status.ts';
 import { isLedgerTable, PULLED_TABLES } from './tables.ts';
@@ -38,20 +39,6 @@ type PullResponse = {
 
 export type Progress = (done: number, total: number) => void;
 
-/**
- * Serialises pull/snapshot/restore across tabs of the same shop. The lock name is
- * per-tenant so another shop in the same browser is unaffected.
- */
-async function withPullLock<T>(
-  db: BikriDb,
-  task: () => Promise<T>,
-): Promise<T> {
-  const locks = globalThis.navigator?.locks;
-  if (locks?.request)
-    return locks.request(`bikri-pull-${db.tenantId}`, task) as Promise<T>;
-  return task();
-}
-
 export type SnapshotState = {
   seq: number;
   tables: { tbl: string; rows: number }[];
@@ -65,7 +52,7 @@ export async function pullAll(
   db: BikriDb,
   onSnapshot?: Progress,
 ): Promise<number | null> {
-  return withPullLock(db, () => pullAllUnlocked(db, onSnapshot));
+  return withSyncLock(db, () => pullAllUnlocked(db, onSnapshot));
 }
 
 async function pullAllUnlocked(
@@ -380,7 +367,7 @@ export async function runSnapshot(
   db: BikriDb,
   onProgress?: Progress,
 ): Promise<void> {
-  return withPullLock(db, () => runSnapshotUnlocked(db, onProgress));
+  return withSyncLock(db, () => runSnapshotUnlocked(db, onProgress));
 }
 
 async function runSnapshotUnlocked(
@@ -841,7 +828,7 @@ export async function restoreRecovery(
   restoreEpoch: string,
   onProgress?: Progress,
 ): Promise<void> {
-  return withPullLock(db, () =>
+  return withSyncLock(db, () =>
     restoreRecoveryUnlocked(db, restorePointAt, restoreEpoch, onProgress),
   );
 }

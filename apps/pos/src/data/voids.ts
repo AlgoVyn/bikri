@@ -68,13 +68,16 @@ export function voidBlocker(
 ): VoidBlocker {
   if (detail.sale.status === 'void') return 'voided';
   if (detail.refunds.length > 0) return 'refunded';
-  if (!allowed && !override) return 'forbidden';
+  // An earlier-day void is an owner's action. Check it before the permission gate:
+  // a cashier without `sale.void` must be offered an owner approval, not a flat
+  // "forbidden" (POS-H3).
   if (
     role !== 'owner' &&
     !override &&
     String(detail.sale.business_date) !== today
   )
     return 'same_day';
+  if (!allowed && !override) return 'forbidden';
   return null;
 }
 
@@ -82,7 +85,12 @@ export function voidBlocker(
 export async function computeVoid(
   src: TableSource,
   saleId: string,
-  options: { staffId: string; override?: boolean; now?: number },
+  options: {
+    staffId: string;
+    /** The approver's staff id; `null`/omitted means no override. */
+    approvedBy?: string | null;
+    now?: number;
+  },
 ): Promise<VoidPlan> {
   const sale = await (src.table('sales') as Table<SyncedRow>).get(saleId);
   if (!sale) throw new VoidNotAllowedError('missing');
@@ -100,6 +108,7 @@ export async function computeVoid(
     options.staffId,
   );
   const role = (staff?.role ?? 'cashier') as Role;
+  const override = options.approvedBy != null;
   let allowed = role === 'owner' || role === 'manager';
   if (staff) {
     try {
@@ -112,16 +121,27 @@ export async function computeVoid(
       // Bad JSON falls back to the role default.
     }
   }
-  if (!allowed && !options.override) throw new VoidNotAllowedError('forbidden');
   const shop = await (src.table('shop') as Table<MasterRow>).get('shop');
   const timeZone = String(shop?.timezone ?? 'Asia/Karachi') || 'Asia/Karachi';
-  if (
-    role !== 'owner' &&
-    !options.override &&
+  const pastDay =
     String(sale.business_date) !==
-      businessDate(options.now ?? Date.now(), timeZone)
-  )
-    throw new VoidNotAllowedError('same_day');
+    businessDate(options.now ?? Date.now(), timeZone);
+  if (role !== 'owner' && pastDay) {
+    // A past-day bill needs an owner: the action's own `sale.void` grant is not
+    // enough, and only an owner's approval is accepted (the Worker rejects a
+    // manager's, API-H2). Report the button's code so the screen asks for one.
+    if (!override) throw new VoidNotAllowedError('same_day');
+    const approver = options.approvedBy
+      ? await (src.table('staff') as Table<MasterRow>).get(options.approvedBy)
+      : undefined;
+    if (!approver) throw new VoidNotAllowedError('forbidden');
+    if (approver.active !== 1 || approver.deleted_at)
+      throw new VoidNotAllowedError('forbidden');
+    if (String(approver.role) !== 'owner')
+      throw new VoidNotAllowedError('forbidden');
+  } else if (!allowed && !override) {
+    throw new VoidNotAllowedError('forbidden');
+  }
 
   const payments = (
     await (src.table('payments') as Table<SyncedRow>)
@@ -316,7 +336,7 @@ export async function voidSale(
     async (w) => {
       const plan = await computeVoid(w, input.saleId, {
         staffId: ctx.staff_id,
-        override: input.override != null,
+        approvedBy: input.override?.approved_by ?? null,
         now,
       });
       const shop = await (w.table('shop') as Table<MasterRow>).get('shop');

@@ -19,6 +19,7 @@ import { clearSearchCache } from '../data/search.ts';
 import { clearSoldCache } from '../state/catalogue.ts';
 import { jsonBytes, MAX_BATCH_OPS, nextTxBatch } from './chunk.ts';
 import { tillRequest } from './client.ts';
+import { syncLockName } from './lock.ts';
 import { applyStatus, type StatusPayload } from './status.ts';
 
 export { MAX_BATCH_BYTES, MAX_BATCH_OPS } from './chunk.ts';
@@ -125,7 +126,9 @@ async function releaseClaims(
 /**
  * Pushes every pending op. Throws SyncHttpError / OfflineError for the engine to handle.
  * A cross-tab lock stops two tills from claiming and sending dependent transactions
- * out of order; the server is still idempotent when a lock is unavailable.
+ * out of order; it is the same lock a pull/snapshot/restore takes (POS-M1), so a
+ * restore clear cannot run while this push has `sending` ops in flight. The server is
+ * still idempotent when a lock is unavailable.
  */
 export async function pushAll(
   db: BikriDb,
@@ -133,7 +136,7 @@ export async function pushAll(
 ): Promise<PushOutcome> {
   const locks = globalThis.navigator?.locks;
   if (locks?.request)
-    return locks.request(`bikri-push-${db.tenantId}`, () =>
+    return locks.request(syncLockName(db.tenantId), () =>
       pushAllUnlocked(db, maxRounds, true),
     ) as Promise<PushOutcome>;
   return pushAllUnlocked(db, maxRounds, false);
@@ -310,8 +313,11 @@ async function pushAllUnlocked(
             // with the row the server now has; for a delete or a field merge, keep the
             // shadow the newer op recorded when it was queued.
             if (r.result === 'applied' && entry.row) {
-              // Keep the server-managed columns (avg_cost, sales.status, …) from the
-              // current local row; the op payload intentionally omits them.
+              // Keep the server-managed columns (avg_cost, sales.status, …) and the
+              // fields this op never carried from the pre-edit shadow. Reading them
+              // from the live row would pick up a newer local transaction (for
+              // example a delivery's avg_cost) that the server has not accepted yet
+              // and make it the restore point (POS-H1).
               const local = (await db.table(entry.tbl).get(entry.row_id)) as
                 | Record<string, unknown>
                 | undefined;
@@ -331,10 +337,10 @@ async function pushAllUnlocked(
                   id: entry.row_id,
                   source: 'local',
                   row: {
-                    ...(local ?? {}),
+                    ...(existing?.row ?? local ?? {}),
                     ...entry.row,
                     id: entry.row_id,
-                    rev: r.server_rev ?? local?.rev ?? 0,
+                    rev: r.server_rev ?? existing?.row.rev ?? local?.rev ?? 0,
                   },
                 });
             }
@@ -364,7 +370,8 @@ async function pushAllUnlocked(
           // Only a plain applied result proves the local row equals the server row.
           // A field merge keeps fields from the other device; adopting its revision
           // here would let the next edit overwrite that device's field with our stale
-          // copy. Keep the old base revision until the merged row is pulled.
+          // copy. Keep the old base revision until the merged row is pulled. This is
+          // deliberate: do not update `rev` on `conflict_merged` (POS-H1).
           if (
             r.result === 'applied' &&
             typeof r.server_rev === 'number' &&
@@ -572,7 +579,14 @@ export async function discardFailed(
           const current = await db.table(e.tbl).get(e.row_id);
           const shadowRev = Number(shadow.row.rev ?? 0);
           const currentRev = Number(current?.rev ?? 0);
-          if (shadow.source === 'server' || shadowRev >= currentRev) {
+          if (shadow.source === 'local' && shadowRev === 0) {
+            // The restore point is this till's own never-synced create (trace B): the
+            // row has no server copy to restore. Discard it instead of putting the
+            // phantom row back with no outbox op. A create that may exist on the
+            // server (a lost response) still has its op in the outbox, and then
+            // `hasOther` above keeps this branch from running.
+            await db.table(e.tbl).delete(e.row_id);
+          } else if (shadow.source === 'server' || shadowRev >= currentRev) {
             await db.table(e.tbl).put(shadow.row);
           }
           // A shadow older than the live server row is a stale restore point; keep

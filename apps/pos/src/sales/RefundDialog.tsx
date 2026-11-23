@@ -1,4 +1,10 @@
-import { businessDate, isQtyUnit, newId } from '@bikri/core';
+import {
+  businessDate,
+  formatQtyFromMilli,
+  isQtyUnit,
+  newId,
+} from '@bikri/core';
+import type { SyncedRow } from '@bikri/db';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
@@ -41,6 +47,73 @@ import {
 
 type Choice = { saleLineId: string; qtyMilli: number; restock: boolean };
 
+type SelectableLine = { line: SyncedRow; keptMilli: number };
+
+/**
+ * The refund lines a set of checked rows and draft quantities describes (UI-H3).
+ * Checked state is separate from the draft: clearing or backspacing a `QtyInput`
+ * empties that row's draft (`null`) without unchecking it or unmounting the input.
+ */
+export function pickRefundChoices(
+  lines: readonly SelectableLine[],
+  mode: 'whole' | 'items',
+  checked: Readonly<Record<string, boolean>>,
+  drafts: Readonly<Record<string, number | null>>,
+  restock: Readonly<Record<string, boolean>>,
+): Choice[] {
+  const out: Choice[] = [];
+  const seenGroups = new Set<string>();
+  for (const { line, keptMilli } of lines) {
+    const group = line.bundle_group ? String(line.bundle_group) : null;
+    if (group !== null) {
+      if (seenGroups.has(group)) continue;
+      seenGroups.add(group);
+      const groupLines = lines.filter(
+        (row) => String(row.line.bundle_group ?? '') === group,
+      );
+      const remaining = Math.min(
+        ...groupLines.map(({ line: row, keptMilli: kept }) => {
+          const perBundle = Number(row.bundle_component_qty_milli ?? 0);
+          return perBundle > 0 ? Math.floor(kept / perBundle) : 0;
+        }),
+      );
+      if (mode === 'items' && checked[group] !== true) continue;
+      const k =
+        mode === 'whole'
+          ? remaining
+          : Math.min(
+              Math.max(0, Math.floor((drafts[group] ?? 0) / 1000)),
+              remaining,
+            );
+      if (k <= 0) continue;
+      for (const { line: row } of groupLines) {
+        const perBundle = Number(row.bundle_component_qty_milli ?? 0);
+        if (perBundle <= 0) continue;
+        out.push({
+          saleLineId: String(row.id),
+          qtyMilli: perBundle * k,
+          restock: restock[group] !== false,
+        });
+      }
+      continue;
+    }
+    const requested =
+      mode === 'whole'
+        ? keptMilli
+        : checked[line.id] === true
+          ? (drafts[line.id] ?? 0)
+          : 0;
+    const amount = Math.min(Math.max(0, requested), keptMilli);
+    if (amount > 0)
+      out.push({
+        saleLineId: String(line.id),
+        qtyMilli: amount,
+        restock: restock[line.id] !== false,
+      });
+  }
+  return out;
+}
+
 /** Refund modal (screens/11), route `/sales/:id/refund`. */
 export function RefundDialog({
   saleId,
@@ -58,8 +131,8 @@ export function RefundDialog({
   const { staff, can, role, support, branchId } = useCurrentStaff();
   const readOnly = useReadOnly();
   const [mode, setMode] = useState<'whole' | 'items'>('whole');
-  const [qty, setQty] = useState<Record<string, number>>({});
-  const [bundleChoice, setBundleChoice] = useState<Record<string, number>>({});
+  const [checked, setChecked] = useState<Record<string, boolean>>({});
+  const [qty, setQty] = useState<Record<string, number | null>>({});
   const [restock, setRestock] = useState<Record<string, boolean>>({});
   const [method, setMethod] = useState<'cash' | 'card' | 'bank_wallet'>('cash');
   const [reasonKey, setReasonKey] = useState<ReasonKey | ''>('');
@@ -91,8 +164,8 @@ export function RefundDialog({
     setDone(null);
     setReasonKey('');
     setReasonText('');
+    setChecked({});
     setQty({});
-    setBundleChoice({});
     setRestock({});
     savingRef.current = false;
     modeInitialized.current = false;
@@ -108,51 +181,13 @@ export function RefundDialog({
     setMode(groups.size > 1 ? 'items' : 'whole');
   }, [detail, done]);
 
-  const chosen: Choice[] = useMemo(() => {
-    if (!detail) return [];
-    const out: Choice[] = [];
-    const seenBundle = new Set<string>();
-    for (const { line, keptMilli } of detail.lines) {
-      if (line.bundle_group) {
-        const group = String(line.bundle_group);
-        if (seenBundle.has(group)) continue;
-        seenBundle.add(group);
-        const groupLines = detail.lines.filter(
-          (row) => row.line.bundle_group === group,
-        );
-        const remaining = Math.min(
-          ...groupLines.map(({ line: row, keptMilli: kept }) => {
-            const perBundle = Number(row.bundle_component_qty_milli ?? 0);
-            return perBundle > 0 ? Math.floor(kept / perBundle) : 0;
-          }),
-        );
-        const k =
-          mode === 'whole'
-            ? remaining
-            : Math.min(Math.max(0, bundleChoice[group] ?? 0), remaining);
-        if (k <= 0) continue;
-        for (const { line: row } of groupLines) {
-          const perBundle = Number(row.bundle_component_qty_milli ?? 0);
-          if (perBundle <= 0) continue;
-          out.push({
-            saleLineId: row.id,
-            qtyMilli: perBundle * k,
-            restock: restock[group] !== false,
-          });
-        }
-        continue;
-      }
-      const requested = mode === 'whole' ? keptMilli : (qty[line.id] ?? 0);
-      const amount = Math.min(Math.max(0, requested), keptMilli);
-      if (amount > 0)
-        out.push({
-          saleLineId: line.id,
-          qtyMilli: amount,
-          restock: restock[line.id] !== false,
-        });
-    }
-    return out;
-  }, [detail, mode, qty, bundleChoice, restock]);
+  const chosen: Choice[] = useMemo(
+    () =>
+      detail
+        ? pickRefundChoices(detail.lines, mode, checked, qty, restock)
+        : [],
+    [detail, mode, checked, qty, restock],
+  );
   const blocks = useMemo(() => {
     if (!detail) return [];
     const rows: Array<{
@@ -440,10 +475,7 @@ export function RefundDialog({
             if (block.kind === 'bundle') {
               const soldBundles = Number(first.line.bundle_qty ?? 0);
               const already = Math.max(0, soldBundles - block.remaining);
-              const k = Math.min(
-                Math.max(0, bundleChoice[block.key] ?? 0),
-                block.remaining,
-              );
+              const isChecked = checked[block.key] === true;
               return (
                 <li
                   key={block.key}
@@ -452,19 +484,24 @@ export function RefundDialog({
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
                     {mode === 'items' ? (
-                      <label className="flex items-center gap-2">
+                      <label className="flex min-h-11 items-center gap-2">
                         <input
                           type="checkbox"
-                          checked={k > 0}
+                          checked={isChecked}
                           disabled={block.remaining <= 0}
-                          onChange={(e) =>
-                            setBundleChoice((current) => ({
+                          onChange={(e) => {
+                            const next = e.target.checked;
+                            setChecked((current) => ({
                               ...current,
-                              [block.key]: e.target.checked
-                                ? Math.max(1, block.remaining)
+                              [block.key]: next,
+                            }));
+                            setQty((current) => ({
+                              ...current,
+                              [block.key]: next
+                                ? Math.max(1, block.remaining) * 1000
                                 : 0,
-                            }))
-                          }
+                            }));
+                          }}
                         />
                         <span className="font-medium">
                           {String(first.line.bundle_name ?? '')}
@@ -496,21 +533,24 @@ export function RefundDialog({
                         : ''}
                     </span>
                   </div>
-                  {mode === 'items' && selected ? (
+                  {mode === 'items' && isChecked ? (
                     <div className="flex flex-col gap-2">
                       <div className="flex flex-wrap items-end gap-2">
                         <div className="w-36">
                           <QtyInput
                             label={t('office.refund.bundle_qty')}
                             unit="pc"
-                            value={k * 1000}
+                            value={qty[block.key] ?? null}
                             onChange={(milli) =>
-                              setBundleChoice((current) => ({
+                              setQty((current) => ({
                                 ...current,
-                                [block.key]: Math.min(
-                                  Math.max(0, Math.round((milli ?? 0) / 1000)),
-                                  block.remaining,
-                                ),
+                                [block.key]:
+                                  milli === null
+                                    ? null
+                                    : Math.min(
+                                        Math.max(0, milli),
+                                        block.remaining * 1000,
+                                      ),
                               }))
                             }
                           />
@@ -567,15 +607,12 @@ export function RefundDialog({
                   <p className="text-small text-text-muted">
                     {t('office.refund.bundle_includes')}{' '}
                     {block.lines
-                      .map(({ line }) => {
+                      .map(({ line, unit }) => {
                         const per = Number(
                           line.bundle_component_qty_milli ?? 0,
                         );
-                        return `${String(line.name_snapshot)} × ${
-                          per % 1000 === 0
-                            ? per / 1000
-                            : (per / 1000).toFixed(3)
-                        }`;
+                        const componentUnit = isQtyUnit(unit) ? unit : 'pc';
+                        return `${String(line.name_snapshot)} × ${formatQtyFromMilli(per, componentUnit)}`;
                       })
                       .join(' · ')}
                   </p>
@@ -587,6 +624,10 @@ export function RefundDialog({
             }
             const { line, refundedMilli, keptMilli, unit } = first;
             const qtyUnit = isQtyUnit(unit) ? unit : 'pc';
+            const isChecked = checked[line.id] === true;
+            // Whole mode selects every remaining line; items mode only the checked
+            // rows, whose draft may be empty while the cashier retypes it.
+            const open = mode === 'whole' ? selected : isChecked;
             return (
               <li
                 key={line.id}
@@ -594,17 +635,22 @@ export function RefundDialog({
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   {mode === 'items' ? (
-                    <label className="flex items-center gap-2">
+                    <label className="flex min-h-11 items-center gap-2">
                       <input
                         type="checkbox"
-                        checked={selected}
+                        checked={isChecked}
                         disabled={keptMilli <= 0}
-                        onChange={(e) =>
+                        onChange={(e) => {
+                          const next = e.target.checked;
+                          setChecked((current) => ({
+                            ...current,
+                            [line.id]: next,
+                          }));
                           setQty((current) => ({
                             ...current,
-                            [line.id]: e.target.checked ? keptMilli : 0,
-                          }))
-                        }
+                            [line.id]: next ? keptMilli : 0,
+                          }));
+                        }}
                       />
                       <span className="font-medium">
                         {String(line.name_snapshot)}
@@ -618,46 +664,50 @@ export function RefundDialog({
                       </span>
                     </span>
                   )}
-                  <span className="text-small text-text-muted">
+                  <bdi className="text-small text-text-muted">
                     {t('office.refund.sold', {
-                      qty: `${Number(line.qty_milli) / 1000} ${t(`unit.${qtyUnit}`)}`,
-                    })}
+                      qty: formatQtyFromMilli(Number(line.qty_milli), qtyUnit),
+                    })}{' '}
+                    {t(`unit.${qtyUnit}`)}
                     {refundedMilli > 0
                       ? ` · ${t('office.refund.already', {
-                          qty: refundedMilli / 1000,
+                          qty: formatQtyFromMilli(refundedMilli, qtyUnit),
                         })}`
                       : ''}
-                  </span>
+                  </bdi>
                 </div>
-                {selected ? (
+                {open ? (
                   <div className="flex flex-wrap items-end gap-2">
                     {mode === 'items' ? (
                       <div className="w-36">
                         <QtyInput
                           label={t('office.refund.qty')}
                           unit={qtyUnit}
-                          value={qty[line.id] ?? 0}
+                          value={qty[line.id] ?? null}
                           onChange={(milli) =>
                             setQty((current) => ({
                               ...current,
-                              [line.id]: Math.min(
-                                Math.max(0, milli ?? 0),
-                                keptMilli,
-                              ),
+                              [line.id]:
+                                milli === null
+                                  ? null
+                                  : Math.min(Math.max(0, milli), keptMilli),
                             }))
                           }
                         />
                       </div>
                     ) : (
                       <p className="text-small text-text-muted">
-                        {t('office.refund.qty')}: {keptMilli / 1000}{' '}
+                        {t('office.refund.qty')}:{' '}
+                        <bdi dir="ltr">
+                          {formatQtyFromMilli(keptMilli, qtyUnit)}
+                        </bdi>{' '}
                         {t(`unit.${qtyUnit}`)}
                       </p>
                     )}
                     <p className="ms-auto text-end">
                       <MoneyText paisa={amount} />
                     </p>
-                    <label className="flex items-center gap-1 text-small">
+                    <label className="flex min-h-11 items-center gap-1 text-small">
                       <input
                         type="checkbox"
                         checked={restock[line.id] !== false}
