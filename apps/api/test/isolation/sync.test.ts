@@ -239,7 +239,11 @@ describe('sync isolation', () => {
       .run();
 
     // Each builder returns the ops and the row id whose B-side insert must not exist.
-    const payment = (saleId: string) => {
+    type RefCase = {
+      check: readonly [string, string];
+      ops: ReturnType<typeof op>[];
+    };
+    const payment = (saleId: string): RefCase => {
       const id = newId();
       return {
         check: ['payments', id] as const,
@@ -260,7 +264,7 @@ describe('sync isolation', () => {
         ],
       };
     };
-    const move = (staffId: string) => {
+    const move = (staffId: string): RefCase => {
       const id = newId();
       return {
         check: ['stock_movements', id] as const,
@@ -282,7 +286,7 @@ describe('sync isolation', () => {
         ],
       };
     };
-    const ledger = (supplierId: string) => {
+    const ledger = (supplierId: string): RefCase => {
       const id = newId();
       return {
         check: ['ledger_entries', id] as const,
@@ -303,7 +307,7 @@ describe('sync isolation', () => {
         ],
       };
     };
-    const supplierReturn = (purchaseLineId: string) => {
+    const supplierReturn = (purchaseLineId: string): RefCase => {
       const returnId = newId();
       return {
         check: ['supplier_returns', returnId] as const,
@@ -352,8 +356,8 @@ describe('sync isolation', () => {
 
     const cases: Array<{
       label: string;
-      aOnly: ReturnType<typeof payment>;
-      unknown: ReturnType<typeof payment>;
+      aOnly: RefCase;
+      unknown: RefCase;
     }> = [
       {
         label: 'sale',
