@@ -558,8 +558,11 @@ func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 	if err != nil {
 		return &Error{Code: "SPOOL_ERROR", Message: "invalid PNG: " + err.Error()}
 	}
+	// Composite over white: draw.Src kept transparent pixels at (0,0,0,0), so a
+	// logo or QR with an alpha channel printed a black box.
 	rgba := image.NewRGBA(img.Bounds())
-	draw.Draw(rgba, rgba.Bounds(), img, img.Bounds().Min, draw.Src)
+	draw.Draw(rgba, rgba.Bounds(), image.White, image.Point{}, draw.Src)
+	draw.Draw(rgba, rgba.Bounds(), img, img.Bounds().Min, draw.Over)
 	width := rgba.Bounds().Dx()
 	height := rgba.Bounds().Dy()
 	// StretchDIBits reads 32-bit BGRA. Swap R and B in place and pass a top-down
@@ -623,20 +626,15 @@ func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 	if vertRes > 0 && vertRes < pageHeight {
 		pageHeight = vertRes
 	}
+	bands := gdiBands(height, destHeight, pageHeight)
+	if len(bands) == 0 {
+		return &Error{Code: "SPOOL_ERROR", Message: "the image has no printable rows"}
+	}
 	for i := 0; i < max(1, job.Copies); i++ {
-		for top := 0; top < destHeight; top += pageHeight {
+		for _, band := range bands {
 			if err := ctx.Err(); err != nil {
 				abort()
 				return &Error{Code: "SPOOL_ERROR", Message: err.Error()}
-			}
-			bandDestHeight := min(pageHeight, destHeight-top)
-			srcTop := top * height / destHeight
-			srcHeight := bandDestHeight * height / destHeight
-			if srcHeight < 1 {
-				srcHeight = 1
-			}
-			if srcTop+srcHeight > height {
-				srcHeight = height - srcTop
 			}
 			r1, _, callErr = procStartPage.Call(hdc)
 			if !gdiSucceeded(r1) {
@@ -648,25 +646,31 @@ func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 			_, _, _ = procSetStretchBltMode.Call(hdc, gdiHalftone)
 			// HALFTONE uses the brush origin; reset it so the first band is not offset.
 			_, _, _ = procSetBrushOrgEx.Call(hdc, 0, 0, 0)
+			// Slice the top-down BGRA buffer per band and describe just that band
+			// as a top-down DIB. GDI measures ySrc from the bottom of the DIB even
+			// for a negative biHeight when the blit stretches or crops, so passing
+			// a source offset reversed the page order and the double truncation
+			// dropped seam rows. A per-band DIB always starts at ySrc = 0.
+			bandBits := bits[band.SrcTop*width*4 : (band.SrcTop+band.SrcHeight)*width*4]
 			bmi := bitmapInfoHeader{
 				biSize:        uint32(unsafe.Sizeof(bitmapInfoHeader{})),
 				biWidth:       int32(width),
-				biHeight:      -int32(height),
+				biHeight:      -int32(band.SrcHeight),
 				biPlanes:      1,
 				biBitCount:    32,
 				biCompression: 0, // BI_RGB
-				biSizeImage:   uint32(len(bits)),
+				biSizeImage:   uint32(len(bandBits)),
 			}
 			r1, _, callErr = procStretchDIBits.Call(
 				hdc,
-				0, 0, uintptr(destWidth), uintptr(bandDestHeight),
-				0, uintptr(srcTop), uintptr(width), uintptr(srcHeight),
-				uintptr(unsafe.Pointer(&bits[0])),
+				0, 0, uintptr(destWidth), uintptr(band.DestHeight),
+				0, 0, uintptr(width), uintptr(band.SrcHeight),
+				uintptr(unsafe.Pointer(&bandBits[0])),
 				uintptr(unsafe.Pointer(&bmi)),
 				0,          // DIB_RGB_COLORS
 				0x00CC0020, // SRCCOPY
 			)
-			runtime.KeepAlive(bits)
+			runtime.KeepAlive(bandBits)
 			runtime.KeepAlive(bmi)
 			if !gdiSucceeded(r1) {
 				abort()

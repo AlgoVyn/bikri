@@ -40,7 +40,10 @@ func NewAuth(cfg *Config) *Auth {
 	return a
 }
 
-// PairingCode returns the current code while the agent is unpaired.
+// PairingCode returns the current code while the agent is unpaired. A code that
+// has used all of its attempts is not returned until its window expires: keep
+// showing it would invite another five guesses and let every /v1/health poll
+// reset the lockout clock.
 func (a *Auth) PairingCode() string {
 	a.mu.Lock()
 	defer a.mu.Unlock()
@@ -49,6 +52,9 @@ func (a *Auth) PairingCode() string {
 	}
 	if a.code == "" || a.now().After(a.expires) {
 		a.rotateLocked()
+	}
+	if a.attempts >= pairingAttempts {
+		return ""
 	}
 	return a.code
 }

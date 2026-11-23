@@ -7,6 +7,7 @@ import (
 	"encoding/hex"
 	"encoding/json"
 	"errors"
+	"fmt"
 	"os"
 	"path/filepath"
 	"time"
@@ -101,12 +102,20 @@ func LoadConfig(path string) (*Config, error) {
 	if cfg.Port == 0 {
 		cfg.Port = DefaultPort
 	}
+	if cfg.Port < 1 || cfg.Port > 65535 {
+		return nil, fmt.Errorf("config: port %d is outside 1-65535", cfg.Port)
+	}
 	if len(cfg.Origins) == 0 {
 		cfg.Origins = DefaultConfig().Origins
 	}
 	cfg.Origins = sanitizeOrigins(cfg.Origins)
 	if cfg.AgentID == "" {
 		cfg.AgentID = randomID()
+	}
+	// A lost or hand-edited token hash cannot authenticate anyone. Never report
+	// the agent as paired (and hide the pairing code) without a stored hash.
+	if cfg.TokenHash == "" {
+		cfg.Paired = false
 	}
 	return &cfg, nil
 }

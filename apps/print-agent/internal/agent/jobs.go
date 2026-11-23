@@ -164,6 +164,15 @@ func (m *Manager) Submit(ctx context.Context, req *JobRequest) (*JobStatus, erro
 		return m.copy(rec), nil
 	}
 	defer unlock()
+	// A cancel may have landed while this job was validating or waiting for the
+	// printer. Do not spool a receipt the till already dropped; a cancel that
+	// lands after this point is handled by the post-print spool-id check below.
+	m.mu.Lock()
+	cancelled := rec.Status == "canceled"
+	m.mu.Unlock()
+	if cancelled {
+		return m.copy(rec), nil
+	}
 	copies := req.Copies
 	if copies < 1 {
 		copies = 1
@@ -185,20 +194,34 @@ func (m *Manager) Submit(ctx context.Context, req *JobRequest) (*JobStatus, erro
 	}
 	m.mu.Lock()
 	rec.spoolID = spoolID
-	if spoolID == "" {
-		// Driver-mode Windows and some CUPS queues finish synchronously and return
-		// no spool id. There is nothing to poll; reporting "spooled" made the till
-		// sleep 400 ms and then ask for a status that was already done. Do not
-		// overwrite a concurrent Cancel's terminal state.
-		if rec.Status == "received" {
+	// A Cancel that landed while backend.Print was in flight saw no spool id and
+	// could not stop the OS job. Now that the id exists, cancel it instead of
+	// printing a receipt the till has already dropped.
+	cancelSpool := spoolID != "" && rec.Status == "canceled"
+	// Never overwrite a terminal status: only a job still "received" may move to
+	// "spooled"/"done" once the backend returns.
+	if !cancelSpool && rec.Status == "received" {
+		if spoolID == "" {
 			rec.Status = "done"
+		} else {
+			rec.Status = "spooled"
 		}
-	} else if rec.Status == "received" {
-		rec.Status = "spooled"
 	}
 	rec.UpdatedAt = m.now().UnixMilli()
+	current := rec
+	if registered := m.jobs[req.JobID]; registered != nil {
+		current = registered
+	}
+	status := current.JobStatus
 	m.mu.Unlock()
-	return m.copy(rec), nil
+	if cancelSpool {
+		// The job record is already terminal; a failed OS cancel must not turn
+		// the client's successful cancel into an error.
+		cancelCtx, cancel := context.WithTimeout(context.WithoutCancel(ctx), 5*time.Second)
+		defer cancel()
+		_ = m.backend.Cancel(cancelCtx, req.Printer, spoolID)
+	}
+	return &status, nil
 }
 
 // Get refreshes and returns a job's status. Terminal jobs are not polled again.
@@ -225,7 +248,10 @@ func (m *Manager) Get(ctx context.Context, id string) (*JobStatus, bool) {
 	status, err := m.backend.Status(ctx, printer, spoolID)
 	if err != nil {
 		m.mu.Lock()
-		if rec := m.jobs[id]; rec != nil {
+		// A retry may have replaced the record while the spooler was polled, and
+		// a cancel may have made this attempt terminal. Neither may receive the
+		// stale poll's error detail.
+		if current := m.jobs[id]; current == rec && !isTerminal(rec.Status) {
 			rec.Detail = err.Error()
 			rec.UpdatedAt = m.now().UnixMilli()
 		}
@@ -234,8 +260,9 @@ func (m *Manager) Get(ctx context.Context, id string) (*JobStatus, bool) {
 	}
 	m.mu.Lock()
 	// A cancel that landed while the spooler was polled is terminal: do not
-	// overwrite "canceled" with a spooler snapshot ("printing"/"done").
-	if rec := m.jobs[id]; rec != nil && !isTerminal(rec.Status) {
+	// overwrite "canceled" with a spooler snapshot ("printing"/"done"). The
+	// pointer check also keeps a retry's new attempt untouched.
+	if current := m.jobs[id]; current == rec && !isTerminal(rec.Status) {
 		rec.Status = status.State
 		rec.Error = status.Error
 		rec.Detail = status.Detail
@@ -257,7 +284,9 @@ func (m *Manager) GetNoPoll(id string) (*JobStatus, bool) {
 	return &copy, true
 }
 
-// Cancel asks the OS to cancel a job and records the result.
+// Cancel asks the OS to cancel a job and records the result. A job that the
+// backend has not spooled yet is marked canceled immediately; Submit cancels the
+// OS job as soon as Print returns its spool id.
 func (m *Manager) Cancel(ctx context.Context, id string) (*JobStatus, bool, error) {
 	m.mu.Lock()
 	rec := m.jobs[id]
@@ -265,25 +294,35 @@ func (m *Manager) Cancel(ctx context.Context, id string) (*JobStatus, bool, erro
 		m.mu.Unlock()
 		return nil, false, nil
 	}
-	printer, spoolID := rec.Printer, rec.spoolID
 	if isTerminal(rec.Status) {
 		copy := rec.JobStatus
 		m.mu.Unlock()
 		return &copy, true, nil
 	}
+	printer, spoolID := rec.Printer, rec.spoolID
 	m.mu.Unlock()
 
-	if err := m.backend.Cancel(ctx, printer, spoolID); err != nil {
-		return nil, true, err
+	if spoolID != "" {
+		if err := m.backend.Cancel(ctx, printer, spoolID); err != nil {
+			return nil, true, err
+		}
 	}
 	m.mu.Lock()
-	if current := m.jobs[id]; current != nil && !isTerminal(current.Status) {
-		current.Status = "canceled"
-		current.Error = ""
-		current.Detail = ""
-		current.UpdatedAt = m.now().UnixMilli()
+	// Only the attempt that was cancelled becomes terminal. A retry Submit may
+	// have replaced m.jobs[id] while backend.Cancel ran; marking the replacement
+	// canceled would report a job canceled while its spooled receipt still
+	// prints. The caller gets the record that is current now.
+	if current := m.jobs[id]; current == rec && !isTerminal(rec.Status) {
+		rec.Status = "canceled"
+		rec.Error = ""
+		rec.Detail = ""
+		rec.UpdatedAt = m.now().UnixMilli()
 	}
-	status := rec.JobStatus
+	current := m.jobs[id]
+	if current == nil {
+		current = rec
+	}
+	status := current.JobStatus
 	m.mu.Unlock()
 	return &status, true, nil
 }
@@ -310,9 +349,15 @@ func (m *Manager) Recent(limit int) []JobStatus {
 	return out
 }
 
+// update publishes a backend result on a job. It must not resurrect a terminal
+// job (a cancel that landed first wins) and must not write to a record that a
+// retry has already replaced.
 func (m *Manager) update(rec *jobRecord, status, code, detail string) {
 	m.mu.Lock()
 	defer m.mu.Unlock()
+	if isTerminal(rec.Status) || m.jobs[rec.JobID] != rec {
+		return
+	}
 	rec.Status = status
 	rec.Error = code
 	rec.Detail = detail

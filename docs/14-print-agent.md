@@ -122,6 +122,7 @@ Bikri renders the receipt to a PNG at the **full paper/head dot width** (576 dot
 **Windows**
 
 - GDI: `CreateDC("WINSPOOL", printerName, …)` → `StartDoc` → `StartPage` → `StretchDIBits`/`SetDIBitsToDevice` → `EndPage` → `EndDoc` → `DeleteDC`.
+- A receipt taller than the driver's `VERTRES` is paginated. GDI measures `ySrc` upward from the bottom of a DIB even when `biHeight` is negative, so a source offset on one full-size top-down DIB printed the last page first; and two independent integer divisions dropped scanlines at the seams. The agent instead slices the top-down BGRA buffer into contiguous page-high bands, gives each band its own top-down DIB (`biHeight = -srcHeight`, `biSizeImage = len(bandBits)`) and draws it with `ySrc = 0`, so every source row is printed exactly once in top-to-bottom order. The band math is pure and unit-tested on every OS.
 - The drawing surface is `MM_TEXT` (device pixels), so the agent reads `LOGPIXELSX`/`LOGPIXELSY`/`HORZRES` with `GetDeviceCaps`, scales the image to the physical `paperMm` width (never past `HORZRES`), keeps the aspect ratio and uses `HALFTONE` stretching. A 1:1 576-dot image on a 600 dpi driver would otherwise print as a ~24 mm strip.
 - Use a per-job custom page size (height from the image) where the driver supports it; otherwise use the queue's configured receipt media and let the driver feed/cut.
 - The agent can read the queue's supported media via `DeviceCapabilities`/`DEVMODE` and apply `dmPaperSize`/`dmPaperWidth`/`dmPaperLength` and margins **per job** (or via a `PrintTicket` on the XPS path). It must not silently change the machine-wide default; that is an explicit "save as default" action.
@@ -208,6 +209,7 @@ Base URL: `http://127.0.0.1:17890/v1`. JSON is UTF-8; binary payloads are base64
 
 States: `received → queued → spooled → printing → done | failed | canceled`.
 
+- Cancelling a job while the backend is still spooling marks it `canceled` (the backend cannot be cancelled yet because no spool id exists). When `Print` returns the spool id, the agent cancels that OS job immediately, so a receipt the till dropped is not printed. A cancel never overwrites a retry attempt that replaced the job record, and a status poll or backend error never resurrects a terminal state.
 - Windows: poll `GetJob`/`EnumJobs` and map `JOB_STATUS_PRINTED`, `JOB_STATUS_ERROR`, `JOB_STATUS_OFFLINE`, `JOB_STATUS_PAPEROUT`, `JOB_STATUS_USER_INTERVENTION`.
 - CUPS: parse `lpstat -W not-completed`; a job that is no longer in that list is treated as done (a failed job stays active with a reason). Polling `-W completed` was removed because its answer was ignored.
 - Direct TCP: `done` after the write; `failed` on a socket error; no physical confirmation.
@@ -237,14 +239,14 @@ States: `received → queued → spooled → printing → done | failed | cancel
 
 - **Bind to `127.0.0.1:17890` only.** No `0.0.0.0`, no firewall rule, no mDNS advertisement.
 - **Origin allowlist:** `https://algovyn.com` in production. The local page is same-origin with its request `Host`. Development origins are never written to a production config: pass `--allow-origin http://localhost:5173` for one run. Echo only an allowed Origin; `Vary: Origin`.
-- **CORS:** allow `Authorization`, `Content-Type`, `Idempotency-Key`; methods `GET, POST, DELETE, OPTIONS`; `Access-Control-Allow-Private-Network: true` for the Private Network Access preflight.
+- **CORS:** emitted only on `/v1/` responses. Allow `Authorization`, `Content-Type`, `Idempotency-Key`; methods `GET, POST, DELETE, OPTIONS`; `Access-Control-Allow-Private-Network: true` for the Private Network Access preflight. The local page (`/` and `/ui/unpair`) is not a CORS resource: it never emits `Access-Control-Allow-Origin` and rejects any non-empty `Origin` that is not its own loopback origin, so a script on `https://algovyn.com` cannot read the CSRF nonce, printer list or log path.
 - **Host check:** accept only `127.0.0.1:<listener port>` and `localhost:<listener port>` (the process's actual bound port); reject any other host or port (DNS rebinding).
 - **Pairing:** 6-digit code, 2-minute TTL, 5 attempts, constant-time compare. On success return a 32-byte random token (base64url); store only its SHA-256 hash. Rotate on unpair.
 - **Bearer only:** `Authorization: Bearer <token>`; no cookies, no token in URLs.
 - **Rate limits:** pairing 5/min/IP, jobs 60/min/token, diagnostics 10/min.
 - **Limits:** 5 MiB body, 30 s job timeout, 100 queued jobs, 1 concurrent job per printer, 24 h idempotency window.
 - **No receipt contents in logs.** Log job id, printer, mode, byte count, duration, status and error code only. Rotate `agent.log` at 5 MB while running, keeping one previous file; `crash.log` is capped separately.
-- **Local UI:** serves an embedded page with no external scripts, strict CSP, pairing code only while unpaired. The unpair form carries a per-process CSRF nonce and accepts only a same-origin POST from the loopback page; `Origin`, `Sec-Fetch-Site` and the nonce are checked before the token is revoked. It is reachable only on loopback; any local process on the same account could read it, which is accepted for a single-user till (see open questions). `/v1/health` returns the same short-lived code to an allowed Origin while unpaired so Bikri can pair without opening the page; it is not returned after pairing.
+- **Local UI:** serves an embedded page with no external scripts, strict CSP (`default-src 'none'; style-src 'unsafe-inline'; form-action 'self'; base-uri 'none'; frame-ancestors 'none'`), pairing code only while unpaired. The unpair form carries a per-process CSRF nonce and accepts only a same-origin POST from the loopback page; `Origin`, `Sec-Fetch-Site` and the nonce are checked before the token is revoked. It is reachable only on loopback; any local process on the same account could read it, which is accepted for a single-user till (see open questions). `/v1/health` returns the same short-lived code to an allowed Origin while unpaired so Bikri can pair without opening the page; it is not returned after pairing, and a code whose five attempts are exhausted is hidden until its window expires.
 
 ### Browser constraints to validate in Phase 0
 
@@ -269,6 +271,7 @@ States: `received → queued → spooled → printing → done | failed | cancel
 - Raw: `lp -d <queue> -o raw -t "Bikri <jobId>" <tempfile>`; parse the request id.
 - Image: `lp -d <queue> -o media=Custom.<w>x<h>mm <png>`.
 - Status: `lpstat -W not-completed -o <queue>`; no longer active ⇒ done (or IPP `Get-Job-Attributes`).
+- Cancel: `cancel <queue>-<job id>`. CUPS has no `--` end-of-options marker (`cancel -- …` fails with `unknown option "-"`), so the agent validates the id against `^[A-Za-z0-9._][A-Za-z0-9._-]*-[0-9]+$` and passes it directly; the first character can never be a hyphen.
 - No root, no udev rules; the user must be permitted to print (CUPS policy / `lp` group).
 - systemd user unit for autostart; `.deb`/`.rpm`/tarball. A system service is optional for kiosk tills.
 - SELinux/AppArmor: the agent only executes `lp`/`lpstat`/`lpoptions` and writes temp files; document any confinement exceptions.
@@ -396,11 +399,11 @@ No changes to `apps/api`, D1, sync, auth or tenancy. The agent is per-till infra
 
 ## 12. Operations
 
-- **Config:** `%APPDATA%\bikri-print-agent\config.json` (per-user Windows; `os.UserConfigDir()` = `%APPDATA%`), `~/.config/bikri-print-agent/config.json` (Linux), `~/Library/Application Support/bikri-print-agent/config.json` (macOS). Token stored as a hash; file permissions restricted. Development origins passed with `--allow-origin` exist only for that run and are never written.
+- **Config:** `%APPDATA%\bikri-print-agent\config.json` (per-user Windows; `os.UserConfigDir()` = `%APPDATA%`), `~/.config/bikri-print-agent/config.json` (Linux), `~/Library/Application Support/bikri-print-agent/config.json` (macOS). Token stored as a hash; file permissions restricted. Development origins passed with `--allow-origin` exist only for that run and are never written. `port` must be 1–65535; a hand-edited value fails startup instead of binding an ephemeral or invalid port. A config with `paired: true` and no `tokenHash` loads as unpaired, so the page offers a new pairing code instead of locking the till out. The log is opened before the config is loaded and every startup failure (unreadable/corrupt config, invalid or busy port, backend init) is written to it, so a Windows GUI build with no stderr cannot exit silently.
 - **Logs:** Windows `%LOCALAPPDATA%\Bikri\PrintAgent\logs\agent.log` (plus `crash.log` for fatal panics, appended across restarts), Linux `~/.local/state/bikri-print-agent/logs/agent.log`, macOS `~/Library/Logs/BikriPrintAgent/agent.log`; JSON lines, rotated at 5 MB while running with one previous file; no receipt payloads. Logs go to the rotating file even when the process has no usable stderr (Windows GUI builds) or a log write fails.
 - **Health:** `/health` and `/diagnostics` (token required). Bikri's "Copy printer info" combines agent version, platform, queues and last error.
 - **Update:** signed `latest.json` with version, SHA-256 and minimum protocol; v1 notifies and links to the installer; auto-update only after signature verification is implemented.
-- **Uninstall:** removes the app, autostart, shortcuts, logs and the per-user config; leaves OS queues and drivers untouched.
+- **Uninstall:** removes the app, autostart, shortcuts, logs and the per-user config (`%APPDATA%\bikri-print-agent`, `~/.config/bikri-print-agent` with its state under `~/.local/state/bikri-print-agent`, `~/Library/Application Support/bikri-print-agent`), so a reinstall starts unpaired rather than "already paired" with a token the till no longer has; leaves OS queues and drivers untouched.
 - **Support bundle:** metadata only; explicitly excludes receipt data, tokens and customer information.
 
 ## 13. Testing
@@ -487,13 +490,13 @@ These are recorded as D-195 (and follow-ups) in [decisions](decisions.md).
 Implemented in this repository (Phase 1):
 
 - **Go agent** in `apps/print-agent`:
-  - loopback HTTP API, pairing, bearer-token auth, rate limits, CORS/PNA headers, Host/Origin checks;
-  - local status page with the pairing code and installed printers; `/v1/health` also returns the short-lived code while unpaired so the Bikri wizard can pair without opening the page;
-  - job manager with idempotency, status polling, cancellation and 24 h in-memory retention;
+  - loopback HTTP API, pairing, bearer-token auth, rate limits, CORS/PNA headers on `/v1` only, Host/Origin checks;
+  - local status page with the pairing code and installed printers; `/v1/health` also returns the short-lived code while unpaired so the Bikri wizard can pair without opening the page; the page itself never emits CORS and refuses any non-loopback Origin;
+  - job manager with idempotency, status polling, cancellation and 24 h in-memory retention; a cancel that lands while the backend is spooling cancels the OS job when its spool id appears, and terminal states are never overwritten by a poll, retry or backend error;
   - Windows spooler `RAW` printing, printer enumeration, `GetJob` status and cancel;
-  - Windows GDI image printing for compatibility mode;
-  - CUPS `lp`/`lpstat`/`cancel` backend for Linux and macOS;
-  - Go unit tests and cross-builds for Windows, Linux and macOS.
+  - Windows GDI image printing for compatibility mode, paginated as contiguous per-page DIB bands (correct page order, every source row once) with transparent PNGs composited over white;
+  - CUPS `lp`/`lpstat`/`cancel` backend for Linux and macOS; the cancel id is validated and passed without the unsupported `--` terminator;
+  - Go unit tests and cross-builds for Windows, Linux and macOS; the uninstallers remove the per-user config, and startup errors are logged before exit.
 - **Bikri PWA**:
   - `transport: 'agent'` in `PrinterKv` (local-only `kv`, no sync/D1 change);
   - raw ESC/POS and driver-PNG jobs, polling, idempotency via `print_jobs.id`;
@@ -524,7 +527,7 @@ GET /v1/health
 ```json
 {
   "app": "bikri-print-agent",
-  "version": "0.1.8",
+  "version": "0.1.9",
   "protocol": 1,
   "platform": "windows/amd64",
   "paired": true,

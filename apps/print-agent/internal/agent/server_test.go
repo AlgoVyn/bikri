@@ -222,6 +222,78 @@ func TestSecurityChecks(t *testing.T) {
 	}
 }
 
+// The local page shows the CSRF nonce, the OS printer list and the log path. It
+// is not an API resource: no Origin other than the loopback page itself may read
+// it, and no CORS header may be emitted for it (PRT-H3).
+func TestUINeverEmitsCORSAndRejectsCrossOrigin(t *testing.T) {
+	s, _ := testServer(t)
+	httpServer := httptest.NewServer(s.Handler())
+	defer httpServer.Close()
+
+	get := func(origin string) (*http.Response, []byte) {
+		t.Helper()
+		req, _ := http.NewRequest(http.MethodGet, httpServer.URL+"/", nil)
+		if origin != "" {
+			req.Header.Set("Origin", origin)
+		}
+		res, err := http.DefaultClient.Do(req)
+		if err != nil {
+			t.Fatal(err)
+		}
+		defer res.Body.Close()
+		body, _ := io.ReadAll(res.Body)
+		return res, body
+	}
+	for _, origin := range []string{"https://algovyn.com", "https://evil.example"} {
+		res, _ := get(origin)
+		if res.StatusCode != http.StatusForbidden {
+			t.Fatalf("GET / with Origin %q = %d, want 403", origin, res.StatusCode)
+		}
+		if got := res.Header.Get("Access-Control-Allow-Origin"); got != "" {
+			t.Fatalf("GET / with Origin %q leaked Access-Control-Allow-Origin %q", origin, got)
+		}
+		if got := res.Header.Get("Access-Control-Allow-Private-Network"); got != "" {
+			t.Fatalf("GET / with Origin %q leaked the private-network header %q", origin, got)
+		}
+	}
+
+	// The page on its own loopback origin still loads and never emits CORS.
+	res, body := get(httpServer.URL)
+	if res.StatusCode != http.StatusOK {
+		t.Fatalf("same-origin GET / = %d", res.StatusCode)
+	}
+	if got := res.Header.Get("Access-Control-Allow-Origin"); got != "" {
+		t.Fatalf("same-origin GET / emitted Access-Control-Allow-Origin %q", got)
+	}
+	if !strings.Contains(string(body), "Bikri Print Agent") {
+		t.Fatalf("unexpected UI: %s", body)
+	}
+	if csp := res.Header.Get("Content-Security-Policy"); !strings.Contains(csp, "form-action 'self'") {
+		t.Fatalf("UI CSP does not pin the form action: %q", csp)
+	}
+
+	// The API keeps its CORS contract.
+	req, _ := http.NewRequest(http.MethodGet, httpServer.URL+"/v1/health", nil)
+	req.Header.Set("Origin", "https://algovyn.com")
+	api, err := http.DefaultClient.Do(req)
+	if err != nil {
+		t.Fatal(err)
+	}
+	defer api.Body.Close()
+	if api.StatusCode != http.StatusOK {
+		t.Fatalf("GET /v1/health = %d", api.StatusCode)
+	}
+	if got := api.Header.Get("Access-Control-Allow-Origin"); got != "https://algovyn.com" {
+		t.Fatalf("API Access-Control-Allow-Origin = %q", got)
+	}
+	if got := api.Header.Get("Access-Control-Allow-Private-Network"); got != "true" {
+		t.Fatalf("API Access-Control-Allow-Private-Network = %q", got)
+	}
+	if got := api.Header.Get("Vary"); !strings.Contains(got, "Origin") {
+		t.Fatalf("API Vary = %q, want Origin", got)
+	}
+}
+
 func authGet(t *testing.T, url, token string) []byte {
 	t.Helper()
 	req, _ := http.NewRequest(http.MethodGet, url, nil)

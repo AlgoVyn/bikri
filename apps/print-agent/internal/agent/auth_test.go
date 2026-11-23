@@ -5,6 +5,7 @@ import (
 	"path/filepath"
 	"runtime"
 	"testing"
+	"time"
 )
 
 func TestConfigRoundTrip(t *testing.T) {
@@ -156,5 +157,52 @@ func TestUnpairAndPersistKeepsTheTokenWhenTheWriteFails(t *testing.T) {
 	}
 	if auth.Verify(token) {
 		t.Fatal("token still works after a successful unpair")
+	}
+}
+
+// An exhausted code must disappear instead of being handed out for the rest of
+// its TTL: the wizard polls /v1/health every few seconds, so re-showing it also
+// reset the attempt budget for a brute-force script.
+func TestPairingCodeHidesAnExhaustedCodeUntilTheWindowEnds(t *testing.T) {
+	auth := NewAuth(DefaultConfig())
+	now := time.Now()
+	auth.now = func() time.Time { return now }
+	code := auth.PairingCode()
+	if code == "" {
+		t.Fatal("unpaired agent has no pairing code")
+	}
+	wrong := "000000"
+	if code == wrong {
+		wrong = "000001"
+	}
+	for i := 0; i < pairingAttempts; i++ {
+		if _, err := auth.Pair(wrong); err != errBadCode {
+			t.Fatalf("attempt %d = %v, want errBadCode", i, err)
+		}
+	}
+	if got := auth.PairingCode(); got != "" {
+		t.Fatalf("exhausted pairing code is still visible: %q", got)
+	}
+	if got := auth.PairingCode(); got != "" {
+		t.Fatalf("a poll re-exposed the exhausted pairing code: %q", got)
+	}
+	if _, err := auth.Pair(code); err != errTooManyTries {
+		t.Fatalf("correct code after exhaustion = %v, want errTooManyTries", err)
+	}
+
+	// When the window ends, a fresh code appears and the old one stays dead.
+	now = now.Add(pairingTTL + time.Second)
+	fresh := auth.PairingCode()
+	if fresh == "" {
+		t.Fatal("the expired lockout did not produce a new pairing code")
+	}
+	if _, err := auth.Pair(code); err != errBadCode {
+		t.Fatalf("the expired code = %v, want errBadCode", err)
+	}
+	if _, err := auth.Pair(fresh); err != nil {
+		t.Fatalf("the fresh pairing code was rejected: %v", err)
+	}
+	if !auth.Paired() {
+		t.Fatal("agent is not paired after using the fresh code")
 	}
 }
