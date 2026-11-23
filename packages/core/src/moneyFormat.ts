@@ -16,11 +16,21 @@ export function parseMoneyToPaisa(
   const allowNegative = options?.allowNegative ?? false;
   let text = normaliseNumericText(raw).trim().toLowerCase();
   text = text.replaceAll(TRUE_MINUS, '-');
-  text = text.replaceAll(',', '').replace(/\s+/gu, '');
+  text = text.replaceAll(',', '');
   // Only a leading currency prefix is text: stripping every "rs" also turned the
-  // standard "Rs. 50" into ".50" (Rs 0.50) and "1rs2" into "12". Keep a leading minus
-  // so "−Rs 500" still parses as a negative amount.
-  text = text.replace(/^(-?)(?:rs\.?|pkr)\s*/u, '$1');
+  // standard "Rs. 50" into ".50" (Rs 0.50) and "1rs2" into "12". Strip the prefix
+  // before the internal whitespace, otherwise "PKR. 50" becomes ".50" and is read as
+  // 50 paisa, a 100x undercharge. Keep a leading minus so "−Rs 500" stays negative.
+  const prefix = /^(-?)(?:rs|pkr)(\.?)\s*/u.exec(text);
+  if (prefix !== null) {
+    const rest = text.slice(prefix[0].length);
+    // "Rs.. 50" (or "Rs. .50") is a typo, not Rs 0.50.
+    if (prefix[2] === '.' && rest.startsWith('.')) {
+      return null;
+    }
+    text = `${prefix[1] ?? ''}${rest}`;
+  }
+  text = text.replace(/\s+/gu, '');
   if (text === '' || text === '-' || text === '.' || text === '-.') {
     return null;
   }

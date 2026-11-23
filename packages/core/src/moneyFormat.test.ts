@@ -33,6 +33,16 @@ describe('parseMoneyToPaisa', () => {
     expect(parseMoneyToPaisa('-')).toBeNull();
   });
 
+  it('strips one optional currency period before the whitespace', () => {
+    expect(parseMoneyToPaisa('PKR. 50')).toBe(5_000);
+    expect(parseMoneyToPaisa('PKR. 150')).toBe(15_000);
+    expect(parseMoneyToPaisa('pkr.50')).toBe(5_000);
+    expect(parseMoneyToPaisa('Rs. 50')).toBe(5_000);
+    expect(parseMoneyToPaisa('Rs.. 50')).toBeNull();
+    expect(parseMoneyToPaisa('PKR.. 50')).toBeNull();
+    expect(parseMoneyToPaisa('Rs. .50')).toBeNull();
+  });
+
   it('allows a leading minus only when asked', () => {
     expect(parseMoneyToPaisa('-500')).toBeNull();
     expect(parseMoneyToPaisa('−500')).toBeNull();

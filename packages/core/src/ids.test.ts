@@ -1,5 +1,9 @@
-import { describe, expect, it } from 'vitest';
-import { isUlid, newId } from './ids.ts';
+import { afterEach, describe, expect, it, vi } from 'vitest';
+import { isUlid, newId, randomUnit } from './ids.ts';
+
+afterEach(() => {
+  vi.unstubAllGlobals();
+});
 
 describe('ids', () => {
   it('makes monotonic ULIDs for one timestamp', () => {
@@ -34,5 +38,21 @@ describe('ids', () => {
     expect(isUlid('01jb0000000000000000000001')).toBe(false);
     expect(isUlid('01JB000000000000000000000I')).toBe(false);
     expect(isUlid('')).toBe(false);
+  });
+
+  it('draws base-32 digits from a uniform [0, 1) range', () => {
+    const draw = (value: number) => {
+      vi.stubGlobal('crypto', {
+        getRandomValues: (bytes: Uint8Array) => {
+          bytes[0] = value;
+          return bytes;
+        },
+      });
+      return randomUnit();
+    };
+    expect(draw(0)).toBe(0);
+    expect(draw(0x80)).toBe(0.5);
+    expect(draw(0xff)).toBe(0xff / 0x100);
+    expect(draw(0xff)).toBeLessThan(1);
   });
 });

@@ -25,6 +25,12 @@ describe('parseQtyToMilli', () => {
     expect(parseQtyToMilli('', 'pc')).toBeNull();
     expect(parseQtyToMilli('-1', 'pc')).toBeNull();
   });
+
+  it('strips non-breaking and thin spaces inside a quantity', () => {
+    expect(parseQtyToMilli('1\u00A05', 'pc')).toBe(15_000);
+    expect(parseQtyToMilli('1\u2009.5', 'm')).toBe(1_500);
+    expect(parseQtyToMilli('1\u00A0000', 'pc')).toBe(1_000_000);
+  });
 });
 
 describe('formatQtyFromMilli', () => {

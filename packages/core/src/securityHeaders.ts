@@ -78,11 +78,17 @@ export function securityHeaderEntries(): ReadonlyArray<
  */
 export function renderAssetHeaders(): string {
   const blocks: string[] = [];
-  const broad = [`${BASE_PATH}/*`, `  Cache-Control: ${ASSET_CACHE_CONTROL}`];
-  for (const [name, value] of securityHeaderEntries()) {
-    broad.push(`  ${name}: ${value}`);
+  const broad = securityHeaderEntries().map(
+    ([name, value]) => `  ${name}: ${value}`,
+  );
+  // Cloudflare's `/*` wildcard does not cover the bare prefix itself, and the PWA is
+  // served at `/bikri` as well as under it (01 §1.1): emit both rules with the same
+  // headers so a request for `/bikri` gets the security headers too.
+  for (const path of [BASE_PATH, `${BASE_PATH}/*`]) {
+    blocks.push(
+      [path, `  Cache-Control: ${ASSET_CACHE_CONTROL}`, ...broad].join('\n'),
+    );
   }
-  blocks.push(broad.join('\n'));
   for (const path of IMMUTABLE_ASSET_PATHS) {
     blocks.push(
       [

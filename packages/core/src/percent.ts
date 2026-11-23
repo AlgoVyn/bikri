@@ -11,7 +11,7 @@ export function parsePercentToBp(raw: string): number | null {
     .replace('\u2212', '-')
     .replace(/[%٪]$/u, '')
     .replaceAll(',', '')
-    .replaceAll(' ', '');
+    .replace(/\s+/gu, '');
   const match = /^([+-]?)(\d*)(?:\.(\d*))?$/u.exec(text);
   if (match === null) return null;
   const whole = match[2] ?? '';

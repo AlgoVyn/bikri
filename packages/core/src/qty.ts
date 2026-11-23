@@ -37,7 +37,7 @@ export function parseQtyToMilli(raw: string, unit: string): number | null {
   const text = normaliseNumericText(raw)
     .trim()
     .replaceAll(',', '')
-    .replaceAll(' ', '');
+    .replace(/\s+/gu, '');
   if (text === '') {
     return null;
   }
