@@ -193,10 +193,11 @@ The prune covers **all tenants in one run** (still one cron trigger), with per-t
 
 | Trigger | Action |
 |---|---|
-| After any local write | debounce 5 s, then push |
-| Every 60 s while online | push (if pending) then pull; browsers may throttle timers in a hidden tab |
+| After any local write | debounce 5 s, then push; resets the idle poll to the base interval |
+| Every `poll_after_ms` (60 s default) while visible | push (if pending) then pull; each empty pull doubles the interval up to 5 min |
+| Hidden tab | sync continues at the 5 min hidden interval; a pull with rows resets the visible interval |
 | `online` event | push then pull |
-| `visibilitychange` → visible | pull; a push deferred during the Share grace runs first |
+| `visibilitychange` → visible | pull immediately and reset the idle interval; a push deferred during the Share grace runs first |
 | `pagehide` (tab closed or navigated away) | best-effort push of pending ops |
 | Day close saved | push + pull immediately; show result in the day-close success view |
 | Manual "Sync now" (staff menu → Sync / Settings → Sync) | push + pull |

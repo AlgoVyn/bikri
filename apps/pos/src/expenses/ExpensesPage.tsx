@@ -1,6 +1,6 @@
 import { businessDate, newId } from '@bikri/core';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
@@ -12,6 +12,7 @@ import {
 import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { ExpensesIcon, UndoIcon } from '../components/icons.tsx';
+import { ListPager } from '../components/ListPager.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
@@ -23,6 +24,7 @@ import { ledgerContext } from '../data/catalog.ts';
 import { isBusinessDate } from '../data/dates.ts';
 import { getDb } from '../data/db.ts';
 import {
+  type ExpenseDay,
   ExpenseError,
   type ExpenseRow,
   expenseList,
@@ -47,6 +49,8 @@ import { categoryName, dateText, timeText } from './format.ts';
 import { categorySharePercent } from './share.ts';
 
 type Preset = 'today' | '7d' | '30d' | 'month' | 'last_month' | 'custom';
+
+const PAGE = 50;
 
 const PRESETS: Preset[] = [
   'today',
@@ -119,6 +123,31 @@ function ExpensesPageContent() {
     () => expenseList(getDb(), range),
     [range.from, range.to],
   );
+  const [page, setPage] = useState(0);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new range starts at page 1
+  useEffect(() => setPage(0), [range.from, range.to]);
+  const pages = useMemo(() => {
+    if (!data) return [];
+    const out: ExpenseDay[][] = [];
+    let current: ExpenseDay[] = [];
+    let count = 0;
+    for (const day of data.days) {
+      if (current.length > 0 && count + day.rows.length > PAGE) {
+        out.push(current);
+        current = [];
+        count = 0;
+      }
+      current.push(day);
+      count += day.rows.length;
+    }
+    if (current.length > 0) out.push(current);
+    return out;
+  }, [data]);
+  const pageDays = pages[page] ?? [];
+  const pageCount = Math.max(1, pages.length);
+  useEffect(() => {
+    if (page > pages.length - 1) setPage(Math.max(0, pages.length - 1));
+  }, [page, pages.length]);
 
   useHotkey(plainKey('n'), () => setNewOpen(true), {
     enabled: can('expense.create') && !readOnly,
@@ -327,7 +356,7 @@ function ExpensesPageContent() {
           />
         ) : null}
 
-        {data?.days.map((day) => (
+        {pageDays.map((day) => (
           <section key={day.date} className="flex flex-col gap-1">
             <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 pt-3 pb-1">
               <h2 className="text-title font-semibold">
@@ -400,6 +429,7 @@ function ExpensesPageContent() {
             </ul>
           </section>
         ))}
+        <ListPager page={page} pageCount={pageCount} onPage={setPage} />
       </ListSurface>
 
       <ExpenseDialog open={newOpen} onOpenChange={setNewOpen} />

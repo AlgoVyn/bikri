@@ -14,7 +14,9 @@ import {
 } from './client.ts';
 import {
   backoffDelay,
+  IDLE_POLL_MAX_MS,
   mergeRun,
+  nextPollDelay,
   notifyLocalWrite,
   SyncEngine,
   syncNow,
@@ -2656,6 +2658,11 @@ describe('status, me and engine (03 §6–7)', () => {
     const db = await enrolled('eng');
     expect(backoffDelay(1)).toBe(5_000);
     expect(backoffDelay(9)).toBe(300_000);
+    expect(nextPollDelay(60_000, 0, false)).toBe(60_000);
+    expect(nextPollDelay(60_000, 1, false)).toBe(120_000);
+    expect(nextPollDelay(60_000, 2, false)).toBe(240_000);
+    expect(nextPollDelay(60_000, 3, false)).toBe(IDLE_POLL_MAX_MS);
+    expect(nextPollDelay(60_000, 0, true)).toBe(IDLE_POLL_MAX_MS);
     const engine = await SyncEngine.start(db);
     expect(engine).not.toBeNull();
     await syncNow();
@@ -2991,12 +2998,13 @@ describe('status, me and engine (03 §6–7)', () => {
     ).scheduleNext();
     server.log = [];
     const start = Date.now();
-    while (Date.now() - start < 300) {
+    while (Date.now() - start < 600) {
       await engine.run('push');
       await new Promise((resolve) => setTimeout(resolve, 50));
     }
-    // The poll at t=200 must have fired even though pushes kept happening.
-    // Before D-231 each push moved it 200 ms further out, so it never fired.
+    // The initial empty pull backs the 200 ms poll off to 400 ms (M4); that poll
+    // must still fire even though pushes keep happening. Before D-231 each push
+    // moved it further out, so it never fired.
     expect(server.log.some((entry) => entry.path === '/sync/pull')).toBe(true);
     engine.stop();
   });

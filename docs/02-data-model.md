@@ -2422,6 +2422,35 @@ END;
 
 The bundle triggers make recipe history restore-safe: a soft-deleted `bundle_items` row is never checked against the current product kind, and a product that merely gained a catalogue cost can still become a bundle. The sale-line and expense triggers close the operator-import path that bypasses `checkOp`; the normal push path keeps its richer checks.
 
+### 2.32 Bundle push lookup indexes (migration `0033_bundle_lookup_indexes.sql`)
+
+```sql
+-- D-301 / 24 Nov review L6: the push bundle lookup reads soft-deleted recipe rows
+-- (to tell a stored recipe from the one the till sold), so the existing partial
+-- `bundle_items_component`/`bundle_items_lookup` indexes cannot serve it. These
+-- non-partial indexes avoid a tenant-wide scan of bundle_items. Index-only;
+-- SCHEMA_VERSION stays 8.
+CREATE INDEX bundle_items_by_bundle
+  ON bundle_items (tenant_id, bundle_id);
+
+CREATE INDEX bundle_items_by_component
+  ON bundle_items (tenant_id, component_product_id);
+```
+
+The push bundle lookup deliberately includes soft-deleted `bundle_items` rows, so the existing partial `bundle_items_component` and `bundle_items_lookup` indexes cannot serve it. These two non-partial indexes replace two tenant-wide scans. Index-only; `SCHEMA_VERSION` stays 8.
+
+### 2.33 Drop the unused change-log row index (migration `0034_drop_change_log_row.sql`)
+
+```sql
+-- D-302 / 24 Nov review M5 (safe first step): `change_log_row` has no production
+-- reader. Pull reads by `(tenant_id, seq)`, the prune uses the daily watermark/seq,
+-- and the only `tbl,row_id` lookups are in tests. Dropping it removes one index write
+-- from every synced row. The batch-level `applied_ops` redesign remains separate.
+DROP INDEX IF EXISTS change_log_row;
+```
+
+Pull pages read `change_log` by `(tenant_id, seq)`, the prune uses the daily watermark/seq, and no production query filters by `(tenant_id, tbl, row_id)`. Removing the index saves one D1 index write per synced row. Index-only; `SCHEMA_VERSION` stays 8.
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.

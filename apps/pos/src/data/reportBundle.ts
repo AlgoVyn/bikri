@@ -872,6 +872,28 @@ async function voidedSaleIds(db: BikriDb): Promise<Set<string>> {
   return ids;
 }
 
+async function mapLimit<T, R>(
+  items: readonly T[],
+  limit: number,
+  fn: (item: T) => Promise<R>,
+): Promise<R[]> {
+  const out = new Array<R>(items.length);
+  let next = 0;
+  const workers = Array.from(
+    { length: Math.min(Math.max(limit, 1), items.length) },
+    async () => {
+      while (true) {
+        const index = next;
+        next += 1;
+        if (index >= items.length) return;
+        out[index] = await fn(items[index] as T);
+      }
+    },
+  );
+  await Promise.all(workers);
+  return out;
+}
+
 /**
  * Products with stock that have not sold for 30 days. The recent window is read from
  * the `sale_lines.business_date` index; only the few candidates left after that are
@@ -917,8 +939,12 @@ export async function slowMoversReport(
       (levels.get(String(product.id)) ?? 0) > 0 &&
       !soldRecently.has(String(product.id)),
   );
-  const rows = await Promise.all(
-    candidates.map(async (product): Promise<SlowMover> => {
+  // One reverse seek per candidate is cheap, but a shop with thousands of unsold SKUs
+  // must not open thousands of IndexedDB requests at once.
+  const rows = await mapLimit(
+    candidates,
+    12,
+    async (product): Promise<SlowMover> => {
       const id = String(product.id);
       // Newest first; the compound index makes this one bounded reverse seek and
       // the filter stops at the first non-voided sale (voids are rare).
@@ -936,7 +962,7 @@ export async function slowMoversReport(
             ? last.business_date
             : null,
       };
-    }),
+    },
   );
   return rows
     .filter((row) => row.lastSale === null || row.lastSale <= slowCutoff)

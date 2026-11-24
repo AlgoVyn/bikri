@@ -144,6 +144,18 @@ const HOT_QUERIES: Array<{
     args: ['t', 'd'],
     index: 'day_closes_device',
   },
+  {
+    name: 'bundle rows by bundle',
+    sql: 'SELECT id FROM bundle_items WHERE tenant_id = ? AND bundle_id IN (?)',
+    args: ['t', 'b'],
+    index: 'bundle_items_by_bundle',
+  },
+  {
+    name: 'bundle rows by component',
+    sql: 'SELECT id FROM bundle_items WHERE tenant_id = ? AND component_product_id IN (?)',
+    args: ['t', 'p'],
+    index: 'bundle_items_by_component',
+  },
 ];
 
 const REFERENCE_LINES = 3;

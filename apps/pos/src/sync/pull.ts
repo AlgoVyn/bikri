@@ -53,13 +53,15 @@ export type SnapshotState = {
 export async function pullAll(
   db: BikriDb,
   onSnapshot?: Progress,
+  onRows?: (count: number) => void,
 ): Promise<number | null> {
-  return withSyncLock(db, () => pullAllUnlocked(db, onSnapshot));
+  return withSyncLock(db, () => pullAllUnlocked(db, onSnapshot, onRows));
 }
 
 async function pullAllUnlocked(
   db: BikriDb,
   onSnapshot?: Progress,
+  onRows?: (count: number) => void,
 ): Promise<number | null> {
   if (await getKv<SnapshotState | null>(db, 'snapshot_state', null)) {
     await runSnapshotUnlocked(db, onSnapshot);
@@ -100,6 +102,7 @@ async function pullAllUnlocked(
       res.changes.map((c) => ({ tbl: c.tbl, row: c.row })),
       res.next_since,
     );
+    onRows?.(res.changes.length);
     if (!res.has_more) {
       completed = true;
       break;

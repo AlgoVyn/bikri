@@ -57,7 +57,8 @@ export async function loadCatalogueMaster(
 }
 
 export function useCatalogueMaster(): CatalogueMaster | undefined {
-  return useLiveQuery(() => loadCatalogueMaster(getDb()), []);
+  const warm = getWarmCatalogue(getDb().tenantId)?.master;
+  return useLiveQuery(() => loadCatalogueMaster(getDb()), [], warm);
 }
 
 export async function loadStockLevels(
@@ -72,10 +73,73 @@ export async function loadStockLevels(
 }
 
 export function useStockLevels(): Map<string, number> | undefined {
-  return useLiveQuery(() => loadStockLevels(getDb()), []);
+  const warm = getWarmCatalogue(getDb().tenantId)?.levels;
+  return useLiveQuery(() => loadStockLevels(getDb()), [], warm);
 }
 
-/** A short-lived session cache: 30-day sold quantities do not need to update mid-session. */
+/** A short-lived prewarm from the lock screen; the live queries still own freshness. */
+const WARM_TTL_MS = 5 * 60_000;
+type WarmCatalogue = {
+  tenant: string;
+  at: number;
+  master: CatalogueMaster;
+  levels: Map<string, number>;
+  sold: Map<string, number>;
+  rows: ProductListRow[];
+};
+let warmCatalogue: WarmCatalogue | null = null;
+let warmInFlight: Promise<WarmCatalogue> | null = null;
+
+/** Load the catalogue while the lock screen is visible; the PIN typing hides the read. */
+export function prewarmSellCatalogue(
+  db: BikriDb,
+  costMethod: 'avg' | 'last' = 'avg',
+  now = Date.now(),
+): Promise<WarmCatalogue> {
+  if (
+    warmCatalogue?.tenant === db.tenantId &&
+    now - warmCatalogue.at < WARM_TTL_MS
+  )
+    return Promise.resolve(warmCatalogue);
+  if (warmInFlight !== null) return warmInFlight;
+  warmInFlight = (async () => {
+    const [master, levels, sold] = await Promise.all([
+      loadCatalogueMaster(db),
+      loadStockLevels(db),
+      sold30For(db),
+    ]);
+    const index = buildCatalogueIndex(master, levels, sold, costMethod);
+    warmCatalogue = {
+      tenant: db.tenantId,
+      at: Date.now(),
+      master,
+      levels,
+      sold,
+      rows: index.rows,
+    };
+    return warmCatalogue;
+  })().finally(() => {
+    warmInFlight = null;
+  });
+  return warmInFlight;
+}
+
+export function getWarmCatalogue(
+  tenant: string,
+  now = Date.now(),
+): WarmCatalogue | null {
+  return warmCatalogue?.tenant === tenant &&
+    now - warmCatalogue.at < WARM_TTL_MS
+    ? warmCatalogue
+    : null;
+}
+
+/** Test/shop-switch hook. */
+export function clearWarmCatalogue(): void {
+  warmCatalogue = null;
+  warmInFlight = null;
+}
+
 const SOLD_TTL_MS = 5 * 60_000;
 let soldCache: {
   tenant: string;
@@ -108,16 +172,26 @@ const SOLD_TABLES = new Set([
   'refund_lines',
   'sale_voids',
 ]);
+const WARM_TABLES = new Set([
+  'products',
+  'product_barcodes',
+  'bundle_items',
+  'categories',
+  'stock_levels',
+]);
 
 // A sale or refund invalidates the snapshot for the next screen that opens; the Sell
 // grid keeps its current order until it remounts, so the counter never waits for this.
 // A product edit or a settings write no longer throws the snapshot away.
 onLocalWrite((_count, tables) => {
   if (tables.some((table) => SOLD_TABLES.has(table))) clearSoldCache();
+  if (tables.some((table) => WARM_TABLES.has(table))) clearWarmCatalogue();
 });
 
 export function useSold30(): Map<string, number> | undefined {
-  const [sold, setSold] = useState<Map<string, number> | undefined>(undefined);
+  const [sold, setSold] = useState<Map<string, number> | undefined>(
+    () => getWarmCatalogue(getDb().tenantId)?.sold,
+  );
   useEffect(() => {
     let alive = true;
     const db = getDb();

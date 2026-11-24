@@ -38,18 +38,18 @@ import {
 } from '../data/reportRange.ts';
 import {
   defaultSaleSortDirection,
-  filterSalesHistory,
-  loadSalesHistory,
-  loadSalesLineText,
   type MethodFilter,
   rangeFor,
   type SaleListRow,
   type SaleSort,
   type SaleStatus,
   type SalesDay,
+  type SalesFilter,
   type SalesPreset,
+  type SalesSummary,
   salesCsv,
   salesFilterOptions,
+  salesHistory,
 } from '../data/salesHistory.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import {
@@ -74,6 +74,7 @@ import {
   statusTone,
   timeText,
 } from './format.ts';
+import type { SalesWorkerResponse } from './salesWorker.ts';
 
 const PAGE = 50;
 const SALES_PRESETS: SalesPreset[] = [
@@ -216,44 +217,91 @@ function SalesListContent({
   const range = resolvedRange.range;
   const longRange =
     resolvedRange.long || (preset === 'custom' && customDays > LONG_RANGE_DAYS);
-  const history = useLiveQuery(
-    () => (rangeError ? null : loadSalesHistory(getDb(), range)),
-    [range.from, range.to, rangeError],
-  );
-  const hasQuery = deferredQuery.trim() !== '';
-  // Only a typed search needs line names/SKUs; the normal list does not read lines.
-  const lineText = useLiveQuery(
-    () =>
-      hasQuery
-        ? loadSalesLineText(getDb(), range)
-        : Promise.resolve(new Map<string, string>()),
-    [range.from, range.to, hasQuery],
-  );
-  const data = useMemo(() => {
-    if (history === null || history === undefined) return history;
-    return {
-      ...filterSalesHistory(
-        history,
-        {
-          ...range,
-          query: deferredQuery,
-          method: method || null,
-          status: status || null,
-          staffId: staffId || null,
-          deviceId: deviceId || null,
-          branchId: limited ? branchId : null,
-          sort,
-          direction,
-        },
-        lineText,
-      ),
-      timeZone,
-      range,
+  // The full range is loaded and filtered in a worker; the page only receives one page
+  // of rows plus the summary. These probes are the live-query dependency for writes.
+  const dataVersion =
+    useLiveQuery(async () => {
+      if (rangeError) return 0;
+      const db = getDb();
+      await Promise.all([
+        db.sales.toCollection().first(),
+        db.sale_lines.toCollection().first(),
+        db.payments.toCollection().first(),
+        db.refunds.toCollection().first(),
+        db.print_jobs.toCollection().first(),
+        db.customers.toCollection().first(),
+        db.staff.toCollection().first(),
+        db.devices.toCollection().first(),
+      ]);
+      return Date.now();
+    }, [range.from, range.to, rangeError]) ?? 0;
+  const [pageData, setPageData] = useState<{
+    summary: SalesSummary;
+    days: SalesDay[];
+    pageCount: number;
+    rowCount: number;
+  } | null>(null);
+  const workerRef = useRef<Worker | null>(null);
+  const requestId = useRef(0);
+
+  useEffect(() => {
+    const worker = new Worker(new URL('./salesWorker.ts', import.meta.url), {
+      type: 'module',
+    });
+    workerRef.current = worker;
+    return () => {
+      worker.terminate();
+      workerRef.current = null;
     };
+  }, []);
+
+  useEffect(() => {
+    const worker = workerRef.current;
+    if (!worker || dataVersion === 0 || rangeError) {
+      setPageData(null);
+      return;
+    }
+    const id = ++requestId.current;
+    const filter: SalesFilter = {
+      ...range,
+      query: deferredQuery,
+      method: method || null,
+      status: status || null,
+      staffId: staffId || null,
+      deviceId: deviceId || null,
+      branchId: limited ? branchId : null,
+      sort,
+      direction,
+    };
+    const onMessage = (event: MessageEvent<SalesWorkerResponse>) => {
+      if (event.data.id !== id) return;
+      worker.removeEventListener('message', onMessage);
+      if (event.data.error !== undefined || event.data.summary === undefined) {
+        setPageData(null);
+        return;
+      }
+      setPageData({
+        summary: event.data.summary,
+        days: event.data.days ?? [],
+        pageCount: event.data.pageCount ?? 1,
+        rowCount: event.data.rowCount ?? 0,
+      });
+    };
+    worker.addEventListener('message', onMessage);
+    worker.postMessage({
+      id,
+      tenantId: getDb().tenantId,
+      range: { from: range.from, to: range.to },
+      filter,
+      page,
+      pageSize: PAGE,
+      version: dataVersion,
+    });
+    return () => worker.removeEventListener('message', onMessage);
   }, [
-    history,
-    lineText,
+    dataVersion,
     range,
+    rangeError,
     deferredQuery,
     method,
     status,
@@ -263,7 +311,7 @@ function SalesListContent({
     direction,
     limited,
     branchId,
-    timeZone,
+    page,
   ]);
   const options = useLiveQuery(() => salesFilterOptions(getDb()), []) ?? {
     staff: [],
@@ -288,30 +336,13 @@ function SalesListContent({
     ],
   );
 
-  // Paginate at day boundaries so a day header never splits; a single busy day
-  // still forms one page. Keeps the DOM bounded without hiding older bills (D-231).
-  const pages = useMemo((): SalesDay[][] => {
-    if (!data) return [];
-    const out: SalesDay[][] = [];
-    let current: SalesDay[] = [];
-    let count = 0;
-    for (const day of data.days) {
-      if (current.length > 0 && count + day.rows.length > PAGE) {
-        out.push(current);
-        current = [];
-        count = 0;
-      }
-      current.push(day);
-      count += day.rows.length;
-    }
-    if (current.length > 0) out.push(current);
-    return out;
-  }, [data]);
-  const pageDays = pages[page] ?? [];
-  const pageCount = Math.max(1, pages.length);
+  // The worker returns one page, split inside a busy day as well as between days.
+  const pageDays = pageData?.days ?? [];
+  const pageCount = pageData?.pageCount ?? 1;
   useEffect(() => {
-    if (page > pages.length - 1) setPage(Math.max(0, pages.length - 1));
-  }, [page, pages.length]);
+    if (pageData && page > pageData.pageCount - 1)
+      setPage(Math.max(0, pageData.pageCount - 1));
+  }, [page, pageData]);
 
   const runPreset = (next: SalesPreset) => {
     setPreset(next);
@@ -322,6 +353,40 @@ function SalesListContent({
     setPage(next);
     listTop.current?.scrollIntoView?.({ block: 'start' });
   };
+
+  const exportCsv = useCallback(async () => {
+    try {
+      const filter: SalesFilter = {
+        ...range,
+        query: deferredQuery,
+        method: method || null,
+        status: status || null,
+        staffId: staffId || null,
+        deviceId: deviceId || null,
+        branchId: limited ? branchId : null,
+        sort,
+        direction,
+      };
+      const full = await salesHistory(getDb(), filter);
+      downloadText('bikri-sales.csv', salesCsv(full.rows, timeZone));
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    }
+  }, [
+    range,
+    deferredQuery,
+    method,
+    status,
+    staffId,
+    deviceId,
+    limited,
+    branchId,
+    sort,
+    direction,
+    timeZone,
+    toast,
+    t,
+  ]);
 
   const reprint = useCallback(
     async (saleId: string) => {
@@ -363,14 +428,8 @@ function SalesListContent({
               <button
                 type="button"
                 className={buttonQuiet}
-                disabled={!data || data.rows.length === 0}
-                onClick={() =>
-                  data &&
-                  downloadText(
-                    'bikri-sales.csv',
-                    salesCsv(data.rows, data.timeZone),
-                  )
-                }
+                disabled={!pageData || pageData.rowCount === 0}
+                onClick={() => void exportCsv()}
               >
                 {t('office.sales.export_csv')}
               </button>
@@ -579,31 +638,31 @@ function SalesListContent({
             </search>
           }
         >
-          {data && data.rows.length > 0 ? (
+          {pageData && pageData.rowCount > 0 ? (
             <div
               data-testid="sales-summary"
               className={`grid gap-3 border-b border-border px-3 py-3 ${embedded ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}
             >
               <Metric
                 label={t('office.sales.summary_bills')}
-                value={String(data.summary.bills)}
+                value={String(pageData.summary.bills)}
               />
               <Metric
                 label={t('office.sales.summary_sold')}
-                value={<MoneyText paisa={data.summary.sold} />}
+                value={<MoneyText paisa={pageData.summary.sold} />}
               />
               <Metric
                 label={t('office.sales.summary_refunds')}
-                value={<MoneyText paisa={data.summary.refunds} />}
+                value={<MoneyText paisa={pageData.summary.refunds} />}
               />
               <Metric
                 label={t('office.sales.summary_avg')}
-                value={<MoneyText paisa={data.summary.avgBill} />}
+                value={<MoneyText paisa={pageData.summary.avgBill} />}
               />
             </div>
           ) : null}
 
-          {data && data.rows.length === 0 ? (
+          {pageData && pageData.rowCount === 0 ? (
             <EmptyState
               variant="plain"
               icon={<SalesIcon />}
@@ -641,7 +700,7 @@ function SalesListContent({
                     today,
                     yesterday,
                     i18n.language,
-                    data?.timeZone ?? 'Asia/Karachi',
+                    timeZone,
                   )}
                 </h2>
                 <p className="text-small text-text-muted">
@@ -711,7 +770,7 @@ function SalesListContent({
                     row={row}
                     current={row.sale.id === selectedId}
                     embedded={embedded}
-                    timeZone={data?.timeZone ?? 'Asia/Karachi'}
+                    timeZone={timeZone}
                     onReprint={reprint}
                   />
                 ))}
@@ -719,7 +778,7 @@ function SalesListContent({
             </section>
           ))}
 
-          {data && pageCount > 1 ? (
+          {pageData && pageCount > 1 ? (
             <nav
               className="flex items-center justify-between gap-2 border-t border-border p-3"
               aria-label={t('office.sales.pagination')}

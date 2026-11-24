@@ -14,7 +14,13 @@ describe('pwa options', () => {
     expect(pwaOptions.workbox.navigateFallback).toBe('/bikri/index.html');
     expect(pwaOptions.workbox.modifyURLPrefix).toEqual({ '': '/bikri/' });
     expect(pwaOptions.includeManifestIcons).toBe(false);
-    expect('runtimeCaching' in pwaOptions.workbox).toBe(false);
+    const runtime = pwaOptions.workbox.runtimeCaching ?? [];
+    expect(runtime).toHaveLength(1);
+    expect(runtime[0]?.handler).toBe('CacheFirst');
+    expect(String(runtime[0]?.urlPattern)).toContain('noto-naskh-arabic');
+    expect(
+      runtime.some((route) => String(route.urlPattern).includes('/api/')),
+    ).toBe(false);
     expect(
       pwaOptions.workbox.navigateFallbackDenylist?.map(
         (pattern) => pattern.source,

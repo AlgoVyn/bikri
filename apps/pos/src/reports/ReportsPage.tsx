@@ -206,6 +206,7 @@ function ReportsPageContent() {
   const requestId = useRef(0);
   const workerFailures = useRef(new Map<number, (error: Error) => void>());
   const firstRequest = useRef(true);
+  const lastRequestKey = useRef('');
   const firstDay = useLiveQuery(() => firstBusinessDay(getDb()), []);
   // Rerun the live query when the business date passes midnight on an idle screen.
   const { today: businessToday } = useBusinessDates(timeZone);
@@ -271,8 +272,40 @@ function ReportsPageContent() {
     };
   }, []);
 
+  // A tab switch must not re-read the range. This probe query owns the data dependency;
+  // the report request below only changes `tab` and lets the worker reuse its cache.
+  const dataVersion =
+    useLiveQuery(async () => {
+      if (workerState === 'starting') return 0;
+      const db = getDb();
+      // Dexie liveQuery tracks these reads; the heavy aggregation runs in the worker.
+      await Promise.all([
+        db.sales.toCollection().first(),
+        db.sale_lines.toCollection().first(),
+        db.payments.toCollection().first(),
+        db.refunds.toCollection().first(),
+        db.sale_voids.toCollection().first(),
+        db.expenses.toCollection().first(),
+        db.day_closes.toCollection().first(),
+        db.stock_movements.toCollection().first(),
+        db.ledger_entries.toCollection().first(),
+        db.products.toCollection().first(),
+        db.customers.toCollection().first(),
+      ]);
+      return Date.now();
+    }, [
+      workerState,
+      preset,
+      custom.from,
+      custom.to,
+      deviceId,
+      limited,
+      timeZone,
+      businessToday,
+    ]) ?? 0;
+
   const data = useLiveQuery(async () => {
-    if (workerState === 'starting') return undefined;
+    if (workerState === 'starting' || dataVersion === 0) return undefined;
     const db = getDb();
     const now = Date.now();
     const today = businessDate(now, timeZone);
@@ -309,29 +342,20 @@ function ReportsPageContent() {
             deviceId: deviceId || undefined,
           }
         : undefined;
-    // Dexie liveQuery tracks these reads; the heavy aggregation itself runs in the worker.
-    // One row from each table registers the dependency and is far cheaper than COUNT(*)
-    // on a shop with tens of thousands of sales and movements.
-    await Promise.all([
-      db.sales.toCollection().first(),
-      db.sale_lines.toCollection().first(),
-      db.payments.toCollection().first(),
-      db.refunds.toCollection().first(),
-      db.sale_voids.toCollection().first(),
-      db.expenses.toCollection().first(),
-      db.day_closes.toCollection().first(),
-      db.stock_movements.toCollection().first(),
-      db.ledger_entries.toCollection().first(),
-      db.products.toCollection().first(),
-      db.customers.toCollection().first(),
-    ]);
     // Coalesce a burst of invalidations (a pull page, a sale, a settings write) before
-    // asking the worker. The worker keeps only the latest pending request, so a 200-page
-    // pull can no longer queue 200 full bundles. The first open skips the wait: there is
-    // no burst yet, and it is the one the user is waiting for.
-    if (!firstRequest.current)
+    // asking the worker. A tab switch with the same range/data version skips the wait;
+    // the worker serves the cached bundle.
+    const requestKey = JSON.stringify({
+      from: range.from,
+      to: range.to,
+      deviceId,
+      dataVersion,
+    });
+    const sameRequest = lastRequestKey.current === requestKey;
+    if (!firstRequest.current && !sameRequest)
       await new Promise((resolve) => setTimeout(resolve, 250));
     firstRequest.current = false;
+    lastRequestKey.current = requestKey;
     const worker = workerRef.current;
     let bundle: ReportBundle;
     let previous: ReportSummary | undefined;
@@ -386,6 +410,7 @@ function ReportsPageContent() {
             range: reportRangeValue,
             previousRange,
             options,
+            version: dataVersion,
           });
         });
         bundle = result.bundle;
@@ -424,6 +449,7 @@ function ReportsPageContent() {
     workerState,
     timeZone,
     businessToday,
+    dataVersion,
     tab,
   ]);
 

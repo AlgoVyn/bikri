@@ -23,6 +23,7 @@ import {
   setKeypadLayout,
 } from '../shell/devicePrefs.ts';
 import { useShopName } from '../shell/TopBarParts.tsx';
+import { prewarmSellCatalogue } from '../state/catalogue.ts';
 import { useSession } from '../state/session.ts';
 import {
   digitOfKey,
@@ -53,6 +54,12 @@ export function LockScreen() {
     };
   }, [i18n.language]);
   const db = getDb();
+  // Hide the Sell catalogue's IndexedDB read and chunk load behind PIN entry. The
+  // prewarmed rows are only a first render; the live queries still own freshness.
+  useEffect(() => {
+    void prewarmSellCatalogue(db).catch(() => undefined);
+    void import('../sell/SellPage.tsx');
+  }, [db]);
   const unlock = useSession((s) => s.unlock);
   const shopName = useShopName();
   const data = useLiveQuery(

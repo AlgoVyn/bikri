@@ -9,11 +9,14 @@
  * The worker keeps at most one running and one pending request. A superseded pending
  * request is answered with the next completed bundle so its page promise still settles.
  */
+import { businessDate } from '@bikri/core';
 import { openTenantDb } from '@bikri/db';
 import {
   type ReportBundle,
   type ReportOptions,
   reportBundle,
+  type SlowMover,
+  slowMoversReport,
 } from '../data/reportBundle.ts';
 import type { ReportRange } from '../data/reports.ts';
 
@@ -23,6 +26,7 @@ type Request = {
   range: ReportRange;
   previousRange?: ReportRange;
   options: ReportOptions;
+  version: number;
 };
 
 type Response = {
@@ -67,24 +71,60 @@ function dropDb(db: ReturnType<typeof openTenantDb>): void {
   }
 }
 
+type ReportCache = {
+  key: string;
+  base: ReportBundle;
+  previous?: ReportBundle['summary'];
+  slow?: SlowMover[];
+};
+let reportCache: ReportCache | null = null;
+
 async function compute(request: Request): Promise<Response> {
-  const { id, tenantId, range, previousRange, options } = request;
+  const { id, tenantId, range, previousRange, options, version } = request;
   // dbFor/openTenantDb can throw (a blocked upgrade, a lost connection); keep it in
   // the try so the page always gets a response instead of waiting forever.
   let db: ReturnType<typeof openTenantDb> | null = null;
   try {
     db = dbFor(tenantId);
-    const bundle = await reportBundle(db, range, options);
-    const previous =
-      previousRange === undefined
-        ? undefined
-        : (
-            await reportBundle(db, previousRange, {
-              ...options,
-              summaryOnly: true,
-            })
-          ).summary;
-    return { id, bundle, previous };
+    const key = JSON.stringify({
+      tenantId,
+      range,
+      previousRange,
+      version,
+      timeZone: options.timeZone,
+    });
+    let cached =
+      reportCache !== null && reportCache.key === key ? reportCache : null;
+    if (cached === null) {
+      const baseOptions: ReportOptions = { ...options, slowMovers: false };
+      const base = await reportBundle(db, range, baseOptions);
+      const previous =
+        previousRange === undefined
+          ? undefined
+          : (
+              await reportBundle(db, previousRange, {
+                ...baseOptions,
+                summaryOnly: true,
+              })
+            ).summary;
+      cached = { key, base, previous, slow: undefined };
+      reportCache = cached;
+    }
+    if (options.slowMovers === true) {
+      cached.slow ??= await slowMoversReport(
+        db,
+        options.today ?? businessDate(Date.now(), options.timeZone),
+      );
+      return {
+        id,
+        bundle: {
+          ...cached.base,
+          products: { ...cached.base.products, slowMovers: cached.slow },
+        },
+        previous: cached.previous,
+      };
+    }
+    return { id, bundle: cached.base, previous: cached.previous };
   } catch (error) {
     if (db !== null) dropDb(db);
     return {
