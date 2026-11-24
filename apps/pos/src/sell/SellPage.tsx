@@ -315,9 +315,13 @@ export function SellPage() {
       takePayment();
       return;
     }
+    // Clear a barcode-like scan now, not after the async lookup: the next scan can
+    // arrive while `findByCode` is still open, and appending to the old text loses it.
+    const scanLike = rapid || /^\d{6,}$/u.test(code);
+    if (scanLike) consumed(value);
     const byCode = await findByCode(getDb(), code);
     if (byCode) {
-      consumed(value);
+      if (!scanLike) consumed(value);
       add(byCode, qty);
       return;
     }
