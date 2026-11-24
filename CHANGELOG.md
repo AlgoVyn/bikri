@@ -4,6 +4,15 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### 24 Nov performance-review batch — 25 Nov 2026
+- **Bundle/PWA:** Excel/CSV/QR libraries moved out of the initial vendor chunk (initial JS 252.7 KB gz); Noto Naskh is runtime-cached on first Urdu use instead of precached.
+- **Sales:** the range is loaded/filtered in a worker; the page receives one page plus summary and splits a busy day inside the page.
+- **Sell:** the lock screen prewarms the catalogue, stock levels and sold map and prefetches the Sell chunk.
+- **Reports:** the worker caches the base bundle per range/device/data version, computes slow movers separately and caps their concurrency.
+- **Sync:** visible empty polls back off to 5 min, hidden polls use 5 min, and writes/visibility/online/rows reset the interval.
+- **Lists/indexes:** Expenses pages at 50 rows; migrations `0033` add non-partial bundle lookup indexes and `0034` drops the unused `change_log_row` index.
+- **Still open:** batch-level idempotency, production Worker CPU p99/snapshot limits, larger snapshot pages/R2 snapshot, Pay-sheet pre-mount, targeted stock-level patching and settle-loop shadow/rev writes.
+
 ### Update detection — 24 Nov 2026
 - The till now checks `registration.update()` as soon as the page's service-worker registration is ready, before the hourly interval or a visibility change. A till reopened or reloaded after a deploy could otherwise sit on the old precached `index.html` for up to an hour (the hourly timer restarted with every app launch, and a reload cannot bypass the old worker), so the **Update** button appeared late or not at all (D-300).
 

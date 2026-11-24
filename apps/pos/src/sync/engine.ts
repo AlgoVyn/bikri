@@ -18,7 +18,24 @@ import { applyStatus, isReadOnly } from './status.ts';
 
 export const BACKOFF_MS = [5_000, 15_000, 60_000, 300_000] as const;
 export const WRITE_DEBOUNCE_MS = 5_000;
+/** An idle till backs off to 5 min; a hidden one always waits 5 min. */
+export const IDLE_POLL_MAX_MS = 300_000;
 const CLOCK_SKEW_LIMIT_MS = 5 * 60_000;
+
+/**
+ * Poll interval after `emptyPolls` consecutive pulls with no rows. Hidden tills use the
+ * maximum; visible tills double from the server value up to 5 min. A local write,
+ * visible/online transition or a pull with rows resets `emptyPolls` to 0.
+ */
+export function nextPollDelay(
+  base: number,
+  emptyPolls: number,
+  hidden: boolean,
+): number {
+  if (hidden) return IDLE_POLL_MAX_MS;
+  const doublings = Math.min(Math.max(emptyPolls, 0), 4);
+  return Math.min(base * 2 ** doublings, IDLE_POLL_MAX_MS);
+}
 
 export function backoffDelay(failures: number): number {
   return (
@@ -66,10 +83,15 @@ export class SyncEngine {
   /** One coalesced follow-up for work requested while a cycle is in flight. */
   private queued: 'first' | 'full' | 'push' | 'pull' | null = null;
   private failures = 0;
+  /** Consecutive pulls that returned no rows; drives the idle back-off. */
+  private emptyPolls = 0;
   private stopped = false;
   /** A cycle was skipped because the till was hidden; flush it when the till returns. */
   private deferredCycle = false;
-  private readonly onOnline = () => void this.run('full');
+  private readonly onOnline = () => {
+    this.emptyPolls = 0;
+    void this.run('full');
+  };
   private readonly onPageHide = () => {
     // Best effort: a phone browser may freeze the page after this event, but a last
     // push often still completes before the tab is discarded.
@@ -77,6 +99,7 @@ export class SyncEngine {
   };
   private readonly onVisible = () => {
     if (document.visibilityState !== 'visible') return;
+    this.emptyPolls = 0;
     // A Share hides the till while WhatsApp opens in another tab; requests started then
     // can sit suspended until their HTTP/3 connection idles out. Those cycles wait for
     // this flush. Ordinary background time (minimised window, locked screen) syncs.
@@ -136,6 +159,7 @@ export class SyncEngine {
 
   schedulePush(): void {
     if (this.stopped) return;
+    this.emptyPolls = 0;
     if (this.pushTimer) clearTimeout(this.pushTimer);
     // Start the debounced push when the till is visible, or after the Share grace has
     // passed: only a request started right after Share may be suspended by Chromium.
@@ -152,8 +176,17 @@ export class SyncEngine {
   private async scheduleNext(delay?: number): Promise<void> {
     if (this.stopped) return;
     if (this.timer) clearTimeout(this.timer);
+    const base =
+      delay !== undefined
+        ? delay
+        : await getKv<number>(this.db, 'poll_after_ms', 60_000);
     const poll =
-      delay ?? (await getKv<number>(this.db, 'poll_after_ms', 60_000));
+      delay ??
+      nextPollDelay(
+        base,
+        this.emptyPolls,
+        document.visibilityState === 'hidden',
+      );
     this.timer = setTimeout(() => {
       if (this.shareHidden()) void this.scheduleNext();
       else void this.run('full');
@@ -225,11 +258,18 @@ export class SyncEngine {
         if (!(await isReadOnly(this.db))) await uploadQueued(this.db);
       }
       if (kind !== 'push') {
-        const pulled = await pullAll(this.db, (done, total) =>
-          useSyncState
-            .getState()
-            .set({ phase: 'downloading', progress: { done, total } }),
+        let received = 0;
+        const pulled = await pullAll(
+          this.db,
+          (done, total) =>
+            useSyncState
+              .getState()
+              .set({ phase: 'downloading', progress: { done, total } }),
+          (count) => {
+            received += count;
+          },
         );
+        this.emptyPolls = received > 0 ? 0 : this.emptyPolls + 1;
         serverTime = pulled ?? serverTime;
       }
       this.failures = 0;
@@ -305,7 +345,11 @@ export class SyncEngine {
         set({ phase: 'idle', progress: null });
         // Pulls continue in read-only mode.
         try {
-          const serverTime = await pullAll(this.db);
+          let received = 0;
+          const serverTime = await pullAll(this.db, undefined, (count) => {
+            received += count;
+          });
+          this.emptyPolls = received > 0 ? 0 : this.emptyPolls + 1;
           this.failures = 0;
           set(await this.recordSyncTime(serverTime));
         } catch {

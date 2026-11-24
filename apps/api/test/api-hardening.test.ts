@@ -850,8 +850,11 @@ describe('API-M1: offline sales and same-day cashier reversals', () => {
     const now = Date.now();
     const yesterday = now - DAY;
     const date = businessDate(yesterday);
+    // Pin the fixture to midday in the shop zone: near PKT midnight a "now + 1 hour"
+    // reversal would cross into today and turn this into a false FORBIDDEN.
+    const midday = Date.parse(`${date}T12:00:00+05:00`);
     const original = {
-      id: newId(yesterday),
+      id: newId(midday),
       category_id: 'tea_snacks',
       amount: 5000,
       method: 'cash',
@@ -862,7 +865,7 @@ describe('API-M1: offline sales and same-day cashier reversals', () => {
       device_id: shop.till.id,
       staff_id: IDS.cashier,
       business_date: date,
-      created_at: yesterday,
+      created_at: midday,
     };
     expect(
       (await pushOk(shop.till, [op('expenses', 'insert', original)])).results[0]
@@ -872,7 +875,7 @@ describe('API-M1: offline sales and same-day cashier reversals', () => {
       ...original,
       id: newId(),
       reverses_id: original.id,
-      created_at: yesterday + 3_600_000,
+      created_at: midday + 3_600_000,
     };
     const late = await pushOk(shop.till, [op('expenses', 'insert', reversal)]);
     expect(late.results[0]?.error_code ?? null).toBeNull();

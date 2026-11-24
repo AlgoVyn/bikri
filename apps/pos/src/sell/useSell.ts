@@ -12,7 +12,11 @@ import {
 } from '../data/cart.ts';
 import { loadBundleRecipe, type ProductListRow } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
-import { useCatalogueRows, useSold30 } from '../state/catalogue.ts';
+import {
+  getWarmCatalogue,
+  useCatalogueRows,
+  useSold30,
+} from '../state/catalogue.ts';
 
 export type SellRow = ProductListRow & { haystack: string };
 
@@ -26,7 +30,10 @@ const NO_SOLD = new Map<string, number>();
 export function useSellProducts(): SellRow[] | undefined {
   const sold = useSold30();
   // `buildProductRows` always sets the haystack; the cast avoids re-spreading rows.
-  return useCatalogueRows(sold ?? NO_SOLD) as SellRow[] | undefined;
+  const rows = useCatalogueRows(sold ?? NO_SOLD) as SellRow[] | undefined;
+  return (
+    rows ?? (getWarmCatalogue(getDb().tenantId)?.rows as SellRow[] | undefined)
+  );
 }
 
 /** Every word must appear; an exact barcode or SKU also matches. */

@@ -133,7 +133,10 @@ export default defineConfig({
             },
             {
               name: 'vendor',
-              test: /node_modules[\\/]/,
+              // Keep dynamically imported spreadsheet/QR libraries out of the initial
+              // vendor chunk. They are only needed when a file is imported or a QR is
+              // rendered, so the catch-all must not pull them into every cold load.
+              test: /^(?!.*node_modules[\\/](read-excel-file|fflate|papaparse|qrcode-generator)[\\/]).*node_modules[\\/]/,
               priority: 10,
               minSize: 20_000,
             },

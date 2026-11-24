@@ -79,6 +79,22 @@ export const pwaOptions = {
        Cloudflare caches and downloads the whole initial graph twice on first visit. */
     dontCacheBustURLsMatching: /\/assets\/.+-[A-Za-z0-9_-]{8,}\.(?:js|css)$/u,
     globPatterns: ['**/*.{js,css,html,svg,png,ico,woff2}'],
+    // The Arabic font is 94 KB and every English/Roman-Urdu till would otherwise
+    // download it at install. Fetch and cache it on first Urdu use instead.
+    runtimeCaching: [
+      {
+        urlPattern: new RegExp(
+          `${baseRe}/fonts/noto-naskh-arabic-.*\\.woff2$`,
+          'u',
+        ),
+        handler: 'CacheFirst',
+        options: {
+          cacheName: 'bikri-fonts',
+          cacheableResponse: { statuses: [0, 200] },
+          expiration: { maxEntries: 4, maxAgeSeconds: 60 * 60 * 24 * 30 },
+        },
+      },
+    ],
     // The operator console is always online and must not be precached (01 §6).
     globIgnores: [
       '**/admin/**',
@@ -89,6 +105,8 @@ export const pwaOptions = {
       '**/public/**',
       // Email/brand images are served from the website, not needed offline.
       '**/brand/**',
+      // Runtime-cached on the first Urdu render (runtimeCaching above).
+      '**/noto-naskh-arabic-*.woff2',
     ],
   },
   devOptions: {

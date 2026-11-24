@@ -295,19 +295,59 @@ async function pushAllUnlocked(
         if (appliedSeqs.length > 0) await db.outbox.bulkDelete(appliedSeqs);
         // Settle master shadows before writing the rejected followers: a pending
         // follower must still count as "newer" or its pre-delete shadow is lost.
+        // Preload the three lookups the loop needs; per-op gets made a 200-product
+        // bulk edit ~600 sequential IDB calls.
+        const masterKey = (tbl: string, id: string) => `${tbl}\u0000${id}`;
+        const masterKeys = masterApplied.map(
+          ({ entry }) => [entry.tbl, entry.row_id] as [string, string],
+        );
+        const liveByKey = new Map<string, Record<string, unknown>>();
+        const idsByTable = new Map<string, string[]>();
+        for (const { entry } of masterApplied) {
+          const ids = idsByTable.get(entry.tbl) ?? [];
+          if (!ids.includes(entry.row_id)) ids.push(entry.row_id);
+          idsByTable.set(entry.tbl, ids);
+        }
+        for (const [tbl, ids] of idsByTable) {
+          const rows = await db.table(tbl).bulkGet(ids);
+          rows.forEach((row, index) => {
+            if (row)
+              liveByKey.set(
+                masterKey(tbl, ids[index] as string),
+                row as Record<string, unknown>,
+              );
+          });
+        }
+        const shadowRows = await db.pull_shadow.bulkGet(masterKeys);
+        const shadowByKey = new Map<
+          string,
+          NonNullable<(typeof shadowRows)[number]>
+        >();
+        shadowRows.forEach((shadow, index) => {
+          if (shadow !== undefined) {
+            const [tbl, id] = masterKeys[index] as [string, string];
+            shadowByKey.set(masterKey(tbl, id), shadow);
+          }
+        });
+        const newerByKey = new Map<string, number>();
+        if (masterKeys.length > 0) {
+          const followers = await db.outbox
+            .where('[tbl+row_id]')
+            .anyOf(masterKeys)
+            .toArray();
+          for (const follower of followers) {
+            if (follower.status !== 'pending' && follower.status !== 'sending')
+              continue;
+            const key = masterKey(follower.tbl, follower.row_id);
+            newerByKey.set(key, (newerByKey.get(key) ?? 0) + 1);
+          }
+        }
         for (const { entry, result: r } of masterApplied) {
+          const key = masterKey(entry.tbl, entry.row_id);
           // A newer op for the same row may still be pending (for example one queued
           // while this request was in flight). Its restore point is the row the server
           // just accepted, not the older shadow; delete the shadow if we cannot replace it.
-          const newer = await db.outbox
-            .where('[tbl+row_id]')
-            .equals([entry.tbl, entry.row_id])
-            .filter(
-              (candidate) =>
-                candidate.status === 'pending' ||
-                candidate.status === 'sending',
-            )
-            .count();
+          const newer = newerByKey.get(key) ?? 0;
           if (newer > 0) {
             // Keep a restore point for the newer op. For an applied upsert, replace it
             // with the row the server now has; for a delete or a field merge, keep the
@@ -318,41 +358,37 @@ async function pushAllUnlocked(
               // from the live row would pick up a newer local transaction (for
               // example a delivery's avg_cost) that the server has not accepted yet
               // and make it the restore point (POS-H1).
-              const local = (await db.table(entry.tbl).get(entry.row_id)) as
-                | Record<string, unknown>
-                | undefined;
-              const existing = await db.pull_shadow.get([
-                entry.tbl,
-                entry.row_id,
-              ]);
+              const local = liveByKey.get(key);
+              const existing = shadowByKey.get(key);
               const settledRev = Number(r.server_rev ?? 0);
               if (
                 !(
                   existing?.source === 'server' &&
                   Number(existing.row.rev ?? 0) > settledRev
                 )
-              )
-                await db.pull_shadow.put({
+              ) {
+                const next = {
                   tbl: entry.tbl,
                   id: entry.row_id,
-                  source: 'local',
+                  source: 'local' as const,
                   row: {
                     ...(existing?.row ?? local ?? {}),
                     ...entry.row,
                     id: entry.row_id,
                     rev: r.server_rev ?? existing?.row.rev ?? local?.rev ?? 0,
-                  },
-                });
+                  } as Record<string, unknown>,
+                };
+                await db.pull_shadow.put(next);
+                shadowByKey.set(key, next);
+              }
             }
           } else {
-            const shadow = await db.pull_shadow.get([entry.tbl, entry.row_id]);
+            const shadow = shadowByKey.get(key);
             if (shadow?.source === 'server') {
               // A pull parked a newer server row while this local op was pending.
               // The cursor is already past that change, so apply it now; deleting the
               // shadow would strand the till on stale fields/rev until another edit.
-              const local = (await db.table(entry.tbl).get(entry.row_id)) as
-                | Record<string, unknown>
-                | undefined;
+              const local = liveByKey.get(key);
               const localRev = Number(local?.rev ?? 0);
               const shadowRev = Number(shadow.row.rev ?? 0);
               // Only apply a shadow that is at least the revision this push
@@ -360,10 +396,13 @@ async function pushAllUnlocked(
               // fetches the merged row.
               const serverRev =
                 typeof r.server_rev === 'number' ? r.server_rev : shadowRev;
-              if (local && shadowRev > localRev && shadowRev >= serverRev)
+              if (local && shadowRev > localRev && shadowRev >= serverRev) {
                 await db.table(entry.tbl).put(shadow.row);
+                liveByKey.set(key, shadow.row as Record<string, unknown>);
+              }
             }
             await db.pull_shadow.delete([entry.tbl, entry.row_id]);
+            shadowByKey.delete(key);
           }
           // Keep the local optimistic revision current; otherwise the next edit of
           // this row would use a stale base_rev and be needlessly field-merged.
@@ -380,9 +419,7 @@ async function pushAllUnlocked(
             // A newer server shadow applied above may already carry a higher revision
             // (another tab pulled `rev: 3` while this push produced `rev: 2`); never
             // downgrade, or the next edit triggers a spurious field merge.
-            const current = (await db.table(entry.tbl).get(entry.row_id)) as
-              | Record<string, unknown>
-              | undefined;
+            const current = liveByKey.get(key);
             if (r.server_rev > Number(current?.rev ?? 0))
               await db
                 .table(entry.tbl)
