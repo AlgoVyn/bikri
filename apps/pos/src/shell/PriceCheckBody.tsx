@@ -41,7 +41,10 @@ export function PriceCheckBody({ onClose }: { onClose: () => void }) {
   const seq = useRef(0);
 
   useEffect(() => {
-    inputRef.current?.focus();
+    // The body is a lazy chunk; Radix focuses the dialog chrome on mount before this
+    // input exists. Focus on the next frame so the search field wins.
+    const frame = requestAnimationFrame(() => inputRef.current?.focus());
+    return () => cancelAnimationFrame(frame);
   }, []);
 
   // Typed names search as you type; scanners still commit on Enter. A stale response is
