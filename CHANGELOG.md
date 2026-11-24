@@ -4,6 +4,9 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Update detection — 24 Nov 2026
+- The till now checks `registration.update()` as soon as the page's service-worker registration is ready, before the hourly interval or a visibility change. A till reopened or reloaded after a deploy could otherwise sit on the old precached `index.html` for up to an hour (the hourly timer restarted with every app launch, and a reload cannot bypass the old worker), so the **Update** button appeared late or not at all (D-300).
+
 ### Offline routing fix — 24 Nov 2026
 - The shop-request pages are `React.lazy` imports, so the precached router chunk no longer depends on `assets/public/*`; the bundle gate now fails any precached chunk that statically imports a non-precached one. Fixes every section failing with `Failed to fetch dynamically imported module: …/app-routes-….js` when that online-only file could not be fetched (D-299).
 
