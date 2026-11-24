@@ -14,7 +14,9 @@ describe('T-062 D1 size measurement', () => {
     expect(result.bytesPerShopYear).toBeGreaterThan(result.bytesPerBill);
     expect(result.logicalRowsPerBill).toBe(27);
     expect(result.billsPerDay).toBeCloseTo(4);
-  }, 30_000);
+    // Replaying all 32 migrations in a scratch SQLite file usually takes ~10-20 s;
+    // 30 s timed out on a loaded CI runner and cost a deploy, so leave real headroom.
+  }, 120_000);
 
   it('generates the documented large fixture shape without the file', () => {
     const fixture = largeFixture({
