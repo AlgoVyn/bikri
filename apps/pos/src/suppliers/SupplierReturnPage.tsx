@@ -120,21 +120,34 @@ export function SupplierReturnPage({
     setUnlinked([]);
   }, [purchaseId, data]);
 
+  const searchIndex = useMemo(() => {
+    if (!data) return null;
+    const text = new Map(
+      data.products.map((product) => [
+        product.id,
+        `${String(product.name_en)}\u0000${String(product.sku)}`.toLowerCase(),
+      ]),
+    );
+    const barcode = new Map<string, string>();
+    for (const row of data.barcodes) {
+      if (!row.deleted_at)
+        barcode.set(String(row.barcode), String(row.product_id));
+    }
+    return { text, barcode };
+  }, [data]);
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q || !data) return [];
-    const barcode = data.barcodes.find(
-      (row) => String(row.barcode) === q && !row.deleted_at,
-    );
+    if (!q || !data || !searchIndex) return [];
+    const barcodeProduct = searchIndex.barcode.get(q);
     return data.products
       .filter(
         (product) =>
-          product.id === barcode?.product_id ||
-          String(product.name_en).toLowerCase().includes(q) ||
-          String(product.sku).toLowerCase().includes(q),
+          product.id === barcodeProduct ||
+          (searchIndex.text.get(product.id)?.includes(q) ?? false),
       )
       .slice(0, 8);
-  }, [query, data]);
+  }, [query, data, searchIndex]);
 
   const purchase = data?.purchases.find(
     (row) => String(row.purchase.id) === purchaseId,

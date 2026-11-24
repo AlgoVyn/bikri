@@ -206,7 +206,7 @@ No Background Sync in v1: pushes happen only while the app is open (the counter 
 
 **Clock check:** every response carries `server_time`. If `|device clock − server_time| > 5 min`, the avatar status shows an amber warning and its menu explains "This PC's clock is wrong — fix the date/time"; Home also shows an attention card. Ledger rows still use the device clock (`created_at`, `business_date` in `shop.timezone`), because selling must work offline; the warning stops a wrong clock from silently putting bills on the wrong business date.
 
-**Pending report:** every till request sends `X-Bikri-Pending: <pending_op_count>;<oldest_pending_created_at or 0>`; the Worker stores it in `devices.pending_ops` / `devices.oldest_pending_at` together with `last_seen_at` (at most once per 5 minutes) for Settings → Devices and the operator console.
+**Pending report:** every till request sends `X-Bikri-Pending: <pending_op_count>;<oldest_pending_created_at or 0>`; the Worker stores it in `devices.pending_ops` / `devices.oldest_pending_at` together with `last_seen_at` (at most once per 15 minutes) for Settings → Devices and the operator console.
 
 ## 7. Status shown to the user
 

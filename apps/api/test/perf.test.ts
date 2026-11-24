@@ -138,6 +138,12 @@ const HOT_QUERIES: Array<{
     args: ['t', 2000],
     index: 'sales_replaces',
   },
+  {
+    name: 'last close per device',
+    sql: 'SELECT id FROM day_closes WHERE tenant_id = ? AND device_id = ? ORDER BY period_end DESC LIMIT 1',
+    args: ['t', 'd'],
+    index: 'day_closes_device',
+  },
 ];
 
 const REFERENCE_LINES = 3;

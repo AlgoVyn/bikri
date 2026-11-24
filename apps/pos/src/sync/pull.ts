@@ -12,10 +12,12 @@ import type { BikriDb, SyncedRow } from '@bikri/db';
 import { rebuildCaches } from '../data/caches.ts';
 import { getKv, setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
+import { clearFirstBusinessDayCache } from '../data/reportRange.ts';
 import {
   clearCatalogueSearchCache,
   clearInvoiceSearchCache,
 } from '../data/search.ts';
+import { clearSupplierDeliveryCache } from '../data/suppliers.ts';
 import { clearSoldCache } from '../state/catalogue.ts';
 import { SyncHttpError, tillAuth, tillRequest } from './client.ts';
 import { withSyncLock } from './lock.ts';
@@ -63,6 +65,7 @@ async function pullAllUnlocked(
     await runSnapshotUnlocked(db, onSnapshot);
   }
   let serverTime: number | null = null;
+  let completed = false;
   for (let page = 0; page < 200; page += 1) {
     const since = await getKv<number>(db, 'pull_cursor', 0);
     let res: PullResponse;
@@ -97,11 +100,15 @@ async function pullAllUnlocked(
       res.changes.map((c) => ({ tbl: c.tbl, row: c.row })),
       res.next_since,
     );
-    if (!res.has_more) break;
+    if (!res.has_more) {
+      completed = true;
+      break;
+    }
   }
   // One signal per completed pull, not one per page: Home's attention refresh and the
   // "last pull" card must not re-run while a 200-page backlog is still downloading.
-  await setKv(db, 'last_pull_at', Date.now());
+  // A capped pull (200 pages with has_more still true) must not look synced.
+  if (completed) await setKv(db, 'last_pull_at', Date.now());
   await settleRecovery(db);
   return serverTime;
 }
@@ -120,18 +127,34 @@ const SEARCH_CATALOGUE_TABLES = new Set([
   'customers',
 ]);
 const SEARCH_INVOICE_TABLES = new Set(['sales', 'refunds', 'sale_voids']);
+const FIRST_DAY_TABLES = new Set([
+  'sales',
+  'payments',
+  'refunds',
+  'expenses',
+  'day_closes',
+  'stock_movements',
+  'purchases',
+  'supplier_returns',
+]);
 function clearReaderCaches(tables: Iterable<string>): void {
   let sold = false;
   let catalogue = false;
   let invoice = false;
+  let purchases = false;
+  let firstDay = false;
   for (const table of tables) {
     if (SOLD_SOURCE_TABLES.has(table)) sold = true;
     if (SEARCH_CATALOGUE_TABLES.has(table)) catalogue = true;
     if (SEARCH_INVOICE_TABLES.has(table)) invoice = true;
+    if (table === 'purchases') purchases = true;
+    if (FIRST_DAY_TABLES.has(table)) firstDay = true;
   }
   if (sold) clearSoldCache();
   if (catalogue) clearCatalogueSearchCache();
   if (invoice) clearInvoiceSearchCache();
+  if (purchases) clearSupplierDeliveryCache();
+  if (firstDay) clearFirstBusinessDayCache();
 }
 
 /** Pulled rows that advance the derived caches (`stock_levels`, `party_balances`). */

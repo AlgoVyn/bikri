@@ -2,7 +2,7 @@ import { businessDate } from '@bikri/core';
 import type { RasterSource } from '@bikri/printer';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useRef, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -151,6 +151,27 @@ export function CustomerStatement({
     enabled: can('payment.receive') && !readOnly,
   });
 
+  const tz = data?.tz ?? 'Asia/Karachi';
+  const mapRows = useCallback(
+    (value: Statement) =>
+      value.rows.map((row) => ({
+        date: dateText(String(row.entry.business_date), i18n.language, tz),
+        dateShort: shortDateText(String(row.entry.business_date), tz),
+        description: entryDescription(t, row),
+        descriptionShort: entryDescriptionShort(t, row),
+        debit: row.debit,
+        credit: row.credit,
+        balance: row.balance,
+        voided: row.voided,
+        items: row.items,
+      })),
+    [i18n.language, tz, t],
+  );
+  const rows = useMemo(
+    () => (data ? mapRows(data.statement) : []),
+    [data, mapRows],
+  );
+
   if (data === null)
     return (
       <p className="p-6 text-center text-text-muted">
@@ -162,7 +183,6 @@ export function CustomerStatement({
   const {
     customer,
     statement,
-    tz,
     today,
     balance,
     shopName,
@@ -184,19 +204,6 @@ export function CustomerStatement({
       date: dateText(today, i18n.language, tz),
     }),
   );
-  const mapRows = (value: Statement) =>
-    value.rows.map((row) => ({
-      date: dateText(String(row.entry.business_date), i18n.language, tz),
-      dateShort: shortDateText(String(row.entry.business_date), tz),
-      description: entryDescription(t, row),
-      descriptionShort: entryDescriptionShort(t, row),
-      debit: row.debit,
-      credit: row.credit,
-      balance: row.balance,
-      voided: row.voided,
-      items: row.items,
-    }));
-  const rows = mapRows(statement);
   // The data layer returns the newest page; the printed statement and CSV load every
   // row separately, so paging the screen does not truncate an export.
   const shownRows = statement.rows;

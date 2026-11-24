@@ -2,7 +2,7 @@ import { businessDate } from '@bikri/core';
 import type { RasterSource } from '@bikri/printer';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -141,6 +141,27 @@ export function SupplierStatement({
     { enabled: can('purchase.create') && !readOnly },
   );
 
+  const tz = data?.tz ?? 'Asia/Karachi';
+  type StatementData = NonNullable<typeof data>['statement'];
+  const mapRows = useCallback(
+    (value: StatementData) =>
+      value.rows.map((row) => ({
+        date: dateText(String(row.entry.business_date), i18n.language, tz),
+        description: supplierEntryDescription(t, row),
+        got: row.got,
+        paid: row.paid,
+        debit: row.got,
+        credit: row.paid,
+        balance: row.balance,
+        items: row.items,
+      })),
+    [i18n.language, tz, t],
+  );
+  const rows = useMemo(
+    () => (data ? mapRows(data.statement) : []),
+    [data, mapRows],
+  );
+
   if (data === null)
     return (
       <p className="p-6 text-center text-text-muted">
@@ -153,7 +174,6 @@ export function SupplierStatement({
     supplier,
     statement,
     balance,
-    tz,
     shopName,
     shopAddress,
     shopPhone,
@@ -162,18 +182,6 @@ export function SupplierStatement({
   const name = String(supplier.name);
   const supplierPhone = String(supplier.phone ?? '');
   const supplierAddress = String(supplier.address ?? '');
-  const mapRows = (value: typeof statement) =>
-    value.rows.map((row) => ({
-      date: dateText(String(row.entry.business_date), i18n.language, tz),
-      description: supplierEntryDescription(t, row),
-      got: row.got,
-      paid: row.paid,
-      debit: row.got,
-      credit: row.paid,
-      balance: row.balance,
-      items: row.items,
-    }));
-  const rows = mapRows(statement);
   // The data layer returns the newest page; CSV/PDF/share load every row separately.
   const shownRows = statement.rows;
   const shownOpening = statement.openingBalance;

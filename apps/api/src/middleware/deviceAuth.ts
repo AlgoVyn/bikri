@@ -8,7 +8,7 @@ import type { AppEnv } from '../types.ts';
 
 const TOKEN = /^Bearer ([A-Za-z0-9_-]{43})$/u;
 /** `last_seen_at` / pending report is written at most every 5 minutes per device (03 §6). */
-const SEEN_EVERY_MS = 5 * 60_000;
+const SEEN_EVERY_MS = 15 * 60_000;
 
 /** `X-Bikri-Pending: <count>;<oldest created_at or 0>` → numbers, or null when absent/bad. */
 export function parsePending(

@@ -13,6 +13,11 @@ const DAY = 86_400_000;
 
 /** A completed print job older than this can no longer be reprinted from the till. */
 export const PRINT_JOB_RETENTION_MS = 90 * DAY;
+/**
+ * A failed job older than the same window is diagnostic only. Retention used to trim
+ * `done` only, so a broken printer could keep thousands of failed rows forever.
+ */
+export const FAILED_PRINT_JOB_RETENTION_MS = 90 * DAY;
 /** A failed upload keeps its blob so the user can retry during this window. */
 export const FAILED_UPLOAD_RETENTION_MS = 30 * DAY;
 /** Quarantined pull rows are diagnostics, not data. */
@@ -45,7 +50,19 @@ export async function pruneLocalHistory(
           false,
         )
         .primaryKeys();
-      if (oldJobs.length > 0) await db.print_jobs.bulkDelete(oldJobs);
+      // A broken printer can leave thousands of failed rows; they are not business
+      // records and cannot be retried usefully after the retention window.
+      const oldFailedJobs = await db.print_jobs
+        .where('[status+created_at]')
+        .between(
+          ['failed', 0],
+          ['failed', now - FAILED_PRINT_JOB_RETENTION_MS],
+          true,
+          false,
+        )
+        .primaryKeys();
+      const allOldJobs = [...oldJobs, ...oldFailedJobs];
+      if (allOldJobs.length > 0) await db.print_jobs.bulkDelete(allOldJobs);
 
       // primaryKeys() never reads the failed blob itself.
       const oldUploads = await db.file_queue
@@ -77,7 +94,7 @@ export async function pruneLocalHistory(
       }
 
       return {
-        printJobs: oldJobs.length,
+        printJobs: allOldJobs.length,
         failedUploads: oldUploads.length,
         pullErrors: removedErrors,
       };

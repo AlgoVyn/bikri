@@ -325,7 +325,7 @@
     "desc_count": "اسٹاک گنتی",
     "desc_products": "اسٹاک سنبھالیں",
     "desc_sales": "بل اور واپسی",
-    "desc_udhaar": "گاہک کا کھاتہ",
+    "desc_udhaar": "ادھار، بقایا اور یاد دہانیاں",
     "desc_suppliers": "خریداری اور واجبات",
     "desc_expenses": "اخراجات",
     "desc_reports": "منافع اور رجحان",
@@ -425,7 +425,7 @@
     "sell": "بیچیں",
     "settings": "سیٹنگز",
     "suppliers": "سپلائرز",
-    "udhaar": "ادھار"
+    "udhaar": "گاہک"
   },
   "pay": {
     "amount": "رقم",

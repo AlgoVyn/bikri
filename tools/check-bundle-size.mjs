@@ -13,6 +13,8 @@ const DIST = join(ROOT, 'apps/pos/dist', BASE_PATH.replace(/^\//u, ''));
 const BASE_RE = BASE_PATH.replace(/[.*+?^${}()|[\]\\]/gu, '\\$&');
 // 290 KB after counting the (now inline) theme bootstrap and the real initial graph.
 const INITIAL_BUDGET = 290 * 1024;
+// Leave enough room for the next feature; the hard gate is 290 KB.
+const WARN_INITIAL_BUDGET = 285 * 1024;
 const CHUNK_BUDGET = 100 * 1024;
 const CSS_BUDGET = 25 * 1024;
 const PRECACHE_BUDGET = 1.25 * 1024 * 1024;
@@ -133,6 +135,12 @@ if (largestLocale !== null && !initial.has(largestLocale))
 if (initialTotal > INITIAL_BUDGET) {
   problems.push(
     `initial JS is ${kb(initialTotal)} gz (budget ${kb(INITIAL_BUDGET)})`,
+  );
+} else if (initialTotal > WARN_INITIAL_BUDGET) {
+  console.warn(
+    `bundle warning: initial JS is ${kb(initialTotal)} gz; only ${kb(
+      INITIAL_BUDGET - initialTotal,
+    )} of headroom remains before the ${kb(INITIAL_BUDGET)} gate`,
   );
 }
 let cssTotal = 0;

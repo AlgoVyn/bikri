@@ -30,12 +30,13 @@ const upload = (
 });
 
 describe('local history retention', () => {
-  it('trims only completed jobs, old failed uploads and old pull errors', async () => {
+  it('trims old completed and failed jobs, old failed uploads and old pull errors', async () => {
     const db = await readyDb('retention');
     await db.print_jobs.bulkAdd([
       job('done-old', 'done', NOW - 100 * DAY),
       job('done-new', 'done', NOW - 10 * DAY),
       job('failed-old', 'failed', NOW - 100 * DAY),
+      job('failed-new', 'failed', NOW - 10 * DAY),
     ]);
     await db.file_queue.bulkAdd([
       upload(1, 'failed', NOW - 40 * DAY),
@@ -53,13 +54,14 @@ describe('local history retention', () => {
     });
 
     expect(await pruneLocalHistory(db, NOW)).toEqual({
-      printJobs: 1,
+      printJobs: 2,
       failedUploads: 1,
       pullErrors: 1,
     });
     expect(await db.print_jobs.get('done-old')).toBeUndefined();
     expect(await db.print_jobs.get('done-new')).toBeDefined();
-    expect(await db.print_jobs.get('failed-old')).toBeDefined();
+    expect(await db.print_jobs.get('failed-old')).toBeUndefined();
+    expect(await db.print_jobs.get('failed-new')).toBeDefined();
     expect(await db.file_queue.get(1)).toBeUndefined();
     expect(await db.file_queue.get(2)).toBeDefined();
     expect(await db.file_queue.get(3)).toBeDefined();

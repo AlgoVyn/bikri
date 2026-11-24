@@ -125,7 +125,7 @@ describe('app shell', () => {
       'Sell',
       'Products',
       'Sales',
-      'Credits',
+      'Customers',
       'Suppliers',
       'Expenses',
       'Reports',
@@ -186,7 +186,10 @@ describe('app shell', () => {
     await renderAt(`${BASE_PATH}/`);
     await screen.findByRole('heading', { name: 'Welcome back, Adnan' });
     await user.keyboard('/');
-    expect(document.activeElement?.id).toBe('global-search');
+    await screen.findByRole('combobox', { name: /Search/ });
+    await waitFor(() =>
+      expect(document.activeElement?.id).toBe('global-search'),
+    );
     await user.keyboard('A-A');
     (document.activeElement as HTMLElement).blur();
     // The search is a modal; close it before the global N shortcut.
@@ -226,8 +229,8 @@ describe('app shell', () => {
     await waitFor(() =>
       expect(rail.querySelector('a[title^="Sell ("]')).toBeNull(),
     );
-    // Credits and expenses stay readable; their write controls are gated in-screen.
-    expect(rail.querySelector('a[title^="Credits ("]')).not.toBeNull();
+    // Customers and expenses stay readable; their write controls are gated in-screen.
+    expect(rail.querySelector('a[title^="Customers ("]')).not.toBeNull();
     expect(rail.querySelector('a[title^="Expenses ("]')).not.toBeNull();
     expect(rail.querySelector('a[title^="Products ("]')).not.toBeNull();
     const user = userEvent.setup();

@@ -219,7 +219,13 @@ export const DEXIE_SCHEMA_V14 = {
     'id, sale_id, business_date, [product_id+business_date], [bundle_id+business_date]',
 } as const;
 
-export type DexieTableName = keyof typeof DEXIE_SCHEMA_V14;
+/** V15 drops `outbox.created_at`; every outbox read uses seq/status/tbl. */
+export const DEXIE_SCHEMA_V15 = {
+  ...DEXIE_SCHEMA_V14,
+  outbox: '++seq, &op_id, tx_id, [status+seq], [tbl+row_id]',
+} as const;
+
+export type DexieTableName = keyof typeof DEXIE_SCHEMA_V15;
 
 export const LOCAL_ONLY_TABLES = [
   'outbox',
@@ -587,6 +593,8 @@ export class BikriDb extends Dexie {
       .upgrade((tx) => backfillRefundLineDates(tx));
     // V14 only drops an unused index; IndexedDB rebuilds the store from stored rows.
     this.version(14).stores(DEXIE_SCHEMA_V14);
+    // V15 drops the unused outbox.created_at index (an index-only upgrade).
+    this.version(15).stores(DEXIE_SCHEMA_V15);
   }
 }
 

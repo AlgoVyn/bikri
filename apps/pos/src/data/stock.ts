@@ -253,10 +253,10 @@ function newDraftStamp(): string {
     .slice(2, 8)}`;
 }
 
-export async function countProducts(
+export async function countProductsWithLevels(
   db: BikriDb,
   scope: CountScope,
-): Promise<MasterRow[]> {
+): Promise<{ products: MasterRow[]; levels: Map<string, number> }> {
   const levels = new Map(
     (await db.stock_levels.toArray()).map((l) => [
       l.product_id,
@@ -272,7 +272,7 @@ export async function countProducts(
       : scope.kind === 'low'
         ? await db.products.where('track_stock').equals(1).toArray()
         : await db.products.toArray();
-  const list = source.filter((p) => {
+  const products = source.filter((p) => {
     if (p.deleted_at || p.track_stock !== 1) return false;
     if (scope.kind === 'low') {
       const min = Number(p.min_stock_milli ?? 0);
@@ -280,9 +280,19 @@ export async function countProducts(
     }
     return true;
   });
-  return list.sort((a, b) =>
-    String(a.name_en).localeCompare(String(b.name_en)),
-  );
+  return {
+    products: products.sort((a, b) =>
+      String(a.name_en).localeCompare(String(b.name_en)),
+    ),
+    levels,
+  };
+}
+
+export async function countProducts(
+  db: BikriDb,
+  scope: CountScope,
+): Promise<MasterRow[]> {
+  return (await countProductsWithLevels(db, scope)).products;
 }
 
 export async function startCount(
@@ -290,11 +300,9 @@ export async function startCount(
   scope: CountScope,
   now = Date.now(),
 ): Promise<CountDraft> {
-  const products = await countProducts(db, scope);
-  const levels = await db.stock_levels.bulkGet(products.map((p) => p.id));
+  const { products, levels } = await countProductsWithLevels(db, scope);
   const expected: Record<string, number> = {};
-  for (const [index, p] of products.entries())
-    expected[p.id] = levels[index]?.on_hand_milli ?? 0;
+  for (const p of products) expected[p.id] = levels.get(p.id) ?? 0;
   const draft: CountDraft = {
     scope,
     started_at: now,
