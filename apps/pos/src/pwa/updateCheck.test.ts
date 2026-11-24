@@ -3,12 +3,19 @@ import {
   startUpdateChecks,
   stopUpdateChecks,
   UPDATE_CHECK_INTERVAL_MS,
+  UPDATE_CHECK_MIN_GAP_MS,
 } from './updateCheck.ts';
 
 function stubServiceWorker(
   getRegistration: () => Promise<ServiceWorkerRegistration | undefined>,
 ): void {
-  vi.stubGlobal('navigator', { serviceWorker: { getRegistration } });
+  vi.stubGlobal('navigator', {
+    serviceWorker: {
+      getRegistration,
+      // The startup check waits for the active registration, as a real page does.
+      ready: Promise.resolve(fakeRegistration(async () => undefined)),
+    },
+  });
 }
 
 function fakeRegistration(
@@ -21,6 +28,12 @@ async function flushPromises(): Promise<void> {
   await Promise.resolve();
   await Promise.resolve();
   await Promise.resolve();
+}
+
+/** Lets the startup `ready.then(check)` and its `getRegistration` settle. */
+async function settleStartupCheck(): Promise<void> {
+  await flushPromises();
+  await flushPromises();
 }
 
 beforeEach(() => {
@@ -37,22 +50,25 @@ afterEach(() => {
 });
 
 describe('startUpdateChecks', () => {
-  it('checks the registration once an hour', async () => {
+  it('checks once the registration is ready, then once an hour', async () => {
     const update = vi.fn().mockResolvedValue(undefined);
     stubServiceWorker(() => Promise.resolve(fakeRegistration(update)));
 
     startUpdateChecks();
-    await vi.advanceTimersByTimeAsync(UPDATE_CHECK_INTERVAL_MS - 1);
-    await flushPromises();
-    expect(update).not.toHaveBeenCalled();
+    await settleStartupCheck();
+    expect(update).toHaveBeenCalledOnce();
 
-    await vi.advanceTimersByTimeAsync(1);
+    await vi.advanceTimersByTimeAsync(UPDATE_CHECK_INTERVAL_MS - 1);
     await flushPromises();
     expect(update).toHaveBeenCalledOnce();
 
-    await vi.advanceTimersByTimeAsync(UPDATE_CHECK_INTERVAL_MS);
+    await vi.advanceTimersByTimeAsync(1);
     await flushPromises();
     expect(update).toHaveBeenCalledTimes(2);
+
+    await vi.advanceTimersByTimeAsync(UPDATE_CHECK_INTERVAL_MS);
+    await flushPromises();
+    expect(update).toHaveBeenCalledTimes(3);
   });
 
   it('checks when the till becomes visible, with a short minimum gap', async () => {
@@ -60,16 +76,25 @@ describe('startUpdateChecks', () => {
     stubServiceWorker(() => Promise.resolve(fakeRegistration(update)));
 
     startUpdateChecks();
+    await settleStartupCheck();
+    expect(update).toHaveBeenCalledOnce();
+
+    // The startup check counts towards the gap, so an immediate tab switch is free.
     document.dispatchEvent(new Event('visibilitychange'));
     await flushPromises();
     expect(update).toHaveBeenCalledOnce();
 
+    await vi.advanceTimersByTimeAsync(UPDATE_CHECK_MIN_GAP_MS);
     document.dispatchEvent(new Event('visibilitychange'));
     await flushPromises();
-    expect(update).toHaveBeenCalledOnce();
+    expect(update).toHaveBeenCalledTimes(2);
+
+    document.dispatchEvent(new Event('visibilitychange'));
+    await flushPromises();
+    expect(update).toHaveBeenCalledTimes(2);
   });
 
-  it('does not check while the till is hidden', async () => {
+  it('does not run the visibility check while the till is hidden', async () => {
     const update = vi.fn().mockResolvedValue(undefined);
     stubServiceWorker(() => Promise.resolve(fakeRegistration(update)));
     const visibility = vi
@@ -77,9 +102,11 @@ describe('startUpdateChecks', () => {
       .mockReturnValue('hidden');
 
     startUpdateChecks();
+    await settleStartupCheck();
+    await vi.advanceTimersByTimeAsync(UPDATE_CHECK_MIN_GAP_MS);
     document.dispatchEvent(new Event('visibilitychange'));
     await flushPromises();
-    expect(update).not.toHaveBeenCalled();
+    expect(update).toHaveBeenCalledOnce();
 
     visibility.mockRestore();
   });
@@ -93,8 +120,7 @@ describe('startUpdateChecks', () => {
     stubServiceWorker(getRegistration);
 
     startUpdateChecks();
-    document.dispatchEvent(new Event('visibilitychange'));
-    await flushPromises();
+    await settleStartupCheck();
     expect(update).not.toHaveBeenCalled();
 
     document.dispatchEvent(new Event('visibilitychange'));
@@ -107,8 +133,7 @@ describe('startUpdateChecks', () => {
     stubServiceWorker(() => Promise.resolve(fakeRegistration(update)));
 
     startUpdateChecks();
-    document.dispatchEvent(new Event('visibilitychange'));
-    await flushPromises();
+    await settleStartupCheck();
     expect(update).toHaveBeenCalledOnce();
 
     document.dispatchEvent(new Event('visibilitychange'));
@@ -120,15 +145,14 @@ describe('startUpdateChecks', () => {
     expect(update).toHaveBeenCalledTimes(2);
   });
 
-  it('is idempotent and stops both the timer and the listener', async () => {
+  it('is idempotent and stops the startup check, timer and listener', async () => {
     const update = vi.fn().mockResolvedValue(undefined);
     stubServiceWorker(() => Promise.resolve(fakeRegistration(update)));
 
     const first = startUpdateChecks();
     expect(startUpdateChecks()).toBe(first);
 
-    await vi.advanceTimersByTimeAsync(UPDATE_CHECK_INTERVAL_MS);
-    await flushPromises();
+    await settleStartupCheck();
     expect(update).toHaveBeenCalledOnce();
 
     first();
