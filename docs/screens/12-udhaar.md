@@ -1,6 +1,6 @@
 # 12 — Customers (udhaar / khata)
 
-**Visible name:** **Customers** in English and Roman Urdu, **گاہک** in Urdu. The credit concept stays **Udhaar**/khata inside the screen, on receipts and in reports; the route stays `/udhaar`.
+**Visible name:** **Customers** in English and Roman Urdu, **گاہک** in Urdu. English keeps the credit concept as **Credit** (Urdu/Roman Urdu keep **Udhaar**/khata); the route stays `/udhaar`.
 
 **Routes** `/udhaar` (customers), `/udhaar/:customerId` (statement), `/udhaar/chase` (chase list), modals: new/edit customer, receive payment, promise. Permissions: `payment.receive`, `party.edit`, `party.delete`. Balance rules: [07 §5](../07-money-rules.md#5-customer-and-supplier-balances). On ≥ 1280 px the customer list and the selected khata share one master–detail screen ("Select a customer" until one is picked); below 1280 px the statement is a full page with a back arrow.
 

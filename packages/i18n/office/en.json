@@ -360,7 +360,7 @@
       "total": "Total",
       "total_owed": "Total owed to you",
       "voided_bill": "Cancelled",
-      "subtitle": "Udhaar, balances and reminders",
+      "subtitle": "Credit, balances and reminders",
       "select_customer": "Select a customer",
       "select_customer_hint": "Their ledger and balance appear here."
     },

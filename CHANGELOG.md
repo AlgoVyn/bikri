@@ -5,7 +5,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 ## [Unreleased]
 
 ### Customers label — 24 Nov 2026
-- The udhaar section is now **Customers** in English/Roman Urdu and **گاہک** in Urdu, with the subtitle “Udhaar, balances and reminders”. The route `/udhaar`, keys, `payment.receive` gate, payment method, receipts, reports and balance rules are unchanged (D-298).
+- The udhaar section is now **Customers** in English/Roman Urdu and **گاہک** in Urdu, with the English subtitle “Credit, balances and reminders” (Urdu/Roman Urdu keep the udhaar wording). The route `/udhaar`, keys, `payment.receive` gate, payment method, receipts, reports and balance rules are unchanged (D-298).
 
 ### Performance-review cleanup — 24 Nov 2026
 - **D1/Worker:** `lastClose` uses a per-device correlated lookup instead of a full-history `GROUP BY`; `last_seen_at` is written every 15 min; `GET /api/files/*` returns R2 `304`, `PUT` checks the product before buffering, and GC caps one run at 10,000 objects.
