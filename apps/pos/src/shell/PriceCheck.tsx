@@ -1,4 +1,4 @@
-import { lazy, Suspense } from 'react';
+import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { Modal } from '../sell/Modal.tsx';
 import { usePriceCheck } from './priceCheckStore.ts';
@@ -18,14 +18,32 @@ export function PriceCheck() {
   const open = usePriceCheck((s) => s.open);
   const setOpen = usePriceCheck((s) => s.setOpen);
   const { t } = useTranslation();
+  const [ready, setReady] = useState(false);
+
+  // Open the dialog only after the lazy body is in memory. Radix focuses the first
+  // field on open; if the body arrived afterwards, its input would lose that focus.
+  useEffect(() => {
+    if (!open) {
+      setReady(false);
+      return;
+    }
+    let alive = true;
+    void import('./PriceCheckBody.tsx').then(() => {
+      if (alive) setReady(true);
+    });
+    return () => {
+      alive = false;
+    };
+  }, [open]);
+
   return (
     <Modal
-      open={open}
+      open={open && ready}
       onOpenChange={setOpen}
       title={t('pricecheck.title')}
       wide
     >
-      {open ? (
+      {ready ? (
         <Suspense fallback={null}>
           <PriceCheckBody onClose={() => setOpen(false)} />
         </Suspense>
