@@ -4,6 +4,9 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Offline routing fix — 24 Nov 2026
+- The shop-request pages are `React.lazy` imports, so the precached router chunk no longer depends on `assets/public/*`; the bundle gate now fails any precached chunk that statically imports a non-precached one. Fixes every section failing with `Failed to fetch dynamically imported module: …/app-routes-….js` when that online-only file could not be fetched (D-299).
+
 ### Customers label — 24 Nov 2026
 - The udhaar section is now **Customers** in English/Roman Urdu and **گاہک** in Urdu, with the English subtitle “Credit, balances and reminders” (Urdu/Roman Urdu keep the udhaar wording). The route `/udhaar`, keys, `payment.receive` gate, payment method, receipts, reports and balance rules are unchanged (D-298).
 
