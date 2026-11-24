@@ -4,6 +4,15 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Customers label — 24 Nov 2026
+- The udhaar section is now **Customers** in English/Roman Urdu and **گاہک** in Urdu, with the subtitle “Udhaar, balances and reminders”. The route `/udhaar`, keys, `payment.receive` gate, payment method, receipts, reports and balance rules are unchanged (D-298).
+
+### Performance-review cleanup — 24 Nov 2026
+- **D1/Worker:** `lastClose` uses a per-device correlated lookup instead of a full-history `GROUP BY`; `last_seen_at` is written every 15 min; `GET /api/files/*` returns R2 `304`, `PUT` checks the product before buffering, and GC caps one run at 10,000 objects.
+- **POS data/sync:** Dexie V15 drops `outbox.created_at`; the print queue claims with `[status+created_at]`; a capped pull no longer stamps `last_pull_at`; failed print jobs are pruned with done jobs; stock count reuses its stock-level read; `firstBusinessDay`, supplier last-delivery and slow-mover void ids are cached; `checkCaches` samples primary keys; stock-check/repair group lookups are indexed once per transaction.
+- **POS UI:** PriceCheck and global search are lazy chunks (initial JS 282.1 KB gz); the `/` hotkey stays in a tiny gate; statements memoize mapped rows; recipe/delivery/return pickers precompute search keys.
+- **Gates:** Playwright now measures search, scan→line, Pay and Done at 4× CPU; the bundle gate warns at 285 KB and fails at 290 KB.
+
 ### Whole-codebase review remediation — 23 Nov 2026
 - **Database:** migration `0032` makes the bundle recipe INSERT guards ignore soft-deleted history, stops `cost_changed_at` from blocking a zero-movement simple product's conversion to a bundle, and adds import-path guards for bundle sale lines, partial bundle metadata and expense reversals.
 - **Core/i18n:** `parseMoneyToPaisa` strips `PKR.`/`Rs.` before the whitespace (no more 100× undercharge) and rejects double dots; Urdu/Roman-Urdu `owes`/`change`/`subtotal`, backup hint and grammar are corrected; the `bundle_change` audit action has a label and keys; Urdu numeric ranges are LRI/PDI-isolated and checked; area catalogs fall back to English and cross-area duplicates fail; ULID `Z` bias, NBSP stripping and the bare `/bikri` header rule are fixed; the Dexie type/export reference V14.

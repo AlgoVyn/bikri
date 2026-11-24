@@ -37,10 +37,33 @@ export function spanDays(from: string, to: string): number {
  * The shop's first business day: the earliest of its creation date and the first row in
  * the dated tables. Imports and restores can carry rows older than the setup date, so the
  * creation date alone would cut real history off.
+ *
+ * The result changes only on an import/restore (normal sales are dated today or up to
+ * 30 days back and cannot predate the shop), so a short in-memory cache avoids eight
+ * index probes every time Reports or Sales opens.
  */
+const FIRST_DAY_TTL_MS = 5 * 60_000;
+let firstDayCacheEpoch = 0;
+const firstDayCache = new WeakMap<
+  object,
+  { epoch: number; at: number; value: string | null }
+>();
+
+/** Test/restore hook: drop cached first-day values. */
+export function clearFirstBusinessDayCache(): void {
+  firstDayCacheEpoch += 1;
+}
+
 export async function firstBusinessDay(
   src: TableSource,
 ): Promise<string | null> {
+  const cached = firstDayCache.get(src);
+  if (
+    cached !== undefined &&
+    cached.epoch === firstDayCacheEpoch &&
+    Date.now() - cached.at < FIRST_DAY_TTL_MS
+  )
+    return cached.value;
   const shop = await (src.table('shop') as Table<MasterRow, string>).get(
     'shop',
   );
@@ -72,7 +95,13 @@ export async function firstBusinessDay(
     if (DATE.test(date) && Number.isFinite(dateMs(date))) dates.push(date);
   }
   dates.sort();
-  return dates[0] ?? null;
+  const value = dates[0] ?? null;
+  firstDayCache.set(src, {
+    epoch: firstDayCacheEpoch,
+    at: Date.now(),
+    value,
+  });
+  return value;
 }
 
 /** Inclusive calendar-month chunks covering a range; [] for an invalid range. */

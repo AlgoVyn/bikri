@@ -12,7 +12,7 @@ import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { seesAllDates } from '../state/reportScope.ts';
-import { composing, dialogOpen, ignoresHotkey } from './hotkeys.ts';
+import { composing } from './hotkeys.ts';
 import { useGlobalSearch } from './searchStore.ts';
 
 /** Rail or top-bar trigger for the global search overlay (screens/04). */
@@ -26,7 +26,6 @@ export function GlobalSearchHost() {
   const listId = useId();
   const inputRef = useRef<HTMLInputElement>(null);
   const open = useGlobalSearch((state) => state.open);
-  const openSearch = useGlobalSearch((state) => state.openSearch);
   const closeSearch = useGlobalSearch((state) => state.closeSearch);
   const [query, setQuery] = useState('');
   const [active, setActive] = useState(0);
@@ -54,26 +53,6 @@ export function GlobalSearchHost() {
       .getElementById(`${listId}-opt-${active}`)
       ?.scrollIntoView?.({ block: 'nearest' });
   }, [active, open, listId]);
-
-  useEffect(() => {
-    const onKey = (event: KeyboardEvent) => {
-      if (
-        event.defaultPrevented ||
-        composing(event) ||
-        dialogOpen() ||
-        event.key !== '/' ||
-        event.altKey ||
-        event.ctrlKey ||
-        event.metaKey ||
-        ignoresHotkey(event.target)
-      )
-        return;
-      event.preventDefault();
-      openSearch();
-    };
-    window.addEventListener('keydown', onKey);
-    return () => window.removeEventListener('keydown', onKey);
-  }, [openSearch]);
 
   const close = () => {
     closeSearch();

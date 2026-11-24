@@ -22,6 +22,8 @@ import {
   type Lookups,
   linkedInGroup,
   Reject,
+  rowInGroup,
+  rowInGroupAny,
 } from './applyOpsShared.ts';
 import type { PushOp } from './opSchema.ts';
 import { rowJsonExpr } from './tables.ts';
@@ -176,12 +178,7 @@ export function sideEffects(
     // refunded quantity, so a full refund would stay `part_refunded`. Run it once, from
     // the last line of the refund, after that line is inserted.
     const refundId = String(row.refund_id);
-    const saleId = group.find(
-      (candidate) =>
-        candidate.tbl === 'refunds' &&
-        candidate.kind !== 'delete' &&
-        candidate.row?.id === refundId,
-    )?.row?.sale_id;
+    const saleId = rowInGroupAny(group, 'refunds', refundId)?.sale_id;
     const lastLine = linkedInGroup(
       group,
       'refund_lines',
@@ -245,12 +242,9 @@ export function sideEffects(
         // already bumped `rev` and logged `last_cost` (the only cost field a till pulls).
         // Bumping it again would make D1 `rev` disagree with `server_rev` and roll the
         // client into a spurious field_merge (API-M4).
-        const companion = group.some(
-          (candidate) =>
-            candidate.tbl === 'products' &&
-            candidate.kind !== 'delete' &&
-            candidate.row?.id === row.product_id,
-        );
+        const companion =
+          rowInGroupAny(group, 'products', String(row.product_id)) !==
+          undefined;
         out.push(
           guardedUpdate(
             ctx,
@@ -464,13 +458,9 @@ export function stockRepairStatements(
   const businessDate = String(row.business_date);
   const createdAt = number(row.created_at);
   const movements = (reason: string, refId: string, productId: string) =>
-    group.filter(
-      (candidate) =>
-        candidate.tbl === 'stock_movements' &&
-        candidate.kind === 'insert' &&
-        candidate.row?.reason_code === reason &&
-        candidate.row?.ref_id === refId &&
-        candidate.row?.product_id === productId,
+    linkedInGroup(group, 'stock_movements', 'ref_id', refId).filter(
+      (movement) =>
+        movement.reason_code === reason && movement.product_id === productId,
     );
   const addMovement = (
     productId: string,
@@ -548,7 +538,7 @@ export function stockRepairStatements(
       if (product?.track_stock !== 1 || info.latest < product.updated_at)
         continue;
       const moved = movements('sale', id, productId).reduce(
-        (sum, movement) => sum - number(movement.row?.qty_delta_milli),
+        (sum, movement) => sum - number(movement.qty_delta_milli),
         0,
       );
       const missing = info.qty - moved;
@@ -564,7 +554,7 @@ export function stockRepairStatements(
       if (product?.track_stock !== 1 || info.latest < product.updated_at)
         continue;
       const moved = movements('purchase', id, productId).reduce(
-        (sum, movement) => sum + number(movement.row?.qty_delta_milli),
+        (sum, movement) => sum + number(movement.qty_delta_milli),
         0,
       );
       const missing = info.qty - moved;
@@ -604,7 +594,7 @@ export function stockRepairStatements(
       if (product?.track_stock !== 1 || info.latest < product.updated_at)
         continue;
       const moved = movements('supplier_return', id, productId).reduce(
-        (sum, movement) => sum + -number(movement.row?.qty_delta_milli),
+        (sum, movement) => sum + -number(movement.qty_delta_milli),
         0,
       );
       const missing = info.qty - moved;
@@ -627,12 +617,7 @@ export function stockRepairStatements(
     for (const line of lines) {
       if (Number(line.restock ?? 1) !== 1) continue;
       const saleLineId = String(line.sale_line_id);
-      const pushed = group.find(
-        (candidate) =>
-          candidate.tbl === 'sale_lines' &&
-          candidate.kind === 'insert' &&
-          candidate.row?.id === saleLineId,
-      )?.row;
+      const pushed = rowInGroup(group, 'sale_lines', saleLineId);
       const productId =
         pushed?.product_id ?? look.saleLineById.get(saleLineId)?.product_id;
       if (typeof productId !== 'string') continue;
@@ -645,12 +630,12 @@ export function stockRepairStatements(
       const sold =
         (look.saleMoved.get(saleId)?.get(productId) ?? 0) +
         movements('sale', saleId, productId).reduce(
-          (sum, movement) => sum - number(movement.row?.qty_delta_milli),
+          (sum, movement) => sum - number(movement.qty_delta_milli),
           0,
         );
       if (sold <= 0) continue;
       const moved = movements('refund_return', id, productId).reduce(
-        (sum, movement) => sum + number(movement.row?.qty_delta_milli),
+        (sum, movement) => sum + number(movement.qty_delta_milli),
         0,
       );
       // An over-refund is accepted as a conflict, but it must never restock more
@@ -687,12 +672,12 @@ export function stockRepairStatements(
       const sold =
         (look.saleMoved.get(saleId)?.get(productId) ?? 0) +
         movements('sale', saleId, productId).reduce(
-          (sum, movement) => sum - number(movement.row?.qty_delta_milli),
+          (sum, movement) => sum - number(movement.qty_delta_milli),
           0,
         );
       if (sold <= 0) continue;
       const moved = movements('void_return', id, productId).reduce(
-        (sum, movement) => sum + number(movement.row?.qty_delta_milli),
+        (sum, movement) => sum + number(movement.qty_delta_milli),
         0,
       );
       const missing = sold - moved;

@@ -13,7 +13,7 @@ import {
   useRouter,
 } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useId, useRef, useState } from 'react';
+import { useEffect, useId, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import {
@@ -1339,7 +1339,23 @@ function BundleRecipeEditor({
 }) {
   const { t, i18n } = useTranslation();
   const [query, setQuery] = useState('');
-  const byId = new Map(products.map((product) => [product.id, product]));
+  const byId = useMemo(
+    () => new Map(products.map((product) => [product.id, product])),
+    [products],
+  );
+  // Normalise each candidate once per catalogue change, not on every keystroke.
+  const searchText = useMemo(
+    () =>
+      new Map(
+        products.map((product) => [
+          product.id,
+          [product.name_en, product.name_ur, product.sku]
+            .map((value) => String(value ?? '').toLowerCase())
+            .join('\u0000'),
+        ]),
+      ),
+    [products],
+  );
   const chosen = new Set(items.map((item) => item.component_product_id));
   const q = query.trim().toLowerCase();
   const matches = q
@@ -1348,9 +1364,7 @@ function BundleRecipeEditor({
           (product) =>
             !chosen.has(product.id) &&
             product.id !== excludeId &&
-            [product.name_en, product.name_ur, product.sku]
-              .map((value) => String(value ?? '').toLowerCase())
-              .some((value) => value.includes(q)),
+            (searchText.get(product.id)?.includes(q) ?? false),
         )
         .slice(0, 8)
     : [];

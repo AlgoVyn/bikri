@@ -415,9 +415,12 @@ export async function runJob(
 /** Atomically claims the oldest queued job. IndexedDB serialises this across tabs. */
 async function claimNextJob(db: BikriDb): Promise<PrintJob | null> {
   return db.transaction('rw', db.print_jobs, async () => {
-    const next = (
-      await db.print_jobs.where('status').equals('queued').sortBy('created_at')
-    )[0];
+    // A broken printer can leave thousands of queued jobs. `sortBy` would load and
+    // sort all of them on every claim; the compound index gives the oldest directly.
+    const next = await db.print_jobs
+      .where('[status+created_at]')
+      .between(['queued', 0], ['queued', Number.MAX_SAFE_INTEGER])
+      .first();
     if (!next) return null;
     const started_at = Date.now();
     await db.print_jobs.update(next.id, {

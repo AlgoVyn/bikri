@@ -2428,7 +2428,7 @@ The bundle triggers make recipe history restore-safe: a soft-deleted `bundle_ite
 
 ```ts
 // Example only — exact index strings to implement.
-export const DEXIE_SCHEMA_V14 = {
+export const DEXIE_SCHEMA_V15 = {
   // master
   shop: 'id',
   branches: 'id, deleted_at',
@@ -2462,7 +2462,7 @@ export const DEXIE_SCHEMA_V14 = {
   day_closes: 'id, [device_id+period_end], business_date, created_at',
   audit_log: 'id, [entity+entity_id], created_at',
   // local-only
-  outbox: '++seq, &op_id, tx_id, [status+seq], created_at, [tbl+row_id]', // V5 status+seq; V12 drops standalone status; V14 adds tx_id for discard
+  outbox: '++seq, &op_id, tx_id, [status+seq], [tbl+row_id]', // V5 status+seq; V12 drops standalone status; V14 adds tx_id for discard; V15 drops created_at
   kv: 'key',
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',
@@ -2487,6 +2487,8 @@ export const DEXIE_SCHEMA_V14 = {
 **Dexie V13 (D-284)** backfills `refund_lines.business_date` from the local `refunds` table (the V10 repair missed rows written by a restore/replay path). It is local-only: the column is stripped from pushed ops and re-derived from the refund when a server row is merged.
 
 **Dexie V14 (D-288)** drops the unused standalone `sale_lines.bundle_id` index and adds `outbox.tx_id`, so discarding a rejected transaction no longer reads the whole queue. Bundle history reads the `[bundle_id+business_date]` compound index. The upgrade is index-only; no row changes.
+
+**Dexie V15 (D-297)** drops the unused `outbox.created_at` index. Every outbox read uses `seq`, `status`, the `[status+seq]` range or `[tbl+row_id]`, so the index only added a local write per queued op. Index-only upgrade; no row changes.
 
 ### 3.1 Local-only tables
 

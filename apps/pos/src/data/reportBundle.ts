@@ -852,6 +852,27 @@ async function productReports(
 }
 
 /**
+ * Every void ever, not only the last 30 days: a void of an older bill must still hide
+ * that bill as the product's `lastSale` (SYNC-L8). Voids are rare, so a cache refreshed
+ * only when the newest void changes avoids scanning the table on every report.
+ */
+type VoidCache = { latest: number; ids: Set<string> };
+const voidCache = new WeakMap<BikriDb, VoidCache>();
+
+async function voidedSaleIds(db: BikriDb): Promise<Set<string>> {
+  const latest = Number(
+    (await db.sale_voids.orderBy('created_at').last())?.created_at ?? 0,
+  );
+  const cached = voidCache.get(db);
+  if (cached !== undefined && cached.latest === latest) return cached.ids;
+  const ids = new Set(
+    (await db.sale_voids.toArray()).map((row) => String(row.sale_id)),
+  );
+  voidCache.set(db, { latest, ids });
+  return ids;
+}
+
+/**
  * Products with stock that have not sold for 30 days. The recent window is read from
  * the `sale_lines.business_date` index; only the few candidates left after that are
  * probed one at a time with the `[product_id+business_date]` index. Walking every
@@ -867,10 +888,7 @@ export async function slowMoversReport(
   ).filter((product) => !product.deleted_at);
   const [levelRows, voidRows] = await Promise.all([
     db.stock_levels.bulkGet(products.map((product) => String(product.id))),
-    // Every void ever, not only the last 30 days: a void of an older bill must still
-    // hide that bill as the product's `lastSale` (SYNC-L8). Voids are rare, so this
-    // stays far smaller than the products/lines scans around it.
-    db.sale_voids.toArray(),
+    voidedSaleIds(db),
   ]);
   const levels = new Map(
     levelRows
@@ -880,7 +898,7 @@ export async function slowMoversReport(
       )
       .map((level) => [level.product_id, level.on_hand_milli]),
   );
-  const voided = new Set(voidRows.map((row) => String(row.sale_id)));
+  const voided = voidRows;
   // One bounded range over the last 30 business days. A sale voided after a sync is
   // excluded here, and the per-product probe below skips it too. `toArray` is much
   // faster than one cursor step per row on fake-indexeddb/older WebViews; the range

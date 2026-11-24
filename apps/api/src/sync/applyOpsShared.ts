@@ -935,9 +935,7 @@ export function saleOf(
   group: PushOp[],
   saleId: string,
 ): SaleInfo | undefined {
-  const pushed = group.find(
-    (o) => o.tbl === 'sales' && o.kind === 'insert' && o.row?.id === saleId,
-  )?.row;
+  const pushed = rowInGroup(group, 'sales', saleId);
   return (
     look.sales.get(saleId) ??
     (pushed
@@ -953,6 +951,50 @@ export function saleOf(
   );
 }
 
+type GroupIndex = {
+  rows: Map<string, Record<string, unknown>>;
+  upserts: Map<string, Record<string, unknown>>;
+  linked: Map<string, Map<string, Record<string, unknown>[]>>;
+};
+
+const groupIndexes = new WeakMap<readonly PushOp[], GroupIndex>();
+
+function indexFor(group: PushOp[]): GroupIndex {
+  let index = groupIndexes.get(group);
+  if (index !== undefined) return index;
+  index = { rows: new Map(), upserts: new Map(), linked: new Map() };
+  for (const op of group) {
+    if (op.row === undefined) continue;
+    const id = op.row.id;
+    if (typeof id !== 'string') continue;
+    const key = `${op.tbl}\u0000${id}`;
+    if (op.kind !== 'delete' && !index.upserts.has(key))
+      index.upserts.set(key, op.row);
+    if (op.kind === 'insert' && !index.rows.has(key))
+      index.rows.set(key, op.row);
+  }
+  groupIndexes.set(group, index);
+  return index;
+}
+
+/** The first inserted row of `tbl` with this id in the transaction (indexed once). */
+export function rowInGroup(
+  group: PushOp[],
+  tbl: string,
+  id: string,
+): Record<string, unknown> | undefined {
+  return indexFor(group).rows.get(`${tbl}\u0000${id}`);
+}
+
+/** The first inserted/upserted (not deleted) row of `tbl` with this id. */
+export function rowInGroupAny(
+  group: PushOp[],
+  tbl: string,
+  id: string,
+): Record<string, unknown> | undefined {
+  return indexFor(group).upserts.get(`${tbl}\u0000${id}`);
+}
+
 /** Rows of `tbl` in this transaction whose `field` points at `id`. */
 export function linkedInGroup(
   group: PushOp[],
@@ -960,11 +1002,23 @@ export function linkedInGroup(
   field: string,
   id: string,
 ): Record<string, unknown>[] {
-  const out: Record<string, unknown>[] = [];
-  for (const o of group)
-    if (o.tbl === tbl && o.kind === 'insert' && o.row?.[field] === id)
-      out.push(o.row);
-  return out;
+  const index = indexFor(group);
+  const key = `${tbl}\u0000${field}`;
+  let byValue = index.linked.get(key);
+  if (byValue === undefined) {
+    byValue = new Map();
+    for (const op of group) {
+      if (op.kind !== 'insert' || op.row === undefined) continue;
+      if (op.tbl !== tbl) continue;
+      const value = op.row[field];
+      if (typeof value !== 'string') continue;
+      const list = byValue.get(value) ?? [];
+      list.push(op.row);
+      byValue.set(value, list);
+    }
+    index.linked.set(key, byValue);
+  }
+  return byValue.get(id) ?? [];
 }
 
 export function asPayment(p: Record<string, unknown>): LinkedPayment {

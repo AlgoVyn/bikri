@@ -772,6 +772,37 @@ describe('push (03 §3, §4.1)', () => {
     expect(new Set(names)).toEqual(new Set([`bikri-sync-${db.tenantId}`]));
   });
 
+  it('does not stamp last_pull_at when a pull hits the 200-page cap', async () => {
+    const db = await enrolled('pull-cap');
+    let seq = 0;
+    server.override = ({ path }) => {
+      if (path !== '/sync/pull') return undefined;
+      seq += 1;
+      return {
+        json: {
+          changes: [
+            {
+              seq,
+              tbl: 'products',
+              op: 'upsert',
+              row: product(`p-${seq}`),
+            },
+          ],
+          next_since: seq,
+          has_more: true,
+          server_time: Date.now(),
+          restore_epoch: '1',
+          restore_point_at: 0,
+          tenant_status: { status: 'active', since: null },
+          support: null,
+          poll_after_ms: 60_000,
+        },
+      };
+    };
+    await pullAll(db);
+    expect(await getKv(db, 'last_pull_at', null)).toBeNull();
+  });
+
   it('serialises a push through navigator.locks when the browser provides it', async () => {
     const db = await enrolled('push-lock');
     const names: string[] = [];

@@ -442,7 +442,15 @@ export async function loadLookups(
   chunked(
     closeDevices,
     (p) =>
-      `SELECT device_id AS id, (SELECT d2.id FROM day_closes d2 WHERE d2.tenant_id = ?1 AND d2.device_id = d.device_id ORDER BY d2.period_end DESC LIMIT 1) AS close_id, MAX(period_end) AS period_end, (SELECT d2.counted_cash FROM day_closes d2 WHERE d2.tenant_id = ?1 AND d2.device_id = d.device_id ORDER BY d2.period_end DESC LIMIT 1) AS counted_cash FROM day_closes d WHERE d.tenant_id = ?1 AND d.device_id IN (${p}) GROUP BY d.device_id`,
+      `SELECT d.device_id AS id, d.id AS close_id, d.period_end, d.counted_cash
+       FROM day_closes d
+       WHERE d.tenant_id = ?1 AND d.device_id IN (${p})
+         AND NOT EXISTS (
+           SELECT 1 FROM day_closes d2
+           WHERE d2.tenant_id = ?1 AND d2.device_id = d.device_id
+             AND (d2.period_end > d.period_end
+               OR (d2.period_end = d.period_end AND d2.id > d.id))
+         )`,
     { lastClose: true },
   );
   const closeList = [...closeDevices];

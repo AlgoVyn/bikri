@@ -63,6 +63,14 @@ describe('files (T-033, I7)', () => {
       'private, max-age=31536000, immutable',
     );
     expect(new Uint8Array(await own.arrayBuffer())).toEqual(IMG);
+    const etag = own.headers.get('etag');
+    expect(etag).toBeTruthy();
+    const notModified = await api(`/files/${key}`, {
+      token: a.till.token,
+      headers: { 'if-none-match': etag ?? '' },
+    });
+    expect(notModified.status).toBe(304);
+    expect(notModified.headers.get('etag')).toBe(etag);
 
     const other = await api(`/files/${key}`, { token: b.till.token });
     const unknown = await api(
@@ -163,15 +171,26 @@ describe('files (T-033, I7)', () => {
       ).status,
     ).toBe(404);
     const big = new Uint8Array(2 * 1024 * 1024 + 1);
+    const bigDigest = await sha(big);
     expect(
       (
         await upload(
           a.admin.token,
-          `product_image/${IDS.product}/${await sha(big)}`,
+          `product_image/${IDS.product}/${bigDigest}`,
           big,
         )
       ).status,
     ).toBe(413);
+    // The target row is checked before the body: an unknown product is 404, not 413.
+    expect(
+      (
+        await upload(
+          a.admin.token,
+          `product_image/01JC0000000000000000000099/${bigDigest}`,
+          big,
+        )
+      ).status,
+    ).toBe(404);
     expect(
       (await upload(a.admin.token, `logo/shop/${digest}`, IMG, 'image/webp'))
         .status,

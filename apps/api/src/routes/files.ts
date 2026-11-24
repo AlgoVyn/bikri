@@ -116,6 +116,15 @@ export async function putFile(c: Context<AppEnv>): Promise<Response> {
     kind === 'product_image' ? 'catalog.edit' : 'settings.shop';
   if (!staff || !can(staff.role, staff.permissions_json, permission))
     throw new ApiError('FORBIDDEN', 403, 'You cannot upload this file');
+  // Check the target row before reading up to 2 MB: an unknown/deleted product is a
+  // 404 even when the upload is oversized or malformed.
+  if (kind === 'product_image') {
+    const product = await c.var.db.first<{ id: string }>(
+      'SELECT id FROM products WHERE tenant_id = ?1 AND id = ?2 AND deleted_at IS NULL',
+      id,
+    );
+    if (!product) throw notFound();
+  }
   const body = await readBodyBytes(c, MAX_IMAGE_BYTES);
   if (sniffImage(body) !== type)
     throw new ApiError(
@@ -129,13 +138,6 @@ export async function putFile(c: Context<AppEnv>): Promise<Response> {
       400,
       'sha256 does not match the body',
     );
-  if (kind === 'product_image') {
-    const product = await c.var.db.first<{ id: string }>(
-      'SELECT id FROM products WHERE tenant_id = ?1 AND id = ?2 AND deleted_at IS NULL',
-      id,
-    );
-    if (!product) throw notFound();
-  }
   const key = tenantKey(tenant.id, relative);
   if (await c.env.FILES.head(key))
     return c.json({ key: relative, size: body.byteLength }, 200);
@@ -170,11 +172,16 @@ export async function getFile(c: Context<AppEnv>): Promise<Response> {
     throw notFound();
   }
   if (!READABLE.some((r) => r.test(relative))) throw notFound();
-  const object = await c.env.FILES.get(tenantKey(tenant.id, relative));
+  // Let R2 evaluate If-None-Match/If-Modified-Since in the object store. A matching
+  // condition returns an R2Object without a body, so the image bytes are not read.
+  const object = await c.env.FILES.get(tenantKey(tenant.id, relative), {
+    onlyIf: c.req.raw.headers,
+  });
   if (!object) throw notFound();
   const headers = new Headers();
   object.writeHttpMetadata(headers);
   headers.set('etag', object.httpEtag);
   headers.set('cache-control', 'private, max-age=31536000, immutable');
+  if (!('body' in object)) return new Response(null, { status: 304, headers });
   return new Response(object.body, { headers });
 }

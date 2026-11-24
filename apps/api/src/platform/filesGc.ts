@@ -4,12 +4,16 @@ import type { TenantRow } from '../types.ts';
 
 const KEEP_UNREFERENCED_MS = 24 * 60 * 60 * 1000;
 const DELETE_BATCH = 1_000;
+/** One operator call lists at most this many objects; a huge prefix is resumed on the next run. */
+const MAX_OBJECTS = 10_000;
 
 export type FileGcResult = {
   examined: number;
   unreferenced: number;
   deleted: number;
   bytes: number;
+  /** The listing hit `MAX_OBJECTS`; run the operator action again for the rest. */
+  truncated: boolean;
 };
 
 /**
@@ -44,11 +48,12 @@ export async function gcTenantFiles(
     const page = await env.FILES.list({
       prefix,
       ...(cursor ? { cursor } : {}),
-      limit: 1_000,
+      limit: Math.min(1_000, MAX_OBJECTS - objects.length),
     });
     objects.push(...page.objects);
     cursor = page.truncated ? page.cursor : undefined;
-  } while (cursor);
+  } while (cursor && objects.length < MAX_OBJECTS);
+  const truncated = cursor !== undefined;
 
   const cutoff = (options.now ?? Date.now()) - KEEP_UNREFERENCED_MS;
   const stale = objects.filter(
@@ -62,24 +67,34 @@ export async function gcTenantFiles(
       await env.FILES.delete(
         stale.slice(at, at + DELETE_BATCH).map((o) => o.key),
       );
-    // The listing above is authoritative for the objects it saw, so reset the counter to
-    // that total — but only if no upload reserved bytes since the tenant was loaded.
-    // Overwriting unconditionally could erase a concurrent reservation (API-L9).
-    const remaining =
-      objects.reduce((sum, object) => sum + object.size, 0) - bytes;
-    const reset = await env.DB.prepare(
-      'UPDATE tenants SET file_bytes = ?2, files_initialized = 1 WHERE id = ?1 AND file_bytes = ?3',
-    )
-      .bind(tenant.id, remaining, tenant.file_bytes)
-      .run();
-    if ((reset.meta.changes ?? 0) === 0) {
-      // A reservation won the race: keep its increment and remove only the bytes of the
-      // objects this GC actually deleted.
+    if (truncated) {
+      // The listing did not see every object, so it cannot reset file_bytes to the
+      // seen total. Subtract only what this run deleted.
       await env.DB.prepare(
         'UPDATE tenants SET file_bytes = MAX(0, file_bytes - ?2), files_initialized = 1 WHERE id = ?1',
       )
         .bind(tenant.id, bytes)
         .run();
+    } else {
+      // The listing above is authoritative for the objects it saw, so reset the counter to
+      // that total — but only if no upload reserved bytes since the tenant was loaded.
+      // Overwriting unconditionally could erase a concurrent reservation (API-L9).
+      const remaining =
+        objects.reduce((sum, object) => sum + object.size, 0) - bytes;
+      const reset = await env.DB.prepare(
+        'UPDATE tenants SET file_bytes = ?2, files_initialized = 1 WHERE id = ?1 AND file_bytes = ?3',
+      )
+        .bind(tenant.id, remaining, tenant.file_bytes)
+        .run();
+      if ((reset.meta.changes ?? 0) === 0) {
+        // A reservation won the race: keep its increment and remove only the bytes of the
+        // objects this GC actually deleted.
+        await env.DB.prepare(
+          'UPDATE tenants SET file_bytes = MAX(0, file_bytes - ?2), files_initialized = 1 WHERE id = ?1',
+        )
+          .bind(tenant.id, bytes)
+          .run();
+      }
     }
   }
   return {
@@ -87,5 +102,6 @@ export async function gcTenantFiles(
     unreferenced: stale.length,
     deleted: options.dryRun ? 0 : stale.length,
     bytes,
+    truncated,
   };
 }

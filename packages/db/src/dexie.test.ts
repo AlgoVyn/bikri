@@ -120,6 +120,15 @@ describe('Dexie schema (02 §3)', () => {
     db.close();
   });
 
+  it('V15 drops the unused outbox.created_at index', async () => {
+    const db = open('upgrade-v15');
+    await db.open();
+    const names = db.outbox.schema.indexes.map((index) => index.name);
+    expect(names).not.toContain('created_at');
+    expect(names).toContain('[status+seq]');
+    db.close();
+  });
+
   it('upgrades a V12 database: repairs refund lines pulled without a date', async () => {
     const old = new Dexie(tenantDbName('upgrade-v12'));
     old.version(12).stores(DEXIE_SCHEMA_V12);
@@ -138,7 +147,7 @@ describe('Dexie schema (02 §3)', () => {
     const db = open('upgrade-v12');
     await db.open();
     expect((await db.refund_lines.get('l1'))?.business_date).toBe('2026-10-27');
-    expect(db.verno).toBe(14);
+    expect(db.verno).toBe(15);
   });
 
   it('upgrades a V9 database: backfills refund line dates from their refunds', async () => {

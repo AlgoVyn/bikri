@@ -299,7 +299,12 @@ export async function checkCaches(
         stock.push(cached === expected);
       }
       const parties: boolean[] = [];
-      for (const p of pick(await db.party_balances.toArray())) {
+      const partyKeys = pick(
+        await db.party_balances.toCollection().primaryKeys(),
+      );
+      const partyRows = await db.party_balances.bulkGet(partyKeys);
+      for (const p of partyRows) {
+        if (!p) continue;
         const expected = balanceOf(
           p.party_type,
           p.party_id,

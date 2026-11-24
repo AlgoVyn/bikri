@@ -325,7 +325,7 @@
     "desc_count": "Count stock",
     "desc_products": "Manage stock",
     "desc_sales": "Bills & refunds",
-    "desc_udhaar": "Customer credit",
+    "desc_udhaar": "Udhaar, balances and reminders",
     "desc_suppliers": "Purchases & dues",
     "desc_expenses": "Money out",
     "desc_reports": "Profit & trends",
@@ -425,7 +425,7 @@
     "sell": "Sell",
     "settings": "Settings",
     "suppliers": "Suppliers",
-    "udhaar": "Credits"
+    "udhaar": "Customers"
   },
   "pay": {
     "amount": "Amount",

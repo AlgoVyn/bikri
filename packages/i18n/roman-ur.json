@@ -325,7 +325,7 @@
     "desc_count": "Stock ginti",
     "desc_products": "Stock sambhalain",
     "desc_sales": "Bill aur wapsi",
-    "desc_udhaar": "Gahak ka khata",
+    "desc_udhaar": "Udhaar, baqaya aur yaad dehaniyan",
     "desc_suppliers": "Khareedari aur wajibat",
     "desc_expenses": "Kharcha",
     "desc_reports": "Munafa aur rujhan",
@@ -425,7 +425,7 @@
     "sell": "Sale",
     "settings": "Settings",
     "suppliers": "Suppliers",
-    "udhaar": "Udhaar"
+    "udhaar": "Customers"
   },
   "pay": {
     "amount": "Raqam",

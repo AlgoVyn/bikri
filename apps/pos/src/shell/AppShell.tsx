@@ -35,7 +35,7 @@ import {
   loadDevicePrefs,
   togglePrivacyMode,
 } from './devicePrefs.ts';
-import { GlobalSearchHost } from './GlobalSearch.tsx';
+import { GlobalSearchGate } from './GlobalSearchGate.tsx';
 import { GlobalSearchTrigger } from './GlobalSearchTrigger.tsx';
 import { composing, dialogOpen, ignoresHotkey } from './hotkeys.ts';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
@@ -551,7 +551,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
       <PrivacyProvider active={false}>
         <PriceCheck />
       </PrivacyProvider>
-      <GlobalSearchHost />
+      <GlobalSearchGate />
       <CommandPalette />
       <PrivacyProvider active={privacyActive}>
         <PeekGate />

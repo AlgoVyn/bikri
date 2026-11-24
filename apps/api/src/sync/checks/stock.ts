@@ -8,6 +8,7 @@ import {
   linkedInGroup,
   overrideFor,
   Reject,
+  rowInGroup,
 } from '../applyOpsShared.ts';
 import type { PushOp } from '../opSchema.ts';
 import { sourceInGroup } from './shared.ts';
@@ -122,14 +123,11 @@ export function checkStockMovement(
   )
     throw new Reject('CONSTRAINT_FAILED');
   // A source movement must move the document's own goods, not an arbitrary product.
+  // Index the group once per transaction; the old per-row `group.filter` was O(n²).
   const movementsFor = (refId: string, productId: string) =>
-    group.filter(
-      (candidate) =>
-        candidate.tbl === 'stock_movements' &&
-        candidate.kind === 'insert' &&
-        candidate.row?.reason_code === reason &&
-        candidate.row?.ref_id === refId &&
-        candidate.row?.product_id === productId,
+    linkedInGroup(group, 'stock_movements', 'ref_id', refId).filter(
+      (movement) =>
+        movement.reason_code === reason && movement.product_id === productId,
     );
   if (reason === 'sale' && typeof row.ref_id === 'string') {
     const ref = row.ref_id;
@@ -138,7 +136,7 @@ export function checkStockMovement(
       .filter((line) => line.product_id === productId)
       .reduce((sum, line) => sum + Number(line.qty_milli ?? 0), 0);
     const moved = movementsFor(ref, productId).reduce(
-      (sum, movement) => sum - Number(movement.row?.qty_delta_milli ?? 0),
+      (sum, movement) => sum - Number(movement.qty_delta_milli ?? 0),
       0,
     );
     if (qty >= 0 || sold <= 0 || moved > sold)
@@ -158,7 +156,7 @@ export function checkStockMovement(
       0,
     );
     const moved = movementsFor(ref, productId).reduce(
-      (sum, movement) => sum + Number(movement.row?.qty_delta_milli ?? 0),
+      (sum, movement) => sum + Number(movement.qty_delta_milli ?? 0),
       0,
     );
     // The server recomputes avg cost from this unit_cost; it must be one of the
@@ -186,7 +184,7 @@ export function checkStockMovement(
       .filter((line) => line.product_id === productId)
       .reduce((sum, line) => sum + Number(line.qty_milli ?? 0), 0);
     const moved = movementsFor(ref, productId).reduce(
-      (sum, movement) => sum - Number(movement.row?.qty_delta_milli ?? 0),
+      (sum, movement) => sum - Number(movement.qty_delta_milli ?? 0),
       0,
     );
     if (qty >= 0 || returned <= 0 || moved > returned)
@@ -200,18 +198,13 @@ export function checkStockMovement(
     for (const line of refundLines) {
       if (Number(line.restock ?? 1) !== 1) continue;
       const saleLineId = String(line.sale_line_id ?? '');
-      const pushed = group.find(
-        (candidate) =>
-          candidate.tbl === 'sale_lines' &&
-          candidate.kind === 'insert' &&
-          candidate.row?.id === saleLineId,
-      )?.row;
+      const pushed = rowInGroup(group, 'sale_lines', saleLineId);
       const stored = look.saleLineById.get(saleLineId);
       if ((pushed?.product_id ?? stored?.product_id) !== productId) continue;
       restocked += Number(line.qty_milli ?? 0);
     }
     const moved = movementsFor(ref, productId).reduce(
-      (sum, movement) => sum + Number(movement.row?.qty_delta_milli ?? 0),
+      (sum, movement) => sum + Number(movement.qty_delta_milli ?? 0),
       0,
     );
     if (qty <= 0 || restocked <= 0 || moved > restocked)
@@ -237,7 +230,7 @@ export function checkStockMovement(
       .filter((line) => line.product_id === productId)
       .reduce((sum, line) => sum + Number(line.qty_milli ?? 0), 0);
     const moved = movementsFor(ref, productId).reduce(
-      (sum, movement) => sum + Number(movement.row?.qty_delta_milli ?? 0),
+      (sum, movement) => sum + Number(movement.qty_delta_milli ?? 0),
       0,
     );
     if (qty <= 0 || sold <= 0 || moved > sold)

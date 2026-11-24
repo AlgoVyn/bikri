@@ -90,21 +90,34 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
     return d.toISOString().slice(0, 10);
   })();
 
+  const searchIndex = useMemo(() => {
+    if (!data) return null;
+    const text = new Map(
+      data.products.map((product) => [
+        product.id,
+        `${String(product.name_en)}\u0000${String(product.sku)}`.toLowerCase(),
+      ]),
+    );
+    const barcode = new Map<string, string>();
+    for (const row of data.barcodes) {
+      if (!row.deleted_at)
+        barcode.set(String(row.barcode), String(row.product_id));
+    }
+    return { text, barcode };
+  }, [data]);
+
   const matches = useMemo(() => {
     const q = query.trim().toLowerCase();
-    if (!q || !data) return [];
-    const barcode = data.barcodes.find(
-      (b) => String(b.barcode) === q && !b.deleted_at,
-    );
+    if (!q || !data || !searchIndex) return [];
+    const barcodeProduct = searchIndex.barcode.get(q);
     return data.products
       .filter(
         (p) =>
-          p.id === barcode?.product_id ||
-          String(p.name_en).toLowerCase().includes(q) ||
-          String(p.sku).toLowerCase().includes(q),
+          p.id === barcodeProduct ||
+          (searchIndex.text.get(p.id)?.includes(q) ?? false),
       )
       .slice(0, 8);
-  }, [query, data]);
+  }, [query, data, searchIndex]);
 
   const add = (product: MasterRow) => {
     setLines((current) => [
