@@ -3,7 +3,7 @@
 // CSS and the offline precache have separate budgets so a regression cannot hide outside the JS graph.
 // Run after `pnpm build`. Node 24, no dependencies.
 import { readdirSync, readFileSync, statSync } from 'node:fs';
-import { dirname, join, resolve } from 'node:path';
+import { dirname, join, posix, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { gzipSync } from 'node:zlib';
 import { BASE_PATH } from '../packages/core/src/paths.ts';
@@ -173,6 +173,32 @@ if (revisioned.length > 0) {
     `${revisioned.length} hashed asset(s) carry a Workbox revision (double download; add dontCacheBustURLsMatching): ${revisioned
       .slice(0, 5)
       .map((entry) => entry.rel)
+      .join(', ')}`,
+  );
+}
+// Offline graph integrity (D-299): a precached chunk must never statically import a
+// chunk that is not precached. The service worker would replay the importer from
+// Cache Storage and the browser would have to fetch the missing dependency from the
+// network, so one online-only (`assets/public/`) or operator-console chunk in that
+// position takes down every route that shares the importer whenever the fetch fails.
+// Lazy (dynamic) imports are allowed: those only run when their route is opened.
+const precached = new Set(precache);
+const staticImportPattern = /\bfrom"([^"]+\.js)"|\bimport"([^"]+\.js)"/gu;
+const danglingImports = [];
+for (const rel of precache) {
+  if (!rel.endsWith('.js') || !files.includes(rel)) continue;
+  const source = readFileSync(join(DIST, rel), 'utf8');
+  for (const match of source.matchAll(staticImportPattern)) {
+    const specifier = match[1] ?? match[2];
+    if (specifier === undefined || !specifier.startsWith('.')) continue;
+    const target = posix.normalize(posix.join(posix.dirname(rel), specifier));
+    if (!precached.has(target)) danglingImports.push(`${rel} -> ${target}`);
+  }
+}
+if (danglingImports.length > 0) {
+  problems.push(
+    `${danglingImports.length} precached chunk(s) statically import a chunk that is not precached (the offline app would fail to load them): ${danglingImports
+      .slice(0, 5)
       .join(', ')}`,
   );
 }

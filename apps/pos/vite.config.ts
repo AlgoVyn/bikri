@@ -172,6 +172,9 @@ export default defineConfig({
         // A chunk is moved only when *every* module belongs to that area: a shared
         // chunk with even one shop module must stay in the precached graph, or the
         // till's offline start would import a file the service worker skipped.
+        // Shop code must reach these areas only through `import()`/`React.lazy`;
+        // a static import would make a precached chunk depend on an online-only one
+        // (D-299), and `tools/check-bundle-size.mjs` fails the build for it.
         chunkFileNames: (chunk) => {
           const moduleIds =
             chunk.moduleIds.length > 0
