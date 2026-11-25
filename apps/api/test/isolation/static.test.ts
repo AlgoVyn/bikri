@@ -146,5 +146,15 @@ describe('I19 static check', () => {
         `db.prepare(\`SELECT * FROM ${placeholder} WHERE tenant_id = ?1 AND id = ?2\`)`,
       ),
     ).toHaveLength(0);
+    expect(() =>
+      assertTenantScoped(
+        'UPDATE OR IGNORE products SET price = ?2 WHERE id = ?2',
+      ),
+    ).toThrow(/tenant_id = \?1/);
+    expect(() =>
+      assertTenantScoped(
+        'UPDATE OR IGNORE products SET price = ?2 WHERE tenant_id = ?1 AND id = ?2',
+      ),
+    ).not.toThrow();
   });
 });

@@ -1,6 +1,8 @@
 import { businessDate, saleLineFinal } from '@bikri/core';
 import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
 import {
+  bundleInfoOf,
+  loadBundleRecipe,
   type MovementHistoryRow,
   productStockHistoryPage,
 } from '../data/catalog.ts';
@@ -24,7 +26,8 @@ export type ProductPeekData = {
   minStock: number;
   unit: string;
   timeZone: string;
-  lastSale: { date: string; invoice: string } | null;
+  today: string;
+  lastSale: { date: string; invoice: string; branchId: string } | null;
   lastDelivery: {
     date: string;
     invoice: string;
@@ -90,6 +93,30 @@ export async function loadProductPeek(
   const movements = historyPage.rows.filter(
     (row): row is MovementHistoryRow => row.kind === 'movement',
   );
+  const isBundle = product.kind === 'bundle';
+  const bundleInfo = isBundle
+    ? await (async () => {
+        const items = await loadBundleRecipe(db, id);
+        const ids = items.map((item) => String(item.component_product_id));
+        const components = new Map(
+          (await db.products.bulkGet(ids))
+            .filter((row): row is MasterRow => row !== undefined)
+            .map((row) => [row.id, row]),
+        );
+        const levels = new Map(
+          (await db.stock_levels.bulkGet(ids)).flatMap((level) =>
+            level ? [[level.product_id, level.on_hand_milli] as const] : [],
+          ),
+        );
+        return bundleInfoOf(
+          id,
+          items,
+          components,
+          levels,
+          String(shop?.cost_method) === 'last' ? 'last' : 'avg',
+        );
+      })()
+    : null;
   const saleMovement = recentMovements.find(
     (movement) =>
       String(movement.reason_code) === 'sale' &&
@@ -104,20 +131,45 @@ export async function loadProductPeek(
       movement.ref_id !== null &&
       movement.ref_id !== undefined,
   );
-  const [sale, purchase] = await Promise.all([
+  const [sale, purchase, bundleSaleLine] = await Promise.all([
     saleMovement?.ref_id
       ? db.sales.get(String(saleMovement.ref_id))
       : Promise.resolve(undefined),
     deliveryMovement?.ref_id
       ? db.purchases.get(String(deliveryMovement.ref_id))
       : Promise.resolve(undefined),
+    isBundle
+      ? (async () => {
+          // The compound index orders by business date, not created_at; pick the
+          // newest line within the latest date so "Last sold" shows the latest invoice.
+          const latest = await db.sale_lines
+            .where('[bundle_id+business_date]')
+            .between([id, ''], [id, '9999-12-31'])
+            .reverse()
+            .first();
+          if (!latest) return undefined;
+          const sameDate = await db.sale_lines
+            .where('[bundle_id+business_date]')
+            .equals([id, String(latest.business_date)])
+            .toArray();
+          return sameDate.reduce((newest, row) =>
+            Number(row.created_at) > Number(newest.created_at) ? row : newest,
+          );
+        })()
+      : Promise.resolve(undefined),
   ]);
+  const bundleSale = bundleSaleLine
+    ? await db.sales.get(String(bundleSaleLine.sale_id))
+    : undefined;
+  const lastSale = isBundle ? bundleSale : sale;
   const supplier = purchase
     ? await db.suppliers.get(String(purchase.supplier_id))
     : undefined;
+  const liveSupplier = supplier && !supplier.deleted_at ? supplier : undefined;
   const price = Number(product.price);
-  const cost =
-    String(shop?.cost_method) === 'last'
+  const cost = isBundle
+    ? Number(bundleInfo?.cost ?? 0)
+    : String(shop?.cost_method) === 'last'
       ? Number(product.last_cost ?? 0)
       : Number(product.avg_cost ?? 0);
   const lastDeliveryInvoice =
@@ -129,37 +181,47 @@ export async function loadProductPeek(
   return {
     product,
     category: category ?? null,
-    onHand:
-      Number(product.track_stock) === 1 ? (level?.on_hand_milli ?? 0) : null,
+    onHand: isBundle
+      ? bundleInfo?.availability === null || bundleInfo === null
+        ? null
+        : bundleInfo.availability * 1000
+      : Number(product.track_stock) === 1
+        ? (level?.on_hand_milli ?? 0)
+        : null,
     price,
     cost,
     margin: marginText(price, cost),
-    minStock: Number(product.min_stock_milli ?? 0),
-    unit: String(product.unit ?? 'pc'),
+    minStock: isBundle ? 0 : Number(product.min_stock_milli ?? 0),
+    unit: isBundle ? 'pc' : String(product.unit ?? 'pc'),
     timeZone,
-    lastSale: sale
+    today: businessDate(Date.now(), timeZone),
+    lastSale: lastSale
       ? {
-          date: String(sale.business_date),
-          invoice: String(sale.invoice_no),
+          date: String(lastSale.business_date),
+          invoice: String(lastSale.invoice_no),
+          branchId: String(lastSale.branch_id ?? ''),
         }
       : null,
-    lastDelivery: purchase
-      ? {
-          date: String(purchase.business_date),
-          invoice: lastDeliveryInvoice,
-          supplier: supplier ? String(supplier.name) : null,
-        }
-      : null,
-    history: movements.slice(0, 3).map((row) => {
-      const movement = row.kind === 'movement' ? row.movement : null;
-      return {
-        id: movement ? String(movement.id) : '',
-        date: movement ? String(movement.business_date) : '',
-        reasonCode: movement ? String(movement.reason_code) : '',
-        qtyMilli: movement ? Number(movement.qty_delta_milli) : 0,
-        balanceAfter: row.balanceAfter,
-      };
-    }),
+    lastDelivery:
+      !isBundle && purchase
+        ? {
+            date: String(purchase.business_date),
+            invoice: lastDeliveryInvoice,
+            supplier: liveSupplier ? String(liveSupplier.name) : null,
+          }
+        : null,
+    history: isBundle
+      ? []
+      : movements.slice(0, 3).map((row) => {
+          const movement = row.kind === 'movement' ? row.movement : null;
+          return {
+            id: movement ? String(movement.id) : '',
+            date: movement ? String(movement.business_date) : '',
+            reasonCode: movement ? String(movement.reason_code) : '',
+            qtyMilli: movement ? Number(movement.qty_delta_milli) : 0,
+            balanceAfter: row.balanceAfter,
+          };
+        }),
   };
 }
 

@@ -100,6 +100,40 @@ function indexOf(haystack: Uint8Array, needle: number[]): number {
   return -1;
 }
 
+describe('raster cells', () => {
+  it('passes pair cells to the raster renderer', () => {
+    const seen: unknown[] = [];
+    const base = createFakeRasterRenderer();
+    const renderer = {
+      renderLine(
+        text: string,
+        options: Parameters<typeof base.renderLine>[1],
+      ): RasterSource {
+        seen.push(options.cells);
+        return base.renderLine(text, options);
+      },
+    };
+    const blocks: Block[] = [
+      { t: 'pair', left: 'Total', right: '100' },
+      { t: 'item', name: 'Tea', qty: '1', amount: '50' },
+    ];
+    encodeEscPos(blocks, {
+      charsPerLine: 32,
+      dots: 384,
+      leftMarginDots: 0,
+      itemLayout: 'columns',
+      language: 'ur',
+      renderer,
+    });
+    expect(
+      seen.some((cells) => Array.isArray(cells) && cells.length === 2),
+    ).toBe(true);
+    expect(
+      seen.some((cells) => Array.isArray(cells) && cells.length === 3),
+    ).toBe(true);
+  });
+});
+
 describe('sale-basic fixture (e2e/fixtures/sale-basic.json)', () => {
   it('matches the template input and the T2 totals (07 §3.3)', () => {
     const f = fixture();

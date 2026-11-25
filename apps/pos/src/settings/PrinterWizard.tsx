@@ -719,9 +719,15 @@ export function PrinterWizard({
                 <p className="text-small text-text-muted">
                   {t('printer.agent_checking')}
                 </p>
-              ) : agentHealth === null ? (
+              ) : agentHealth === null || !agentCompatible(agentHealth) ? (
                 <>
-                  <p className="text-small">{t('printer.agent_not_found')}</p>
+                  <p className="text-small">
+                    {t(
+                      agentHealth === null
+                        ? 'printer.agent_not_found'
+                        : 'printer.agent_outdated',
+                    )}
+                  </p>
                   <p className="text-small font-medium">
                     {t('printer.agent_download')}
                   </p>
@@ -823,6 +829,16 @@ export function PrinterWizard({
                         {t('printer.agent_open')}
                       </button>
                     )}
+                  </div>
+                  <div className="flex flex-wrap gap-2">
+                    <button
+                      type="button"
+                      className={buttonQuiet}
+                      disabled={agentBusy}
+                      onClick={() => void checkAgent()}
+                    >
+                      {t('printer.agent_recheck')}
+                    </button>
                   </div>
                   <p className="text-small text-text-muted">
                     {t('printer.agent_code_hint')}
@@ -930,6 +946,14 @@ export function PrinterWizard({
                     onClick={() => window.open(AGENT_URL, '_blank', 'noopener')}
                   >
                     {t('printer.agent_open')}
+                  </button>
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    disabled={agentBusy}
+                    onClick={() => void checkAgent()}
+                  >
+                    {t('printer.agent_recheck')}
                   </button>
                 </>
               )}

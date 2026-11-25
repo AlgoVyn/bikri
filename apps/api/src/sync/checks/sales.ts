@@ -385,6 +385,8 @@ export function checkSalePolicy(
         typeof row.replaces_sale_id === 'string' &&
         (look.saleLinesBySale.get(row.replaces_sale_id) ?? []).some(
           (original) =>
+            original.bundle_id == null &&
+            original.bundle_group == null &&
             original.product_id === line.product_id &&
             Number(original.unit_price ?? 0) === unitPrice,
         );

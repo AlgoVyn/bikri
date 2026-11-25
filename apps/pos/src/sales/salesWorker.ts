@@ -9,6 +9,7 @@ import {
   filterSalesHistory,
   loadSalesHistory,
   loadSalesLineText,
+  pageOf,
   type SalesDay,
   type SalesFilter,
   type SalesHistoryData,
@@ -56,39 +57,6 @@ function dbFor(tenantId: string): ReturnType<typeof openTenantDb> {
   openDb?.db.close();
   openDb = { tenantId, db: openTenantDb(tenantId) };
   return openDb.db;
-}
-
-function pageOf(days: SalesDay[], size: number): SalesDay[][] {
-  const pages: SalesDay[][] = [];
-  let current: SalesDay[] = [];
-  let count = 0;
-  const push = () => {
-    if (current.length > 0) pages.push(current);
-    current = [];
-    count = 0;
-  };
-  for (const day of days) {
-    if (day.rows.length > size) {
-      push();
-      for (let at = 0; at < day.rows.length; at += size) {
-        const rows = day.rows.slice(at, at + size);
-        let bills = 0;
-        let total = 0;
-        for (const row of rows) {
-          if (row.sale.status === 'void') continue;
-          bills += 1;
-          total += Number(row.sale.total ?? 0);
-        }
-        pages.push([{ date: day.date, bills, total, rows }]);
-      }
-      continue;
-    }
-    if (current.length > 0 && count + day.rows.length > size) push();
-    current.push(day);
-    count += day.rows.length;
-  }
-  push();
-  return pages;
 }
 
 const scope = self as unknown as {
@@ -139,7 +107,40 @@ async function compute(
   }
 }
 
+let running = false;
+let pending: SalesWorkerRequest | null = null;
+/** Requests replaced before they ran; they receive the next completed result. */
+const superseded = new Set<number>();
+
+async function pump(): Promise<void> {
+  if (running) return;
+  running = true;
+  try {
+    while (pending !== null) {
+      const request = pending;
+      pending = null;
+      const response = await compute(request);
+      scope.postMessage(response);
+      // A page that posted while this request ran must settle even when its own
+      // request was replaced. The next completed result is the current one.
+      if (pending === null) {
+        for (const id of superseded) scope.postMessage({ ...response, id });
+        superseded.clear();
+      }
+    }
+  } finally {
+    running = false;
+  }
+}
+
 scope.onmessage = (event) => {
-  const request = event.data;
-  void compute(request).then((response) => scope.postMessage(response));
+  // `compute` reads and writes the module-level cache across awaits. Serialize requests
+  // so a slower range cannot overwrite a newer cache or attach its line text to it.
+  if (running) {
+    if (pending !== null) superseded.add(pending.id);
+    pending = event.data;
+    return;
+  }
+  pending = event.data;
+  void pump();
 };

@@ -101,6 +101,54 @@ describe('import spreadsheet (screens/08)', () => {
     });
   });
 
+  it('rejects switching a tracked product to an integer unit while stock is fractional', async () => {
+    const { db } = await shop('imp-fractional');
+    const product = await saveNewProduct(
+      db,
+      {
+        name_en: 'Sugar',
+        sku: 'SUG-1',
+        unit: 'kg',
+        price: 10000,
+        opening_milli: 2500,
+      },
+      await ledgerContext(db, 'st-1'),
+      { now: NOW },
+    );
+    const g = grid(['name_en,sku,price,unit', 'Sugar,SUG-1,100,pc'].join('\n'));
+    const preview = await previewImport(db, g, autoMap(g[0] as string[]));
+    expect(preview.rows[0]).toMatchObject({
+      productId: product.id,
+      action: 'error',
+      errors: [{ field: 'unit', code: 'unit_stock_fractional' }],
+    });
+  });
+
+  it('rechecks fractional stock at import time, not only in preview', async () => {
+    const { db, ctx } = await shop('imp-fractional-race');
+    const product = await saveNewProduct(
+      db,
+      {
+        name_en: 'Sugar',
+        sku: 'SUG-2',
+        unit: 'kg',
+        price: 10000,
+        opening_milli: 2000,
+      },
+      ctx,
+      { now: NOW },
+    );
+    const g = grid(['name_en,sku,price,unit', 'Sugar,SUG-2,100,pc'].join('\n'));
+    const preview = await previewImport(db, g, autoMap(g[0] as string[]));
+    expect(preview.rows[0]?.action).toBe('update');
+    // A sync/sale changes the live level after the preview was accepted.
+    await db.stock_levels.update(product.id, { on_hand_milli: 2500 });
+    const result = await runImport(db, preview, ctx, { now: NOW + 1000 });
+    expect(result.updated).toBe(0);
+    expect(result.skipped).toBe(1);
+    expect((await db.products.get(product.id))?.unit).toBe('kg');
+  });
+
   it('AC 5: 1,000 valid template rows import in < 10 s with 1,000 opening movements, ≤ 200 ops per transaction', {
     retry: 1,
     timeout: 20_000,

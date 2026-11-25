@@ -279,14 +279,32 @@ export async function loadLookups(
   // product edits, bundle recipes) overlap on almost every document. One query over the
   // union replaces two `WHERE id IN (...)` scans of the same rows.
   const productList = [...new Set([...products, ...saleProductIds])];
+  const productQuery = (params: string) =>
+    `SELECT id, price, avg_cost, last_cost, track_stock, updated_at, kind,
+      deleted_at, on_hand_milli AS on_hand, cost_changed_at
+     FROM products WHERE tenant_id = ?1 AND id IN (${params})`;
   for (let i = 0; i < productList.length; i += 90) {
     const chunk = productList.slice(i, i + 90);
+    const params = chunk.map((_, j) => `?${j + 2}`).join(', ');
+    stmts.push(db.prepare(productQuery(params), ...chunk));
+    kinds.push({ productRows: true });
+  }
+  // A narrowed bundle_items update carries only the changed columns, so its bundle and
+  // component ids are known only from the stored row. Load those products too; the
+  // recipe check cannot resolve them from the op payload alone.
+  const bundleItemList = [...bundleItemIds];
+  for (let i = 0; i < bundleItemList.length; i += 90) {
+    const chunk = bundleItemList.slice(i, i + 90);
     const params = chunk.map((_, j) => `?${j + 2}`).join(', ');
     stmts.push(
       db.prepare(
         `SELECT id, price, avg_cost, last_cost, track_stock, updated_at, kind,
           deleted_at, on_hand_milli AS on_hand, cost_changed_at
-         FROM products WHERE tenant_id = ?1 AND id IN (${params})`,
+         FROM products WHERE tenant_id = ?1 AND id IN (
+           SELECT bundle_id FROM bundle_items WHERE tenant_id = ?1 AND id IN (${params})
+           UNION
+           SELECT component_product_id FROM bundle_items WHERE tenant_id = ?1 AND id IN (${params})
+         )`,
         ...chunk,
       ),
     );
@@ -511,6 +529,7 @@ export async function loadLookups(
     bundleRecipes: new Map(),
     bundleRecipeHistory: new Map(),
     bundleItemById: new Map(),
+    bundleItemRows: new Map(),
     bundleOfComponent: new Map(),
     bundleDeleted: new Set(),
     saleMoved: new Map(),
@@ -731,6 +750,15 @@ export async function loadLookups(
           deleted_at: deletedAt,
         });
         look.bundleRecipeHistory.set(bundleId, history);
+        look.bundleItemRows.set(String(r.id), {
+          id: String(r.id),
+          bundle_id: bundleId,
+          component_product_id: String(r.component_product_id),
+          qty_milli: Number(r.qty_milli ?? 0),
+          sort_order: Number(r.sort_order ?? 0),
+          updated_at: Number(r.updated_at ?? 0),
+          deleted_at: deletedAt,
+        });
         // Active rows only: a deleted or soft-deleted recipe row no longer makes the
         // product a component nor counts toward the recipe.
         if (deletedAt !== null) continue;

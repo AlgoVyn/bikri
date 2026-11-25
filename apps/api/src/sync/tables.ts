@@ -16,9 +16,12 @@ export type SnapshotTable = (typeof SNAPSHOT_TABLES)[number];
 /** Columns never sent to a till (besides tenant_id). */
 const HIDDEN: Partial<Record<D1Table, readonly string[]>> = {
   // `enrolled_by` can contain `operator:<email>`; tills only need the device fields.
-  devices: ['token_hash', 'enrolled_by'],
-  // Server-only derived cache; tills keep their own `stock_levels`.
-  products: ['on_hand_milli', 'cost_changed_at'],
+  // `last_report_at` only throttles the pending/app-version report.
+  devices: ['token_hash', 'enrolled_by', 'last_report_at'],
+  // Server-only derived cache; tills keep their own `stock_levels`. `bundle_since`
+  // records when a product became a bundle so a restore can distinguish a historical
+  // simple-product sale from a synthetic bundle line.
+  products: ['on_hand_milli', 'cost_changed_at', 'bundle_since'],
 };
 
 /** The columns of a row as a till sees it: every column except tenant_id and hidden ones. */

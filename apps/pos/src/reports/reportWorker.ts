@@ -92,6 +92,8 @@ async function compute(request: Request): Promise<Response> {
       previousRange,
       version,
       timeZone: options.timeZone,
+      today: options.today,
+      summaryOnly: Boolean(options.summaryOnly),
     });
     let cached =
       reportCache !== null && reportCache.key === key ? reportCache : null;

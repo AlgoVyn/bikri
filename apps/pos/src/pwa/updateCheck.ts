@@ -43,15 +43,15 @@ export function startUpdateChecks(): () => void {
 
   let lastCheckAt = 0;
   let inFlight = false;
+  let active = true;
 
   const check = async (): Promise<void> => {
-    if (inFlight) return;
+    if (!active || inFlight) return;
     inFlight = true;
     try {
       if (await checkOnce()) lastCheckAt = Date.now();
     } catch {
-      // Offline is normal on a till; the next hourly/visible check retries.
-      lastCheckAt = Date.now();
+      // Offline is normal on a till; the next hourly/visible/online check retries.
     } finally {
       inFlight = false;
     }
@@ -62,7 +62,11 @@ export function startUpdateChecks(): () => void {
   // happened meanwhile must surface.
   const ready = navigator.serviceWorker.ready;
   if (ready !== undefined) {
-    void ready.then(() => check()).catch(() => undefined);
+    void ready
+      .then(() => {
+        if (active) void check();
+      })
+      .catch(() => undefined);
   }
 
   const onVisibility = (): void => {
@@ -70,15 +74,22 @@ export function startUpdateChecks(): () => void {
     if (Date.now() - lastCheckAt < UPDATE_CHECK_MIN_GAP_MS) return;
     void check();
   };
+  const onOnline = (): void => {
+    lastCheckAt = 0;
+    void check();
+  };
 
   const timer = window.setInterval(() => {
     void check();
   }, UPDATE_CHECK_INTERVAL_MS);
   document.addEventListener('visibilitychange', onVisibility);
+  window.addEventListener('online', onOnline);
 
   cleanup = () => {
+    active = false;
     window.clearInterval(timer);
     document.removeEventListener('visibilitychange', onVisibility);
+    window.removeEventListener('online', onOnline);
     cleanup = null;
   };
   return cleanup;

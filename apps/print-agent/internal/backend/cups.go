@@ -38,10 +38,17 @@ const cupsRefreshTimeout = 15 * time.Second
 var (
 	requestIDPattern = regexp.MustCompile(`request id is (\S+)`)
 	// CUPS `cancel` has no end-of-options marker (`cancel -- id` fails with
-	// "unknown option '-'"), so the id itself must never look like an option:
-	// the first character cannot be a hyphen.
-	spoolIDPattern = regexp.MustCompile(`^[A-Za-z0-9._][A-Za-z0-9._-]*-[0-9]+$`)
+	// "unknown option '-'"), so the queue part cannot start with a hyphen and must
+	// not contain whitespace, `/` or `#`. Unicode and `+` queue names are valid.
+	spoolIDPattern = regexp.MustCompile(`^[^\s/#-][^\s/#]*-[0-9]+$`)
 )
+
+/** clonePrinters keeps an empty list non-nil, so JSON is [] rather than null. */
+func clonePrinters(src []Printer) []Printer {
+	out := make([]Printer, len(src))
+	copy(out, src)
+	return out
+}
 
 func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	// `/v1/jobs` verifies the requested queue, and health/printers/diagnostics
@@ -49,7 +56,7 @@ func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	// failure keeps the last known list instead of emptying the wizard.
 	b.printersMu.Lock()
 	if b.printers != nil && time.Since(b.printersAt) < cupsPrinterTTL {
-		list := append([]Printer(nil), b.printers...)
+		list := clonePrinters(b.printers)
 		b.printersMu.Unlock()
 		return list, nil
 	}
@@ -69,7 +76,7 @@ func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	b.refreshDone = make(chan struct{})
 	done := b.refreshDone
 	hasStale := b.printers != nil
-	stale := append([]Printer(nil), b.printers...)
+	stale := clonePrinters(b.printers)
 	b.printersMu.Unlock()
 
 	// A refresh runs independently of the caller that started it: `/v1/health`

@@ -4,13 +4,23 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### 25 Nov whole-codebase review remediation — 2026-11-25
+- **Server:** the costed-delivery `avg_cost` side effect now publishes the final `change_log` row; replayed ledger inserts cannot bypass cost/party guards; one payment has one ledger row; bundle recipe changes respect `changed_fields` and stored soft deletes; `last_seen_at` advances only after a completed pull; `files/gc` resumes with a cursor; replayed sales cannot poison `last_invoice_seq`; bundle-component reissues cannot bypass the price floor; narrowed promise/branch/bundle-item updates are accepted; prune and tenant-scope parsers are corrected.
+- **Schema:** migration `0035` adds server-only `products.bundle_since` and `devices.last_report_at`, hardens the bundle sale-line import guard, and drops the redundant `bundle_items_lookup` index. `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` are now 9 (wire-compatible; `MIN_CLIENT_SCHEMA` stays 1).
+- **POS:** serialized sales worker with full-day page totals and a main-thread fallback; warm catalogue invalidation and cost-method-aware prewarm; monotonic report/sales versions over all report-read tables; fractional-stock CSV guard; sale abort on a mid-payment cost change; peek permission/bundle-receipt fixes; reconnect-safe update checks.
+- **Printing:** CUPS returns `[]` for zero printers, Cancel marks a pre-spool job before unlocking, the wizard exposes download links/“Check again” for an outdated agent, `printerConnected` requires a paired agent, raster/preview honour `LaidText.cells`, and Windows/agent status hardening.
+- **Tooling/docs:** masked SQL arity check, backfill through `0035`, dynamic i18n prefix checks, strict backup ULID keys, `D-302` correction, D-304, API/ops docs.
+
+### Reference peeks — 23 Nov 2026
+- Record-to-record links open a read-only peek (`?peek=`), with contextual back navigation, focus restoration and scroll/filter retention (D-296). This entry replaces the missing PR #109 changelog note.
+
 ### 24 Nov performance-review batch — 25 Nov 2026
 - **Bundle/PWA:** Excel/CSV/QR libraries moved out of the initial vendor chunk (initial JS 252.7 KB gz); Noto Naskh is runtime-cached on first Urdu use instead of precached.
 - **Sales:** the range is loaded/filtered in a worker; the page receives one page plus summary and splits a busy day inside the page.
 - **Sell:** the lock screen prewarms the catalogue, stock levels and sold map and prefetches the Sell chunk.
 - **Reports:** the worker caches the base bundle per range/device/data version, computes slow movers separately and caps their concurrency.
 - **Sync:** visible empty polls back off to 5 min, hidden polls use 5 min, and writes/visibility/online/rows reset the interval.
-- **Lists/indexes:** Expenses pages at 50 rows; migrations `0033` add non-partial bundle lookup indexes and `0034` drops the unused `change_log_row` index.
+- **Lists/indexes:** Expenses pages at 50 rows; migration `0033` adds non-partial bundle lookup indexes; `0034` was a no-op because `0021` already dropped `change_log_row` (corrected in `0035`).
 - **Still open:** batch-level idempotency, production Worker CPU p99/snapshot limits, larger snapshot pages/R2 snapshot, Pay-sheet pre-mount, targeted stock-level patching and settle-loop shadow/rev writes.
 
 ### Update detection — 24 Nov 2026

@@ -188,7 +188,7 @@ Creates the tenant, its default branch (`Main` / `INV`), its expense categories 
 
 `POST /api/admin/tenants/:id/enrolment-codes` `{ "device_name", "branch_id"?, "grants_admin": true }` → `201 { "code", "expires_at", "link" }` (72 h when `grants_admin`, else 15 min).
 
-`POST /api/admin/tenants/:id/files/gc` `{ "dry_run"?: true }` → `200 { "examined", "unreferenced", "deleted", "bytes" }`. Lists `t/<tenant>/` and deletes objects not referenced by a live (`deleted_at IS NULL`) `products.image_key` or `shop.logo_key` and at least 24 h old; a soft-deleted product releases its image. `dry_run` defaults to `true`. Writes `operator_file_gc` in the tenant.
+`POST /api/admin/tenants/:id/files/gc` `{ "dry_run"?: true, "cursor"?: "<opaque>" }` → `200 { "examined", "unreferenced", "deleted", "bytes", "truncated", "next_cursor" }`. Lists `t/<tenant>/` and deletes objects not referenced by a live (`deleted_at IS NULL`) `products.image_key` or `shop.logo_key` and at least 24 h old; a soft-deleted product releases its image. `dry_run` defaults to `true`. A truncated run returns `next_cursor`; pass it back to resume instead of restarting at the first 10,000 objects. Writes `operator_file_gc` in the tenant.
 
 `GET /api/admin/tenants/:id/export?tbl=&after=&limit=` → same shapes as the snapshot ([03 §4.3](03-sync.md#43-snapshot--get-apisyncsnapshot)), for that tenant; the first call (no `tbl`) captures the server cutoff as `exported_at` and also writes an `audit_log` row `operator_export` in the tenant. Pages use `before=<exported_at>`. `devices.token_hash` and `devices.enrolled_by` are never exported.
 

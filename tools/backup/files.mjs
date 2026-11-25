@@ -22,7 +22,7 @@ import { backupDate } from './export.mjs';
 
 const DEFAULT_BUCKET = 'bikri-files';
 const DEFAULT_PREFIX = 't/';
-const ULID = /^[0-9A-HJKMNP-TV-Z]{26}$/u;
+const ULID = /^[0-7][0-9A-HJKMNP-TV-Z]{25}$/u;
 const MAX_KEY = 1024;
 const MAX_SEGMENT = 200;
 

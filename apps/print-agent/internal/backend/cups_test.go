@@ -123,10 +123,27 @@ func TestSpoolIDPatternRejectsOptions(t *testing.T) {
 			t.Fatalf("unsafe spool id accepted: %q", id)
 		}
 	}
-	for _, id := range []string{"Bixolon-42", "Office_1-7", "queue.name-123", ".hidden-9", "a-1"} {
+	for _, id := range []string{
+		"Bixolon-42",
+		"Office_1-7",
+		"queue.name-123",
+		".hidden-9",
+		"a-1",
+		"Brother_HL+2350-42",
+		"کاؤنٹر-7",
+	} {
 		if !spoolIDPattern.MatchString(id) {
 			t.Fatalf("valid spool id rejected: %q", id)
 		}
+	}
+}
+
+func TestClonePrintersKeepsEmptyNonNil(t *testing.T) {
+	if list := clonePrinters(nil); list == nil || len(list) != 0 {
+		t.Fatalf("nil source = %#v, want non-nil empty", list)
+	}
+	if list := clonePrinters([]Printer{}); list == nil || len(list) != 0 {
+		t.Fatalf("empty source = %#v, want non-nil empty", list)
 	}
 }
 

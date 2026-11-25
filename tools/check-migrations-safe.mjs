@@ -137,7 +137,7 @@ export function functionArityFindings(sql) {
     const before = masked.slice(0, at).match(/([A-Za-z_][A-Za-z0-9_]*)\s*$/u);
     if (before?.[1] && NOT_A_FUNCTION.has(before[1].toUpperCase())) continue;
     const open = at + match[0].lastIndexOf('(');
-    const args = countArguments(cleaned, open);
+    const args = countArguments(masked, open);
     if (args !== null && args > 32) findings.push({ name, args });
   }
   return findings;

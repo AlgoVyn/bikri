@@ -239,9 +239,9 @@ export function sideEffects(
         );
         state.pushed = true;
         // A costed delivery/stock-in usually carries a companion `products` upsert that
-        // already bumped `rev` and logged `last_cost` (the only cost field a till pulls).
-        // Bumping it again would make D1 `rev` disagree with `server_rev` and roll the
-        // client into a spurious field_merge (API-M4).
+        // already bumped `rev` and logged `last_cost`. Bumping it again would make D1
+        // `rev` disagree with `server_rev` and roll the client into a spurious field_merge
+        // (API-M4). The final `avg_cost` is published below.
         const companion =
           rowInGroupAny(group, 'products', String(row.product_id)) !==
           undefined;
@@ -255,18 +255,13 @@ export function sideEffects(
             opId,
           ),
         );
-        if (!companion)
-          out.push(
-            changeLog(
-              db,
-              'products',
-              row.product_id,
-              'upsert',
-              null,
-              now,
-              true,
-            ),
-          );
+        // Always publish the final server-owned cost. The rank-4 companion
+        // `products` upsert (when present) logged `last_cost` before this update,
+        // so it carries the stale pre-delivery `avg_cost`; a pull would otherwise
+        // roll every till back to that average while D1 has already moved on.
+        out.push(
+          changeLog(db, 'products', row.product_id, 'upsert', null, now, true),
+        );
       }
       // on_hand_milli and cost_changed_at are maintained by the
       // products_stock_after_movement trigger, so this path never bumps rev or writes a

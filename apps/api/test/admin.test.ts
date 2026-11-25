@@ -730,6 +730,7 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
     // Server-maintained caches are not importable columns.
     delete clientRow.on_hand_milli;
     delete clientRow.cost_changed_at;
+    delete clientRow.bundle_since;
 
     await api(`/admin/tenants/${a.tenantId}/maintenance`, {
       method: 'POST',

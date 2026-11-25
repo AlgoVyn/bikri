@@ -43,12 +43,12 @@ Source: "..\..\dist\bikri-print-agent.exe"; DestDir: "{app}"; Flags: ignoreversi
 Source: "README.txt"; DestDir: "{app}"; Flags: ignoreversion
 
 [Dirs]
-Name: "{app}\logs"
+Name: "{localappdata}\Bikri\PrintAgent\logs"
 
 [Icons]
 Name: "{group}\Bikri Print Agent"; Filename: "{app}\{#AppExe}"
 Name: "{group}\Open Bikri Print Agent"; Filename: "http://127.0.0.1:17890/"
-Name: "{group}\Bikri Print Agent logs"; Filename: "{app}\logs"
+Name: "{group}\Bikri Print Agent logs"; Filename: "{localappdata}\Bikri\PrintAgent\logs"
 Name: "{autodesktop}\Bikri Print Agent"; Filename: "{app}\{#AppExe}"; Tasks: desktopicon
 
 [Registry]
@@ -62,10 +62,10 @@ Filename: "{app}\{#AppExe}"; Description: "Start Bikri Print Agent now"; Flags: 
 [UninstallRun]
 ; Only this user's agent: another user on a shared PC may run their own copy on
 ; a different port, and taskkill without the filter fails or needs admin rights.
-Filename: "{cmd}"; Parameters: "/C taskkill /IM {#AppExe} /F /FI ""USERNAME eq %USERNAME%"""; Flags: runhidden; RunOnceId: "StopAgent"
+Filename: "{cmd}"; Parameters: "/C taskkill /IM {#AppExe} /F /FI ""USERNAME eq %USERNAME%"""; Flags: runhidden waituntilterminated; RunOnceId: "StopAgent"
 
 [UninstallDelete]
-Type: filesandordirs; Name: "{app}\logs"
+Type: filesandordirs; Name: "{localappdata}\Bikri\PrintAgent\logs"
 Type: filesandordirs; Name: "{userappdata}\bikri-print-agent"
 
 [Code]

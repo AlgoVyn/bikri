@@ -92,7 +92,20 @@ for (const file of files) {
   const keys = allowedKeys(file);
   for (const match of source.matchAll(literal)) {
     const key = match[2];
-    if (key.includes('${')) continue;
+    if (key.includes('${')) {
+      // Dynamic keys (`stock.reason.${code}`) cannot be checked exactly. At least
+      // require the static prefix to name a real catalog branch, so a renamed area
+      // or a typo in the prefix still fails.
+      const prefix = key.slice(0, key.indexOf('${'));
+      if (
+        prefix.includes('.') &&
+        ![...keys].some((candidate) => candidate.startsWith(prefix))
+      )
+        missing.push(
+          `${relative(ROOT, file)}: ${key} (no key starts with ${prefix})`,
+        );
+      continue;
+    }
     if (keys.has(key) || PLURAL.some((suffix) => keys.has(`${key}${suffix}`)))
       continue;
     missing.push(`${relative(ROOT, file)}: ${key}`);

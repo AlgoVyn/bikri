@@ -1,3 +1,4 @@
+import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
@@ -26,9 +27,13 @@ const dash = '—';
 export function ProductPeekBody({
   data,
   showCost,
+  showDelivery,
+  showLastSale,
 }: {
   data: ProductPeekData;
   showCost: boolean;
+  showDelivery: boolean;
+  showLastSale: boolean;
 }) {
   const { t, i18n } = useTranslation();
   const { product, unit, timeZone } = data;
@@ -42,6 +47,44 @@ export function ProductPeekBody({
     : data.minStock > 0
       ? qtyWithUnit(t, data.minStock, unit)
       : dash;
+  const rows = [
+    {
+      label: t('peek.last_sold'),
+      value:
+        showLastSale && data.lastSale ? (
+          <span>
+            {formatBusinessDate(data.lastSale.date, i18n.language, timeZone)}
+            {' · '}
+            <bdi dir="ltr">{data.lastSale.invoice}</bdi>
+          </span>
+        ) : (
+          dash
+        ),
+    },
+  ];
+  if (showDelivery)
+    rows.push(
+      {
+        label: t('peek.last_delivery'),
+        value: data.lastDelivery ? (
+          <span>
+            {formatBusinessDate(
+              data.lastDelivery.date,
+              i18n.language,
+              timeZone,
+            )}
+            {' · '}
+            <bdi dir="ltr">{data.lastDelivery.invoice}</bdi>
+          </span>
+        ) : (
+          dash
+        ),
+      },
+      {
+        label: t('peek.supplier'),
+        value: data.lastDelivery?.supplier ?? dash,
+      },
+    );
 
   return (
     <>
@@ -52,46 +95,7 @@ export function ProductPeekBody({
         <PeekFigure label={t('peek.available')}>{available}</PeekFigure>
         <PeekFigure label={thirdLabel}>{thirdValue}</PeekFigure>
       </div>
-      <PeekFacts
-        rows={[
-          {
-            label: t('peek.last_sold'),
-            value: data.lastSale ? (
-              <span>
-                {formatBusinessDate(
-                  data.lastSale.date,
-                  i18n.language,
-                  timeZone,
-                )}
-                {' · '}
-                <bdi dir="ltr">{data.lastSale.invoice}</bdi>
-              </span>
-            ) : (
-              dash
-            ),
-          },
-          {
-            label: t('peek.last_delivery'),
-            value: data.lastDelivery ? (
-              <span>
-                {formatBusinessDate(
-                  data.lastDelivery.date,
-                  i18n.language,
-                  timeZone,
-                )}
-                {' · '}
-                <bdi dir="ltr">{data.lastDelivery.invoice}</bdi>
-              </span>
-            ) : (
-              dash
-            ),
-          },
-          {
-            label: t('peek.supplier'),
-            value: data.lastDelivery?.supplier ?? dash,
-          },
-        ]}
-      />
+      <PeekFacts rows={rows} />
       <PeekSection title={t('peek.stock_history')}>
         {data.history.length === 0 ? (
           <PeekEmpty>{t('products.history_empty')}</PeekEmpty>
@@ -188,28 +192,93 @@ export function BillPeekBody({ data }: { data: BillPeekData }) {
         {detail.lines.length === 0 ? (
           <PeekEmpty>{t('peek.none')}</PeekEmpty>
         ) : (
-          detail.lines.slice(0, 3).map((line) => (
-            <PeekRow
-              key={String(line.line.id)}
-              label={
-                <>
-                  <span
-                    className={`data-name ${
-                      isLatinName(String(line.line.name_snapshot))
-                        ? 'ltr-name'
-                        : ''
-                    }`}
-                  >
-                    {String(line.line.name_snapshot)}
-                  </span>
-                  <span className="block text-caption text-text-muted">
-                    {qtyWithUnit(t, Number(line.line.qty_milli), line.unit)}
-                  </span>
-                </>
+          (() => {
+            const blocks: {
+              key: string;
+              label: ReactNode;
+              value: number;
+            }[] = [];
+            const seenGroups = new Set<string>();
+            for (const line of detail.lines) {
+              const group =
+                line.line.bundle_group == null
+                  ? null
+                  : String(line.line.bundle_group);
+              if (group === null) {
+                blocks.push({
+                  key: String(line.line.id),
+                  label: (
+                    <>
+                      <span
+                        className={`data-name ${
+                          isLatinName(String(line.line.name_snapshot))
+                            ? 'ltr-name'
+                            : ''
+                        }`}
+                      >
+                        {String(line.line.name_snapshot)}
+                      </span>
+                      <span className="block text-caption text-text-muted">
+                        {qtyWithUnit(t, Number(line.line.qty_milli), line.unit)}
+                      </span>
+                    </>
+                  ),
+                  value: billLineTotal(detail, line.line),
+                });
+                continue;
               }
-              value={<MoneyText paisa={billLineTotal(detail, line.line)} />}
-            />
-          ))
+              if (seenGroups.has(group)) continue;
+              seenGroups.add(group);
+              const groupLines = detail.lines.filter(
+                (row) =>
+                  row.line.bundle_group != null &&
+                  String(row.line.bundle_group) === group,
+              );
+              const first = groupLines[0]?.line;
+              blocks.push({
+                key: group,
+                label: (
+                  <>
+                    <span className="block font-medium">
+                      {String(first?.bundle_name ?? '')}
+                    </span>
+                    {groupLines.map((row) => (
+                      <span
+                        key={String(row.line.id)}
+                        className="block text-caption text-text-muted"
+                      >
+                        {String(row.line.name_snapshot)} ·{' '}
+                        {qtyWithUnit(t, Number(row.line.qty_milli), row.unit)}
+                      </span>
+                    ))}
+                  </>
+                ),
+                value: groupLines.reduce(
+                  (sum, row) => sum + billLineTotal(detail, row.line),
+                  0,
+                ),
+              });
+            }
+            const shown = blocks.slice(0, 3);
+            const remaining = blocks.length - shown.length;
+            return (
+              <>
+                {shown.map((block) => (
+                  <PeekRow
+                    key={block.key}
+                    label={block.label}
+                    value={<MoneyText paisa={block.value} />}
+                  />
+                ))}
+                {remaining > 0 ? (
+                  <PeekRow
+                    label={t('peek.and_more', { count: remaining })}
+                    value=""
+                  />
+                ) : null}
+              </>
+            );
+          })()
         )}
       </PeekSection>
       <PeekSection title={t('peek.payment')}>

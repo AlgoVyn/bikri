@@ -45,7 +45,8 @@ export function printerConnected(
       return Boolean(draft.serial);
     case 'agent':
       return Boolean(
-        draft.agent?.token &&
+        health?.paired === true &&
+          draft.agent?.token &&
           draft.agent.printerName &&
           agentCompatible(health),
       );

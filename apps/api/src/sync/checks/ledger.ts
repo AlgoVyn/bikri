@@ -6,6 +6,7 @@ import type { Permission } from '@bikri/core';
 import {
   key,
   type Lookups,
+  linkedInGroup,
   overrideFor,
   partyExists,
   partyUsableAt,
@@ -75,6 +76,19 @@ export function checkLedgerEntry(
     if (row.party_type !== 'customer' && row.party_type !== 'supplier')
       throw new Reject('CONSTRAINT_FAILED');
     if (amount < 0) throw new Reject('CONSTRAINT_FAILED');
+    // A new party has one opening balance. A second row with a different amount
+    // would make the balance depend on row order.
+    if (
+      group.filter(
+        (candidate) =>
+          candidate.kind === 'insert' &&
+          candidate.tbl === 'ledger_entries' &&
+          candidate.row?.source_type === 'opening' &&
+          candidate.row?.party_type === row.party_type &&
+          candidate.row?.party_id === row.party_id,
+      ).length !== 1
+    )
+      throw new Reject('CONSTRAINT_FAILED');
     const partyTable =
       row.party_type === 'customer' ? 'customers' : 'suppliers';
     if (
@@ -143,6 +157,14 @@ export function checkLedgerEntry(
     case 'payment': {
       if (!allowed('payment.receive') && !allowed('purchase.create'))
         throw new Reject('FORBIDDEN');
+      // Exactly one ledger row may move a payment's party balance. The header check
+      // already requires a row, but duplicates would each pass this per-row check.
+      if (
+        linkedInGroup(group, 'ledger_entries', 'source_id', sourceId).filter(
+          (entry) => entry.source_type === 'payment',
+        ).length !== 1
+      )
+        throw new Reject('CONSTRAINT_FAILED');
       // Only a standalone customer/supplier payment may move a party balance through
       // its payment row. A sale/refund/void payment has its own documented ledger row
       // (`source_type = sale/refund/void`); accepting a payment-sourced row here would

@@ -38,7 +38,11 @@ import {
 } from '../data/reportRange.ts';
 import {
   defaultSaleSortDirection,
+  filterSalesHistory,
+  loadSalesHistory,
+  loadSalesLineText,
   type MethodFilter,
+  pageOf,
   rangeFor,
   type SaleListRow,
   type SaleSort,
@@ -219,6 +223,7 @@ function SalesListContent({
     resolvedRange.long || (preset === 'custom' && customDays > LONG_RANGE_DAYS);
   // The full range is loaded and filtered in a worker; the page only receives one page
   // of rows plus the summary. These probes are the live-query dependency for writes.
+  const dataVersionRef = useRef(0);
   const dataVersion =
     useLiveQuery(async () => {
       if (rangeError) return 0;
@@ -232,8 +237,11 @@ function SalesListContent({
         db.customers.toCollection().first(),
         db.staff.toCollection().first(),
         db.devices.toCollection().first(),
+        db.kv.toCollection().first(),
       ]);
-      return Date.now();
+      // A clock can return the same millisecond twice; a counter is strictly increasing.
+      dataVersionRef.current += 1;
+      return dataVersionRef.current;
     }, [range.from, range.to, rangeError]) ?? 0;
   const [pageData, setPageData] = useState<{
     summary: SalesSummary;
@@ -243,25 +251,40 @@ function SalesListContent({
   } | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const requestId = useRef(0);
+  const [workerFailed, setWorkerFailed] = useState(false);
 
   useEffect(() => {
-    const worker = new Worker(new URL('./salesWorker.ts', import.meta.url), {
-      type: 'module',
-    });
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL('./salesWorker.ts', import.meta.url), {
+        type: 'module',
+      });
+    } catch {
+      // A browser without module workers uses the main-thread fallback below.
+      setWorkerFailed(true);
+      return;
+    }
+    const fail = () => {
+      setWorkerFailed(true);
+      worker.terminate();
+      workerRef.current = null;
+    };
+    worker.addEventListener('error', fail);
+    worker.addEventListener('messageerror', fail);
     workerRef.current = worker;
     return () => {
+      worker.removeEventListener('error', fail);
+      worker.removeEventListener('messageerror', fail);
       worker.terminate();
       workerRef.current = null;
     };
   }, []);
 
   useEffect(() => {
-    const worker = workerRef.current;
-    if (!worker || dataVersion === 0 || rangeError) {
+    if (rangeError || dataVersion === 0) {
       setPageData(null);
       return;
     }
-    const id = ++requestId.current;
     const filter: SalesFilter = {
       ...range,
       query: deferredQuery,
@@ -273,11 +296,45 @@ function SalesListContent({
       sort,
       direction,
     };
+    if (workerFailed) {
+      // The worker failed to load or crashed: compute the same page on the main thread
+      // instead of leaving `/sales` on its loading skeleton forever.
+      let alive = true;
+      void (async () => {
+        const db = getDb();
+        const history = await loadSalesHistory(db, range);
+        const query = deferredQuery.trim();
+        const lineText =
+          query === '' ? undefined : await loadSalesLineText(db, range);
+        const filtered = filterSalesHistory(history, filter, lineText);
+        const pages = pageOf(filtered.days, PAGE);
+        if (!alive) return;
+        setPageData({
+          summary: filtered.summary,
+          days: pages[page] ?? [],
+          pageCount: Math.max(1, pages.length),
+          rowCount: filtered.rows.length,
+        });
+      })().catch(() => {
+        if (alive) setPageData(null);
+      });
+      return () => {
+        alive = false;
+      };
+    }
+    const worker = workerRef.current;
+    if (!worker) {
+      setPageData(null);
+      return;
+    }
+    const id = ++requestId.current;
     const onMessage = (event: MessageEvent<SalesWorkerResponse>) => {
       if (event.data.id !== id) return;
       worker.removeEventListener('message', onMessage);
       if (event.data.error !== undefined || event.data.summary === undefined) {
-        setPageData(null);
+        // A worker that returns an error is no better than one that crashed; switch
+        // to the main-thread path rather than showing a permanent spinner.
+        setWorkerFailed(true);
         return;
       }
       setPageData({
@@ -300,6 +357,7 @@ function SalesListContent({
     return () => worker.removeEventListener('message', onMessage);
   }, [
     dataVersion,
+    workerFailed,
     range,
     rangeError,
     deferredQuery,

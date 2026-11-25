@@ -2725,7 +2725,7 @@ describe('API-M5: cost overlay and deviceSeenAt', () => {
     expect((await api('/me', { token: shop.till.token })).status).toBe(200);
     expect(await seen()).toBe(0);
     expect(
-      (await api('/sync/pull?since=0&limit=10', { token: shop.till.token }))
+      (await api('/sync/pull?since=0&limit=1000', { token: shop.till.token }))
         .status,
     ).toBe(200);
     expect(await seen()).toBeGreaterThan(0);
@@ -2741,6 +2741,13 @@ describe('API-M5: cost overlay and deviceSeenAt', () => {
           token: shop.till.token,
         })
       ).status,
+    ).toBe(200);
+    // A snapshot page is not a completed download; the follow-up pull advances the
+    // freshness watermark after its final page.
+    expect(await seen()).toBe(0);
+    expect(
+      (await api('/sync/pull?since=0&limit=1000', { token: shop.till.token }))
+        .status,
     ).toBe(200);
     expect(await seen()).toBeGreaterThan(0);
   });

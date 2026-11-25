@@ -28,6 +28,8 @@ export type RenderLineOptions = {
   size: TextSize;
   /** True when the line contains Arabic-script characters. */
   rtl: boolean;
+  /** Explicit columns for pair/item rows; HTML already draws these. */
+  cells?: readonly { text: string; align?: 'start' | 'end' }[];
 };
 
 /**

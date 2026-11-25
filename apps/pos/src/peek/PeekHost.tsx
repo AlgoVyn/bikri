@@ -397,7 +397,21 @@ function PeekContent({ target }: { target: PeekTarget }) {
           ) : null}
         </span>
       </>,
-      <ProductPeekBody data={result.data} showCost={canCost} />,
+      <ProductPeekBody
+        data={result.data}
+        showCost={canCost}
+        showDelivery={canDelivery}
+        showLastSale={
+          result.data.lastSale !== null &&
+          billVisible(
+            role,
+            support,
+            canReport,
+            result.data.lastSale.date === result.data.today,
+            branchId === null || result.data.lastSale.branchId === branchId,
+          )
+        }
+      />,
       <button
         type="button"
         className={`${buttonPrimary} w-full xl:w-auto`}

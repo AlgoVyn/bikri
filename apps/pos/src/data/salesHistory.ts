@@ -104,6 +104,39 @@ export type SalesHistory = {
   summary: SalesSummary;
 };
 
+/** Split days into pages without losing a busy day's full header totals. */
+export function pageOf(days: SalesDay[], size: number): SalesDay[][] {
+  const pages: SalesDay[][] = [];
+  let current: SalesDay[] = [];
+  let count = 0;
+  const push = () => {
+    if (current.length > 0) pages.push(current);
+    current = [];
+    count = 0;
+  };
+  for (const day of days) {
+    if (day.rows.length > size) {
+      push();
+      const bills = day.rows.filter((row) => row.sale.status !== 'void').length;
+      const total = day.rows.reduce(
+        (sum, row) =>
+          row.sale.status === 'void' ? sum : sum + Number(row.sale.total ?? 0),
+        0,
+      );
+      for (let at = 0; at < day.rows.length; at += size) {
+        const rows = day.rows.slice(at, at + size);
+        pages.push([{ date: day.date, bills, total, rows }]);
+      }
+      continue;
+    }
+    if (current.length > 0 && count + day.rows.length > size) push();
+    current.push(day);
+    count += day.rows.length;
+  }
+  push();
+  return pages;
+}
+
 export type SalesOption = { id: string; name: string };
 
 function addDays(date: string, days: number): string {

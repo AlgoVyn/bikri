@@ -90,6 +90,7 @@ export const TABLE_COLUMNS = {
     'created_at',
     'updated_at',
     'device_code_history',
+    'last_report_at',
   ],
   enrolment_codes: [
     'code_hash',
@@ -228,6 +229,7 @@ export const TABLE_COLUMNS = {
     'on_hand_milli',
     'cost_changed_at',
     'kind',
+    'bundle_since',
   ],
   product_barcodes: [
     'tenant_id',

@@ -170,7 +170,30 @@ export function ReceiptPreview({
               className={`whitespace-pre ${line.bold ? 'font-bold' : ''}`}
               style={{ textAlign: line.align }}
             >
-              {line.text || '\u00a0'}
+              {line.cells && line.cells.length > 0 ? (
+                <span
+                  className={
+                    line.cells.length > 2
+                      ? 'grid grid-cols-[minmax(0,1fr)_5ch_15ch] gap-1'
+                      : 'flex justify-between gap-2'
+                  }
+                >
+                  {line.cells.map((cell, cellIndex) => (
+                    <span
+                      // biome-ignore lint/suspicious/noArrayIndexKey: receipt cells have no id
+                      key={cellIndex}
+                      dir="auto"
+                      className={
+                        cell.align === 'end' ? 'text-end' : 'text-start'
+                      }
+                    >
+                      {cell.text}
+                    </span>
+                  ))}
+                </span>
+              ) : (
+                line.text || '\u00a0'
+              )}
             </div>
           ))}
         </div>

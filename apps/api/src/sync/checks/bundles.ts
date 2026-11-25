@@ -4,6 +4,7 @@
  */
 import type { Permission } from '@bikri/core';
 import {
+  type BundleItemRow,
   key,
   type Lookups,
   overrideForLine,
@@ -67,6 +68,70 @@ export function pushedProduct(
   };
 }
 
+/**
+ * The recipe-row state this push actually leaves. `planOp` writes only `changed_fields`
+ * for an existing master row and never clears a stored non-null `deleted_at`, so the raw
+ * op row must not be used to decide whether a row is active or which component it points
+ * at. A new row (`base_rev = 0`) writes every supplied column.
+ */
+export function effectiveBundleItem(
+  look: Lookups,
+  group: PushOp[],
+  id: string,
+): BundleItemRow | undefined {
+  const stored = look.bundleItemRows.get(id);
+  let pushed: PushOp | undefined;
+  for (const candidate of group) {
+    if (candidate.tbl !== 'bundle_items') continue;
+    const candidateId =
+      candidate.kind === 'delete'
+        ? String(candidate.row_id ?? '')
+        : String(candidate.row?.id ?? '');
+    if (candidateId === id) pushed = candidate;
+  }
+  if (pushed === undefined) return stored;
+  if (pushed.kind === 'delete') {
+    return stored === undefined
+      ? undefined
+      : {
+          ...stored,
+          deleted_at:
+            stored.deleted_at ?? Number(pushed.created_at ?? Date.now()),
+        };
+  }
+  const row = pushed.row;
+  if (row === undefined) return stored;
+  if (stored === undefined) {
+    return {
+      id,
+      bundle_id: String(row.bundle_id ?? ''),
+      component_product_id: String(row.component_product_id ?? ''),
+      qty_milli: Number(row.qty_milli ?? 0),
+      sort_order: Number(row.sort_order ?? 0),
+      updated_at: Number(row.updated_at ?? row.created_at ?? 0),
+      deleted_at: row.deleted_at == null ? null : Number(row.deleted_at),
+    };
+  }
+  const changed = new Set(pushed.changed_fields ?? []);
+  const pick = (field: keyof BundleItemRow): unknown =>
+    changed.has(field) && row[field] !== undefined ? row[field] : stored[field];
+  return {
+    ...stored,
+    bundle_id: String(pick('bundle_id')),
+    component_product_id: String(pick('component_product_id')),
+    qty_milli: Number(pick('qty_milli')),
+    sort_order: Number(pick('sort_order')),
+    updated_at: Number(row.updated_at ?? stored.updated_at),
+    // A stored soft delete is never resurrected; `deleted_at` only becomes non-null
+    // when the op explicitly writes it.
+    deleted_at:
+      stored.deleted_at ??
+      (changed.has('deleted_at') && row.deleted_at != null
+        ? Number(row.deleted_at)
+        : null),
+  };
+}
+
 /** Active component ids of a bundle after the recipe ops in this push. */
 export function activeBundleComponents(
   look: Lookups,
@@ -90,35 +155,29 @@ export function activeBundleRecipe(
   for (const item of look.bundleRecipes.get(bundleId) ?? [])
     if (item.deleted_at === null)
       recipe.set(item.component_product_id, item.qty_milli);
+  const seen = new Set<string>();
   for (const candidate of group) {
     if (candidate.tbl !== 'bundle_items') continue;
-    const softDeleted =
-      candidate.kind === 'upsert' &&
-      candidate.row?.deleted_at !== null &&
-      candidate.row?.deleted_at !== undefined;
-    if (candidate.kind === 'delete' || softDeleted) {
-      const known =
-        (candidate.kind === 'upsert' ? candidate.row : undefined) ??
-        look.bundleItemById.get(String(candidate.row_id ?? '')) ??
-        group.find(
-          (row) =>
-            row.tbl === 'bundle_items' &&
-            row.kind !== 'delete' &&
-            row.row?.id === candidate.row_id,
-        )?.row;
-      if (known && String(known.bundle_id) === bundleId)
-        recipe.delete(String(known.component_product_id));
-      continue;
-    }
+    const id =
+      candidate.kind === 'delete'
+        ? String(candidate.row_id ?? '')
+        : String(candidate.row?.id ?? '');
+    if (id === '' || seen.has(id)) continue;
+    seen.add(id);
+    const previous = look.bundleItemRows.get(id);
+    const state = effectiveBundleItem(look, group, id);
     if (
-      candidate.row &&
-      String(candidate.row.bundle_id) === bundleId &&
-      candidate.row.deleted_at == null
+      previous !== undefined &&
+      previous.bundle_id === bundleId &&
+      (state === undefined ||
+        state.bundle_id !== bundleId ||
+        state.component_product_id !== previous.component_product_id ||
+        state.deleted_at !== null)
     )
-      recipe.set(
-        String(candidate.row.component_product_id),
-        Number(candidate.row.qty_milli ?? 0),
-      );
+      recipe.delete(previous.component_product_id);
+    if (state === undefined || state.bundle_id !== bundleId) continue;
+    if (state.deleted_at !== null) recipe.delete(state.component_product_id);
+    else recipe.set(state.component_product_id, state.qty_milli);
   }
   return recipe;
 }

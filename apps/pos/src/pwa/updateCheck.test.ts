@@ -128,7 +128,7 @@ describe('startUpdateChecks', () => {
     expect(update).toHaveBeenCalledOnce();
   });
 
-  it('swallows an offline failure and awaits the next interval', async () => {
+  it('retries an offline failure on visibility and the next interval', async () => {
     const update = vi.fn().mockRejectedValue(new Error('offline'));
     stubServiceWorker(() => Promise.resolve(fakeRegistration(update)));
 
@@ -138,11 +138,11 @@ describe('startUpdateChecks', () => {
 
     document.dispatchEvent(new Event('visibilitychange'));
     await flushPromises();
-    expect(update).toHaveBeenCalledOnce();
+    expect(update).toHaveBeenCalledTimes(2);
 
     await vi.advanceTimersByTimeAsync(UPDATE_CHECK_INTERVAL_MS);
     await flushPromises();
-    expect(update).toHaveBeenCalledTimes(2);
+    expect(update).toHaveBeenCalledTimes(3);
   });
 
   it('is idempotent and stops the startup check, timer and listener', async () => {

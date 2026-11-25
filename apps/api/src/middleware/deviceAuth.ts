@@ -7,7 +7,7 @@ import { deviceByTokenHash } from '../platform/tenants.ts';
 import type { AppEnv } from '../types.ts';
 
 const TOKEN = /^Bearer ([A-Za-z0-9_-]{43})$/u;
-/** `last_seen_at` / pending report is written at most every 5 minutes per device (03 §6). */
+/** Pending/app-version reports are written at most every 15 minutes per device (03 §6). */
 const SEEN_EVERY_MS = 15 * 60_000;
 
 /** `X-Bikri-Pending: <count>;<oldest created_at or 0>` → numbers, or null when absent/bad. */
@@ -62,22 +62,29 @@ export const deviceAuth: MiddlewareHandler<AppEnv> = async (c, next) => {
     String(c.env.MAINTENANCE) !== '1' &&
     (tenant.status === 'active' || tenant.status === 'read_only');
   const pending = parsePending(c.req.header('x-bikri-pending'));
-  // `last_seen_at` means "last successful download" for freshness checks: only pull and
-  // snapshot advance it. Other requests still record the pending backlog/app version.
-  const advancesSeen =
-    c.req.path === `${API_BASE}/sync/pull` ||
-    c.req.path === `${API_BASE}/sync/snapshot`;
-  if (gateAllows && now - (device.last_seen_at ?? 0) >= SEEN_EVERY_MS) {
-    const app =
-      (c.req.header('x-bikri-app') ?? '').slice(0, 20) || device.app_version;
+  const app =
+    (c.req.header('x-bikri-app') ?? '').slice(0, 20) || device.app_version;
+  // `last_seen_at` means "last completed download" for freshness checks. Pull advances
+  // it only after the final page, and snapshot leaves it to the pull that follows.
+  // This middleware only reports the pending backlog/app version, and only when one of
+  // them changed; a stale `last_seen_at` must never cause a write on every request.
+  const reportChanged =
+    (pending !== null &&
+      (pending.count !== device.pending_ops ||
+        (pending.oldest ?? null) !== device.oldest_pending_at)) ||
+    app !== device.app_version;
+  if (
+    gateAllows &&
+    reportChanged &&
+    now - (device.last_report_at ?? 0) >= SEEN_EVERY_MS
+  ) {
     const write = db.run(
-      'UPDATE devices SET last_seen_at = CASE WHEN ?7 = 1 THEN ?2 ELSE last_seen_at END, pending_ops = ?3, oldest_pending_at = ?4, app_version = ?5 WHERE tenant_id = ?1 AND id = ?6',
-      now,
+      'UPDATE devices SET pending_ops = ?2, oldest_pending_at = ?3, app_version = ?4, last_report_at = ?5 WHERE tenant_id = ?1 AND id = ?6',
       pending?.count ?? device.pending_ops,
       pending ? pending.oldest : device.oldest_pending_at,
       app,
+      now,
       device.id,
-      advancesSeen ? 1 : 0,
     );
     try {
       c.executionCtx.waitUntil(write.catch(() => undefined));

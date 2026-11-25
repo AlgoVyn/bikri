@@ -47,11 +47,14 @@ export function useOpenPeek() {
     ) => {
       if (!isPlainLeftClick(event)) return;
       // A double click fires twice before the first navigation renders the modal.
+      if (opening.current) return;
+      const currentPeek = (location.search as { peek?: unknown }).peek;
       if (
-        parsePeekTarget(new URLSearchParams(location.search).get('peek')) !==
-        null
+        typeof currentPeek === 'string' &&
+        parsePeekTarget(currentPeek) !== null
       )
         return;
+      opening.current = true;
       rememberPeekTrigger();
       event.preventDefault();
       const state: PeekOrigin = {

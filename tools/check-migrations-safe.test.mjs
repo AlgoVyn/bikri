@@ -89,6 +89,17 @@ describe('destructive migration guard', () => {
     ).toEqual([]);
   });
 
+  it('ignores commas and parentheses inside string literals when counting', () => {
+    const fifteen = Array.from({ length: 15 }, (_, i) => `'k${i}', 1`).join(
+      ', ',
+    );
+    expect(
+      functionArityFindings(
+        `SELECT json_object('a,b', 1, ${fifteen}); SELECT json_object('x(', 1, ${fifteen});`,
+      ),
+    ).toEqual([]);
+  });
+
   it('honours the reviewed allow marker', () => {
     expect(
       destructiveFindings(

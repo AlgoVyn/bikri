@@ -3,6 +3,7 @@ import {
   isQtyUnit,
   parseMoneyToPaisa,
   parseQtyToMilli,
+  qtyAllowsDecimals,
 } from '@bikri/core';
 import type { BikriDb, MasterRow } from '@bikri/db';
 import { csvCell } from '../lib/csv.ts';
@@ -219,6 +220,7 @@ export type ErrorCode =
   | 'cost_invalid'
   | 'stock_invalid'
   | 'unit_invalid'
+  | 'unit_stock_fractional'
   | 'min_stock_invalid'
   | 'track_invalid'
   | 'barcode_length'
@@ -369,6 +371,12 @@ export async function previewImport(
   const kindIndex = headers.findIndex((h) => norm(h) === 'kind');
   const products = (await db.products.toArray()).filter((p) => !p.deleted_at);
   const byId = new Map(products.map((p) => [p.id, p]));
+  const levels = new Map(
+    (await db.stock_levels.toArray()).map((level) => [
+      level.product_id,
+      Number(level.on_hand_milli ?? 0),
+    ]),
+  );
   const bySku = new Map(products.map((p) => [String(p.sku ?? ''), p.id]));
   // A soft-deleted row still owns its SKU in D1. Do not silently invent another one
   // during the import; show the same taken-SKU error as the live collision (POS-L6).
@@ -443,6 +451,24 @@ export async function previewImport(
         errors.push({ field: 'name_en', code: 'name_required' });
       if (parsed.price === null && !errors.some((e) => e.field === 'price'))
         errors.push({ field: 'price', code: 'price_required' });
+    }
+    // A CSV update must not switch a tracked product to an integer unit (or re-enable
+    // tracking) while its live stock or minimum is fractional. The same guard runs
+    // again inside runImport against the live row.
+    if (productId) {
+      const before = byId.get(productId);
+      const nextUnit = parsed.unit_given
+        ? parsed.unit
+        : String(before?.unit ?? 'pc');
+      const tracked =
+        parsed.track_stock ?? Number(before?.track_stock ?? 0) === 1;
+      const onHand = levels.get(productId) ?? 0;
+      const minStock =
+        parsed.min_stock_milli ?? Number(before?.min_stock_milli ?? 0);
+      if (tracked && !qtyAllowsDecimals(nextUnit)) {
+        if (onHand % 1000 !== 0 || minStock % 1000 !== 0)
+          errors.push({ field: 'unit', code: 'unit_stock_fractional' });
+      }
     }
     const ok = errors.length === 0;
     if (ok) {
@@ -602,6 +628,26 @@ export async function runImport(
           const id = r.productId as string;
           const before = await w.table<MasterRow>('products').get(id);
           if (!before || before.deleted_at) continue;
+          // Re-check the live value here, not only in preview: a sync or sale between
+          // preview and confirm must not switch a tracked product to an integer unit
+          // (or re-enable tracking) while its stock/minimum is fractional.
+          const nextUnit = p.unit_given ? p.unit : String(before.unit ?? 'pc');
+          const willTrack =
+            p.track_stock === null
+              ? Number(before.track_stock) === 1
+              : p.track_stock;
+          if (willTrack && !qtyAllowsDecimals(nextUnit)) {
+            const level = await w
+              .table<{ on_hand_milli: number }, string>('stock_levels')
+              .get(id);
+            const onHand = Number(level?.on_hand_milli ?? 0);
+            const minStock =
+              p.min_stock_milli ?? Number(before.min_stock_milli ?? 0);
+            if (onHand % 1000 !== 0 || minStock % 1000 !== 0) {
+              result.skipped += 1;
+              continue;
+            }
+          }
           const patch: Record<string, string | number | null> = {};
           if (p.name_en) patch.name_en = p.name_en;
           if (p.name_ur) patch.name_ur = p.name_ur;

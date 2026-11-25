@@ -28,13 +28,17 @@ export function PriceCheck() {
       return;
     }
     let alive = true;
-    void import('./PriceCheckBody.tsx').then(() => {
-      if (alive) setReady(true);
-    });
+    void import('./PriceCheckBody.tsx')
+      .then(() => {
+        if (alive) setReady(true);
+      })
+      .catch(() => {
+        if (alive) setOpen(false);
+      });
     return () => {
       alive = false;
     };
-  }, [open]);
+  }, [open, setOpen]);
 
   return (
     <Modal

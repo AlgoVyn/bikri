@@ -65,6 +65,7 @@ describe('printer wizard state', () => {
       false,
     );
     expect(printerConnected(draft, { ...healthy, protocol: 2 })).toBe(false);
+    expect(printerConnected(draft, { ...healthy, paired: false })).toBe(false);
     expect(printerConnected(draft, null)).toBe(false);
     expect(
       printerConnected(
