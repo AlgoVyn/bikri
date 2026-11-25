@@ -6,6 +6,7 @@
 
 import {
   type Block,
+  columnWidths,
   type ItemLayout,
   layOut,
   lineNeedsRtl,
@@ -38,6 +39,7 @@ type Row =
       bold: boolean;
       size: string;
       height: number;
+      cells?: readonly { text: string; align?: 'start' | 'end' }[];
     }
   | { kind: 'raster'; source: RasterSource; height: number }
   | { kind: 'qr'; data: string; size: number; height: number }
@@ -69,6 +71,7 @@ export function receiptRows(blocks: Block[], options: ImageOptions): Row[] {
           bold: c.bold ?? false,
           size,
           height: Math.round(line * scale * (rtl ? 1.4 : 1)),
+          cells: c.cells,
         });
         break;
       }
@@ -188,30 +191,119 @@ export async function renderReceiptCanvas(
       const rtl = lineNeedsRtl(row.text);
       const px =
         font * (row.size === 'small' ? 0.75 : row.size === 'double' ? 2 : 1);
-      ctx.save();
-      ctx.font = `${row.bold ? 700 : 400} ${px}px ${rtl ? URDU : MONO}`;
-      ctx.direction = rtl ? 'rtl' : 'ltr';
-      ctx.textAlign =
-        row.align === 'center'
-          ? 'center'
-          : row.align === 'right'
-            ? 'right'
-            : 'left';
-      const x =
-        row.align === 'center'
-          ? leftPad + options.dots / 2
-          : row.align === 'right'
-            ? leftPad + options.dots
-            : leftPad;
-      // Keep deliberate indentation and let the canvas condense an over-wide
-      // line instead of clipping it at the paper edge.
       const maxWidth = Math.max(1, options.dots);
-      if (row.size === 'double-height') {
-        ctx.translate(0, y);
-        ctx.scale(1, 2);
-        ctx.fillText(row.text, x, 0, maxWidth);
-      } else ctx.fillText(row.text, x, y, maxWidth);
-      ctx.restore();
+      const drawCell = (
+        value: string,
+        cellX: number,
+        cellAlign: CanvasTextAlign,
+        cellRtl: boolean,
+      ): void => {
+        ctx.save();
+        ctx.font = `${row.bold ? 700 : 400} ${px}px ${cellRtl ? URDU : MONO}`;
+        ctx.direction = cellRtl ? 'rtl' : 'ltr';
+        ctx.textAlign = cellAlign;
+        if (row.size === 'double-height') {
+          ctx.translate(0, y);
+          ctx.scale(1, 2);
+          ctx.fillText(value, cellX, 0, maxWidth);
+        } else ctx.fillText(value, cellX, y, maxWidth);
+        ctx.restore();
+      };
+      if (row.cells !== undefined && row.cells.length > 0) {
+        if (row.cells.length > 2) {
+          const widths = columnWidths(options.charsPerLine);
+          const amountPx =
+            (options.dots * widths.amount) / options.charsPerLine;
+          if (rtl) {
+            drawCell(row.cells[2]?.text ?? '', leftPad, 'left', false);
+            drawCell(
+              row.cells[1]?.text ?? '',
+              leftPad + amountPx,
+              'left',
+              lineNeedsRtl(row.cells[1]?.text ?? ''),
+            );
+            drawCell(
+              row.cells[0]?.text ?? '',
+              leftPad + options.dots,
+              'right',
+              lineNeedsRtl(row.cells[0]?.text ?? ''),
+            );
+          } else {
+            drawCell(
+              row.cells[0]?.text ?? '',
+              leftPad,
+              'left',
+              lineNeedsRtl(row.cells[0]?.text ?? ''),
+            );
+            drawCell(
+              row.cells[1]?.text ?? '',
+              leftPad + options.dots - amountPx,
+              'right',
+              lineNeedsRtl(row.cells[1]?.text ?? ''),
+            );
+            drawCell(
+              row.cells[2]?.text ?? '',
+              leftPad + options.dots,
+              'right',
+              false,
+            );
+          }
+        } else {
+          const left = row.cells[0];
+          const right = row.cells[1];
+          if (rtl) {
+            drawCell(
+              left?.text ?? '',
+              leftPad + options.dots,
+              'right',
+              lineNeedsRtl(left?.text ?? ''),
+            );
+            drawCell(
+              right?.text ?? '',
+              leftPad,
+              'left',
+              lineNeedsRtl(right?.text ?? ''),
+            );
+          } else {
+            drawCell(
+              left?.text ?? '',
+              leftPad,
+              'left',
+              lineNeedsRtl(left?.text ?? ''),
+            );
+            drawCell(
+              right?.text ?? '',
+              leftPad + options.dots,
+              'right',
+              lineNeedsRtl(right?.text ?? ''),
+            );
+          }
+        }
+      } else {
+        ctx.save();
+        ctx.font = `${row.bold ? 700 : 400} ${px}px ${rtl ? URDU : MONO}`;
+        ctx.direction = rtl ? 'rtl' : 'ltr';
+        ctx.textAlign =
+          row.align === 'center'
+            ? 'center'
+            : row.align === 'right'
+              ? 'right'
+              : 'left';
+        const x =
+          row.align === 'center'
+            ? leftPad + options.dots / 2
+            : row.align === 'right'
+              ? leftPad + options.dots
+              : leftPad;
+        // Keep deliberate indentation and let the canvas condense an over-wide
+        // line instead of clipping it at the paper edge.
+        if (row.size === 'double-height') {
+          ctx.translate(0, y);
+          ctx.scale(1, 2);
+          ctx.fillText(row.text, x, 0, maxWidth);
+        } else ctx.fillText(row.text, x, y, maxWidth);
+        ctx.restore();
+      }
     }
     y += row.height;
   }

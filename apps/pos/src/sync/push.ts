@@ -16,7 +16,7 @@ import { rebuildCaches } from '../data/caches.ts';
 import { setKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { clearSearchCache } from '../data/search.ts';
-import { clearSoldCache } from '../state/catalogue.ts';
+import { clearSoldCache, clearWarmCatalogue } from '../state/catalogue.ts';
 import { jsonBytes, MAX_BATCH_OPS, nextTxBatch } from './chunk.ts';
 import { tillRequest } from './client.ts';
 import { syncLockName } from './lock.ts';
@@ -642,5 +642,6 @@ export async function discardFailed(
   if (ledgerChanged) await rebuildCaches(db);
   // Search and the catalogue's sold snapshot still contain the discarded rows.
   clearSearchCache();
+  clearWarmCatalogue();
   if (ledgerChanged) clearSoldCache();
 }

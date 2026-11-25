@@ -42,6 +42,7 @@ import {
   sqlValue,
   writableColumns,
 } from './applyOpsShared.ts';
+import { effectiveBundleItem } from './checks/bundles.ts';
 import type { OpResult, PushOp } from './opSchema.ts';
 import { applyRank } from './tables.ts';
 
@@ -606,69 +607,49 @@ function applyProductChanges(
  * and a deleted/soft-deleted row must disappear from the active recipe.
  */
 function applyBundleChanges(look: Lookups, ops: PushOp[]): void {
+  const ids = new Set<string>();
   for (const op of ops) {
     if (op.tbl !== 'bundle_items') continue;
     const id = op.kind === 'delete' ? op.row_id : op.row?.id;
-    if (typeof id !== 'string' || id === '') continue;
-    const previous = look.bundleItemById.get(id);
-    const previousRecipe = previous
-      ? look.bundleRecipes.get(previous.bundle_id)
-      : undefined;
-    const previousRow = previousRecipe?.find((item) => item.id === id);
-    const bundleId =
-      typeof op.row?.bundle_id === 'string'
-        ? op.row.bundle_id
-        : previous?.bundle_id;
-    const componentId =
-      typeof op.row?.component_product_id === 'string'
-        ? op.row.component_product_id
-        : previous?.component_product_id;
-    if (!bundleId || !componentId) continue;
-    const deleted =
-      op.kind === 'delete' ||
-      (op.row?.deleted_at !== null && op.row?.deleted_at !== undefined);
-    const recipe = (look.bundleRecipes.get(bundleId) ?? []).filter(
-      (item) => item.id !== id,
-    );
-    if (deleted) {
-      look.bundleItemById.delete(id);
-      const usedBy = (look.bundleOfComponent.get(componentId) ?? []).filter(
-        (candidate) => candidate !== bundleId,
+    if (typeof id === 'string' && id !== '') ids.add(id);
+  }
+  for (const id of ids) {
+    const previous = look.bundleItemRows.get(id);
+    const state = effectiveBundleItem(look, ops, id);
+    if (previous !== undefined) {
+      const previousRecipe = look.bundleRecipes.get(previous.bundle_id) ?? [];
+      look.bundleRecipes.set(
+        previous.bundle_id,
+        previousRecipe.filter((item) => item.id !== id),
       );
-      if (usedBy.length > 0) look.bundleOfComponent.set(componentId, usedBy);
-      else look.bundleOfComponent.delete(componentId);
-      if (previousRow)
-        recipe.push({
-          ...previousRow,
-          deleted_at: Number(op.row?.deleted_at ?? op.created_at ?? 0),
-        });
-    } else {
-      if (!op.row) continue;
-      recipe.push({
-        id,
-        component_product_id: componentId,
-        qty_milli: Number(op.row.qty_milli ?? 0),
-        sort_order: Number(op.row.sort_order ?? 0),
-        updated_at: Number(op.row.updated_at ?? op.created_at ?? 0),
-        deleted_at: null,
-      });
-      look.bundleItemById.set(id, {
-        bundle_id: bundleId,
-        component_product_id: componentId,
-      });
-      const usedBy = look.bundleOfComponent.get(componentId) ?? [];
-      if (!usedBy.includes(bundleId)) {
-        usedBy.push(bundleId);
-        look.bundleOfComponent.set(componentId, usedBy);
+      if (previous.deleted_at === null) {
+        look.bundleItemById.delete(id);
+        const usedBy = (
+          look.bundleOfComponent.get(previous.component_product_id) ?? []
+        ).filter((bundle) => bundle !== previous.bundle_id);
+        if (usedBy.length > 0)
+          look.bundleOfComponent.set(previous.component_product_id, usedBy);
+        else look.bundleOfComponent.delete(previous.component_product_id);
       }
     }
-    if (previous && previous.bundle_id !== bundleId) {
-      const stale = (look.bundleRecipes.get(previous.bundle_id) ?? []).filter(
-        (item) => item.id !== id,
-      );
-      look.bundleRecipes.set(previous.bundle_id, stale);
+    if (state === undefined) {
+      look.bundleItemRows.delete(id);
+      continue;
     }
-    look.bundleRecipes.set(bundleId, recipe);
+    look.bundleItemRows.set(id, state);
+    if (state.deleted_at !== null) continue;
+    const recipe = (look.bundleRecipes.get(state.bundle_id) ?? []).filter(
+      (item) => item.id !== id,
+    );
+    recipe.push(state);
+    look.bundleRecipes.set(state.bundle_id, recipe);
+    look.bundleItemById.set(id, {
+      bundle_id: state.bundle_id,
+      component_product_id: state.component_product_id,
+    });
+    const usedBy = look.bundleOfComponent.get(state.component_product_id) ?? [];
+    if (!usedBy.includes(state.bundle_id)) usedBy.push(state.bundle_id);
+    look.bundleOfComponent.set(state.component_product_id, usedBy);
   }
 }
 
@@ -821,6 +802,8 @@ export async function applyOps(
 ): Promise<ApplyOutcome> {
   const { db } = ctx;
   const final = new Map<string, OpResult>();
+  /** Sale ops that wrote a fresh row, so only those may advance `last_invoice_seq`. */
+  const freshSaleOps = new Set<string>();
   let rowsWritten = 0;
   let rowsRead = 0;
 
@@ -989,6 +972,13 @@ export async function applyOps(
           for (const p of g.planned) {
             if (lostGroup && p.guard !== null) continue;
             final.set(p.op.op_id, p.result);
+            if (
+              !lostGroup &&
+              p.op.tbl === 'sales' &&
+              p.op.kind === 'insert' &&
+              !p.existingInsert
+            )
+              freshSaleOps.add(p.op.op_id);
           }
           // A lost guard rolls back the whole transaction (`guardAssert`): replay every
           // op of the group, not only the guarded ones, so companions reach round 2 with
@@ -1074,6 +1064,7 @@ export async function applyOps(
   let maxInvoiceSeq = 0;
   for (const op of ops) {
     if (op.tbl !== 'sales' || op.kind !== 'insert' || !op.row) continue;
+    if (!freshSaleOps.has(op.op_id)) continue;
     if (final.get(op.op_id)?.result !== 'applied') continue;
     const seq = Number(op.row.invoice_seq);
     if (Number.isSafeInteger(seq) && seq > 0)

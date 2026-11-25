@@ -132,6 +132,15 @@ function ExpensesPageContent() {
     let current: ExpenseDay[] = [];
     let count = 0;
     for (const day of data.days) {
+      if (day.rows.length > PAGE) {
+        if (current.length > 0) out.push(current);
+        current = [];
+        count = 0;
+        for (let at = 0; at < day.rows.length; at += PAGE) {
+          out.push([{ ...day, rows: day.rows.slice(at, at + PAGE) }]);
+        }
+        continue;
+      }
       if (current.length > 0 && count + day.rows.length > PAGE) {
         out.push(current);
         current = [];

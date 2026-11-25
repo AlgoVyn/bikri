@@ -109,8 +109,9 @@ func main() {
 	go func() {
 		done <- httpServer.Serve(listener)
 	}()
-	logger.Info("Bikri Print Agent started", "url", "http://"+addr, "config", configPath, "log", logPath, "paired", cfg.Paired)
-	if !cfg.Paired {
+	paired := auth.Paired()
+	logger.Info("Bikri Print Agent started", "url", "http://"+addr, "config", configPath, "log", logPath, "paired", paired)
+	if !paired {
 		logger.Info("pairing required", "open", "http://"+addr)
 	}
 

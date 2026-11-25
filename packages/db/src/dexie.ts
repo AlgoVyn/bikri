@@ -183,10 +183,9 @@ export const DEXIE_SCHEMA_V11 = {
  * compound one), and adds the compound indexes the remaining scans need. Dropping an
  * index is local-only; IndexedDB rebuilds the rest from stored rows.
  */
-// `file_queue.status` stays as a standalone index even though it is the first part of a
-// compound index: Dexie's `.where('field')` needs the single-column index and does not
-// use `[field+other]` for a plain equality query. `sale_lines.bundle_id` has no such
-// caller and is dropped in V14.
+// `file_queue.status` stays as a standalone index: a compound `[status+created_at]`
+// index omits rows that have no `created_at`, and an old queued upload would vanish
+// from `.where('status')`. `sale_lines.bundle_id` has no such caller and is dropped in V14.
 export const DEXIE_SCHEMA_V12 = {
   ...DEXIE_SCHEMA_V11,
   products: 'id, sku, category_id, deleted_at, track_stock',

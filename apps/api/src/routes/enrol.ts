@@ -136,6 +136,7 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
     enrolled_by: code.created_by,
     revoked_at: null,
     last_seen_at: now,
+    last_report_at: now,
     last_invoice_seq: 0,
     pending_ops: 0,
     oldest_pending_at: null,

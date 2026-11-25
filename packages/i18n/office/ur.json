@@ -88,7 +88,7 @@
       "print": "پرنٹ",
       "print_queued": "پرنٹر کو بھیج دیا گیا۔",
       "print_refund": "واپسی کی رسید پرنٹ کریں",
-      "qty_price": "{{qty}} × {{price}}",
+      "qty_price": "\u2066{{qty}} × {{price}}\u2069",
       "refund": "رقم واپس",
       "refund_khata": "{{amount}} کھاتے سے کم",
       "refund_money_out": "رقم واپس",

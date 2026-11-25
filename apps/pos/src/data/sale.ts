@@ -608,6 +608,21 @@ export async function completeSale(
           .filter((row): row is MasterRow => row !== undefined)
           .map((row) => [row.id, row]),
       );
+      // Costs may have changed between the pre-transaction pricing read and this
+      // transaction (a delivery pulled on another till). Abort before writing a bill
+      // whose bundle split or below_cost stamp was computed from the old cost.
+      for (const line of cart.lines) {
+        if (!line.product_id) continue;
+        const before = products.get(line.product_id);
+        const current = currentProducts.get(line.product_id);
+        if (
+          before &&
+          current &&
+          unitCostOf(before, money.cost_method) !==
+            unitCostOf(current, money.cost_method)
+        )
+          throw new SaleInvalidError('cost changed');
+      }
       let lineNo = 0;
       const saleLineIds = new Map<string, string>();
       const saleLineRows: SyncedRow[] = [];

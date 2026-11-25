@@ -81,6 +81,7 @@ export const TIME_FIELDS: ReadonlySet<string> = new Set([
   'enrolled_at',
   'expires_at',
   'last_owner_export_at',
+  'last_report_at',
   'last_seen_at',
   'oldest_pending_at',
   'period_end',
@@ -99,6 +100,6 @@ export const TIME_FIELDS: ReadonlySet<string> = new Set([
 export const EXPORT_HIDDEN_COLUMNS: Readonly<
   Record<string, readonly string[]>
 > = {
-  devices: ['token_hash', 'enrolled_by'],
-  products: ['on_hand_milli', 'cost_changed_at'],
+  devices: ['token_hash', 'enrolled_by', 'last_report_at'],
+  products: ['on_hand_milli', 'cost_changed_at', 'bundle_since'],
 };

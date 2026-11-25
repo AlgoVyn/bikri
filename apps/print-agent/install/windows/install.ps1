@@ -12,7 +12,8 @@ try {
 } catch {
   # No running agent, or it belongs to another account.
 }
-Get-Process 'bikri-print-agent' -ErrorAction SilentlyContinue | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
+$sid = (Get-Process -Id $PID).SessionId
+Get-Process 'bikri-print-agent' -ErrorAction SilentlyContinue | Where-Object { $_.SessionId -eq $sid } | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue
 New-Item -ItemType Directory -Force -Path $dest | Out-Null
 Copy-Item -Force $source $exe
 Unblock-File $exe

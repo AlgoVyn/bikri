@@ -371,6 +371,7 @@
       "sku_repeat": "Same product as an earlier row",
       "sku_taken": "SKU already used",
       "stock_invalid": "Stock is not a valid quantity for this unit",
+      "unit_stock_fractional": "Adjust the fractional stock with a stock count before switching to this unit",
       "too_many_rows": "More than {{max}} rows — split the file",
       "bundle_row": "Bundles are managed on the bundle screen",
       "track_invalid": "Track stock must be yes or no",
@@ -477,6 +478,7 @@
     "change_label": "Change to give",
     "due_label": "Still due",
     "cart_changed": "This bill was already paid in another tab. Reload before taking payment again.",
+    "cost_changed": "Costs changed while you were paying. Check the cart and try again.",
     "backdate_summary": "Past sale for {{date}}, made by {{staff}}",
     "backdate_failed": "The past sale was not saved. Check the date and the cashier.",
     "too_many_ops": "This reissue is too large to sync safely. Cancel the old bill and make the new sale separately."
@@ -1308,6 +1310,7 @@
     "cashier": "Cashier",
     "device": "Device",
     "items_section": "Items",
+    "and_more": "and {{count}} more",
     "payment": "Payment",
     "date": "Date",
     "lines": "Lines",

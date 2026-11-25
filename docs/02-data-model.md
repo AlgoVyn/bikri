@@ -1649,8 +1649,8 @@ header (`pushShopHeader`) skips the shop-name line while still printing the logo
 address, phone and tax numbers; the WhatsApp receipt text skips the name too. It is
 a shop-level setting in Settings → Shop profile & receipt and does not change sales.
 The schema marker bump lives in migration `0023` so a database that already applied
-`0022` still advances. `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` are both 8 (bumped
-by the logo field in `0025`); the
+`0022` still advances. `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` were both 8 after
+the logo field in `0025`; the current schema is 9 (`0035`). The
 Worker's bundle pull gate stays at schema 5 because it marks when bundles shipped,
 not the current schema.
 
@@ -2451,6 +2451,96 @@ DROP INDEX IF EXISTS change_log_row;
 
 Pull pages read `change_log` by `(tenant_id, seq)`, the prune uses the daily watermark/seq, and no production query filters by `(tenant_id, tbl, row_id)`. Removing the index saves one D1 index write per synced row. Index-only; `SCHEMA_VERSION` stays 8.
 
+### 2.34 Bundle history guard and schema-9 columns (migration `0035_bundle_history.sql`)
+
+`products.bundle_since` records when a product became a bundle so the import guard can tell a historical simple-product sale from a synthetic bundle line; `devices.last_report_at` throttles the pending/app-version report separately from the download watermark. `0033` left `bundle_items_lookup` redundant next to the new non-partial `bundle_items_by_component`, so `0035` drops it.
+
+```sql
+-- 0035_bundle_history.sql
+--
+-- CORE-M1/CORE-M2 from the 2026-11-25 whole-codebase review:
+--   * drop the redundant partial `bundle_items_lookup` index (0033 added the
+--     non-partial `bundle_items_by_component` on the same key columns);
+--   * record `bundle_since` so the import guard can distinguish a historical
+--     simple-product sale from a synthetic bundle sale line without being fooled
+--     by any later product edit (and without aborting a restore when a till clock
+--     ran slightly ahead).
+--
+-- `bundle_since` is server-only: the API hides it from client columns and rejects
+-- it in a pushed row. Schema changes bump SCHEMA_VERSION and CLIENT_SCHEMA_VERSION
+-- to 9; MIN_CLIENT_SCHEMA stays at 1 because the client wire shape is unchanged.
+
+ALTER TABLE products ADD COLUMN bundle_since INTEGER;
+
+UPDATE products
+SET bundle_since = updated_at
+WHERE kind = 'bundle';
+
+-- The pending/app-version report is throttled separately from the download
+-- freshness watermark, so a device with an old `last_seen_at` does not write on
+-- every request. Start existing devices from their last known activity.
+ALTER TABLE devices ADD COLUMN last_report_at INTEGER;
+
+UPDATE devices
+SET last_report_at = COALESCE(last_seen_at, updated_at, 0);
+
+DROP INDEX IF EXISTS bundle_items_lookup;
+
+DROP TRIGGER sale_lines_no_bundle_product;
+
+CREATE TRIGGER sale_lines_no_bundle_product
+BEFORE INSERT ON sale_lines
+WHEN EXISTS (
+  SELECT 1 FROM products p
+  WHERE p.tenant_id = NEW.tenant_id
+    AND p.id = NEW.product_id
+    AND p.kind = 'bundle'
+    AND COALESCE(p.bundle_since, p.updated_at) <= NEW.created_at
+)
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot be a sale line');
+END;
+
+-- A bundle inserted directly (operator import or setup) starts at its last edit.
+-- Backups do not carry the server-only `bundle_since`, so using `created_at` here
+-- would make a restored converted product reject its historical simple sales;
+-- `updated_at` is included in backups and is never earlier than the conversion.
+CREATE TRIGGER products_bundle_since_insert
+AFTER INSERT ON products
+WHEN NEW.kind = 'bundle' AND NEW.bundle_since IS NULL
+BEGIN
+  UPDATE products
+  SET bundle_since = CASE
+    WHEN NEW.updated_at > 0 THEN NEW.updated_at
+    ELSE NEW.created_at
+  END
+  WHERE tenant_id = NEW.tenant_id AND id = NEW.id;
+END;
+
+CREATE TRIGGER products_bundle_since_update
+AFTER UPDATE OF kind ON products
+WHEN NEW.kind = 'bundle' AND OLD.kind <> 'bundle'
+BEGIN
+  UPDATE products
+  SET bundle_since = CASE
+    WHEN NEW.updated_at > 0 THEN NEW.updated_at
+    ELSE NEW.created_at
+  END
+  WHERE tenant_id = NEW.tenant_id AND id = NEW.id;
+END;
+
+CREATE TRIGGER products_bundle_since_clear
+AFTER UPDATE OF kind ON products
+WHEN NEW.kind <> 'bundle'
+BEGIN
+  UPDATE products
+  SET bundle_since = NULL
+  WHERE tenant_id = NEW.tenant_id AND id = NEW.id;
+END;
+
+UPDATE meta SET value = '9' WHERE key = 'schema_version';
+```
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
@@ -2495,7 +2585,7 @@ export const DEXIE_SCHEMA_V15 = {
   kv: 'key',
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',
-  file_queue: '++id, status, created_at, [status+created_at]', // V12 adds the retention index
+  file_queue: '++id, status, created_at, [status+created_at]', // V12 adds the retention index; status stays standalone for old rows without created_at
   print_jobs: 'id, sale_id, refund_id, day_close_id, supplier_return_id, [status+created_at], created_at', // V3 document ids; V6 compound; V12 drops standalone status
   stock_levels: 'product_id',     // { product_id, on_hand_milli }
   party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at? } (V11 last payment)

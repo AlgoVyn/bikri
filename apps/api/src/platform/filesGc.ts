@@ -12,8 +12,9 @@ export type FileGcResult = {
   unreferenced: number;
   deleted: number;
   bytes: number;
-  /** The listing hit `MAX_OBJECTS`; run the operator action again for the rest. */
+  /** The listing hit `MAX_OBJECTS`; pass `next_cursor` to resume on the next run. */
   truncated: boolean;
+  next_cursor: string | null;
 };
 
 /**
@@ -24,7 +25,7 @@ export type FileGcResult = {
 export async function gcTenantFiles(
   env: Env,
   tenant: TenantRow,
-  options: { now?: number; dryRun?: boolean } = {},
+  options: { now?: number; dryRun?: boolean; cursor?: string } = {},
 ): Promise<FileGcResult> {
   const db = tenantDb(env, tenant);
   const [products, shop] = await db.batch([
@@ -43,7 +44,7 @@ export async function gcTenantFiles(
 
   const prefix = `t/${tenant.id}/`;
   const objects: { key: string; size: number; uploaded: Date }[] = [];
-  let cursor: string | undefined;
+  let cursor: string | undefined = options.cursor;
   do {
     const page = await env.FILES.list({
       prefix,
@@ -62,16 +63,19 @@ export async function gcTenantFiles(
       !referenced.has(object.key.slice(prefix.length)),
   );
   const bytes = stale.reduce((sum, object) => sum + object.size, 0);
+  const resumed = options.cursor !== undefined;
   if (!options.dryRun) {
     for (let at = 0; at < stale.length; at += DELETE_BATCH)
       await env.FILES.delete(
         stale.slice(at, at + DELETE_BATCH).map((o) => o.key),
       );
-    if (truncated) {
-      // The listing did not see every object, so it cannot reset file_bytes to the
-      // seen total. Subtract only what this run deleted.
+    if (truncated || resumed) {
+      // A partial listing (or a resumed one) cannot reset file_bytes to the full
+      // total. Subtract only what this run deleted, and never mark an uninitialized
+      // tenant as initialized: that would zero its pre-existing usage and bypass
+      // the 1 GB cap.
       await env.DB.prepare(
-        'UPDATE tenants SET file_bytes = MAX(0, file_bytes - ?2), files_initialized = 1 WHERE id = ?1',
+        'UPDATE tenants SET file_bytes = MAX(0, file_bytes - ?2) WHERE id = ?1',
       )
         .bind(tenant.id, bytes)
         .run();
@@ -103,5 +107,6 @@ export async function gcTenantFiles(
     deleted: options.dryRun ? 0 : stale.length,
     bytes,
     truncated,
+    next_cursor: truncated ? (cursor ?? null) : null,
   };
 }

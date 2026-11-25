@@ -5,7 +5,9 @@ import { refundSale } from './refunds.ts';
 import { completeSale } from './sale.ts';
 import {
   billDetail,
+  pageOf,
   rangeFor,
+  type SalesDay,
   salesCsv,
   salesFilterOptions,
   salesHistory,
@@ -324,5 +326,22 @@ describe('sales history (screens/10)', () => {
     expect(rows.rows.find((r) => r.sale.id === firstId)?.printFailed).toBe(
       false,
     );
+  });
+
+  it('keeps a busy day full header totals on every page slice', () => {
+    const rows = Array.from({ length: 120 }, (_, index) => ({
+      sale: { id: `sale-${index}`, status: 'completed', total: 100 },
+    })) as unknown as SalesDay['rows'];
+    const pages = pageOf(
+      [{ date: '2026-11-25', bills: 120, total: 12000, rows }],
+      50,
+    );
+    expect(pages).toHaveLength(3);
+    for (const page of pages)
+      expect(page[0]).toMatchObject({
+        date: '2026-11-25',
+        bills: 120,
+        total: 12000,
+      });
   });
 });

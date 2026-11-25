@@ -326,10 +326,20 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
         `{"seq":${Number(row.seq)},"tbl":${JSON.stringify(row.tbl)},"op":${JSON.stringify(row.op)},"row":${row.row_json}}`,
     )
     .join(',');
+  const hasMore = rows.length > q.limit;
+  // `last_seen_at` is the freshness watermark for cost/price validation. Advance it
+  // only after the till has received the final page, never before the query succeeds,
+  // and at most every 15 minutes so an idle 60-second poll does not write every time.
+  if (!hasMore && now - Number(device.last_seen_at ?? 0) >= 15 * 60_000)
+    await db.run(
+      'UPDATE devices SET last_seen_at = ?2 WHERE tenant_id = ?1 AND id = ?3 AND (last_seen_at IS NULL OR last_seen_at < ?2)',
+      now,
+      device.id,
+    );
   const meta = JSON.stringify({
     // Advance past hidden bundle rows even when the visible page is shorter.
     next_since: rawPage.at(-1)?.seq ?? q.since,
-    has_more: rows.length > q.limit,
+    has_more: hasMore,
     server_time: now,
     restore_epoch: tenant.restore_epoch,
     restore_point_at: tenant.restore_point_at,

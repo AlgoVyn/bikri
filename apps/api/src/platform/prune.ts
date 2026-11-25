@@ -229,13 +229,13 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       lastTenant = nextTenant;
       continue;
     }
-    while (floor < target && budget > 0 && calls.ok(2)) {
+    while (floor < target && budget > 0 && calls.ok(3)) {
       const limit = Math.min(
         LOG_CHUNK,
         budget,
-        // Four writes per log row (table + three indexes) plus the floor update, and
-        // one write reserved for the `prune_cursor` update at the end of the pass.
-        Math.floor(Math.max(0, calls.writesLeft() - 1) / 5),
+        // `change_log` has one index (`change_log_tenant_seq`): deleting a row
+        // writes the table plus that index. Reserve one write for the floor update.
+        Math.floor(Math.max(0, calls.writesLeft() - 1) / 2),
       );
       if (limit <= 0) {
         completed = false;

@@ -328,6 +328,9 @@ func (s *Server) printers(w http.ResponseWriter, r *http.Request) {
 		writeError(w, http.StatusBadGateway, code, detail)
 		return
 	}
+	if list == nil {
+		list = []backend.Printer{}
+	}
 	writeJSON(w, http.StatusOK, list)
 }
 
@@ -405,6 +408,9 @@ func (s *Server) diagnostics(w http.ResponseWriter, r *http.Request) {
 	ctx, cancel := context.WithTimeout(r.Context(), 5*time.Second)
 	defer cancel()
 	list, _ := s.backend.ListPrinters(ctx)
+	if list == nil {
+		list = []backend.Printer{}
+	}
 	writeJSON(w, http.StatusOK, diagnostics{
 		App:       "bikri-print-agent",
 		Version:   s.version,

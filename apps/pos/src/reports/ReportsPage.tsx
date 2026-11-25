@@ -274,6 +274,7 @@ function ReportsPageContent() {
 
   // A tab switch must not re-read the range. This probe query owns the data dependency;
   // the report request below only changes `tab` and lets the worker reuse its cache.
+  const dataVersionRef = useRef(0);
   const dataVersion =
     useLiveQuery(async () => {
       if (workerState === 'starting') return 0;
@@ -284,15 +285,27 @@ function ReportsPageContent() {
         db.sale_lines.toCollection().first(),
         db.payments.toCollection().first(),
         db.refunds.toCollection().first(),
+        db.refund_lines.toCollection().first(),
         db.sale_voids.toCollection().first(),
         db.expenses.toCollection().first(),
+        db.expense_categories.toCollection().first(),
         db.day_closes.toCollection().first(),
         db.stock_movements.toCollection().first(),
         db.ledger_entries.toCollection().first(),
         db.products.toCollection().first(),
+        db.categories.toCollection().first(),
         db.customers.toCollection().first(),
+        db.suppliers.toCollection().first(),
+        db.supplier_returns.toCollection().first(),
+        db.supplier_return_lines.toCollection().first(),
+        db.promises.toCollection().first(),
+        db.staff.toCollection().first(),
+        db.devices.toCollection().first(),
+        db.shop.get('shop'),
       ]);
-      return Date.now();
+      // A clock can return the same millisecond twice; a counter is strictly increasing.
+      dataVersionRef.current += 1;
+      return dataVersionRef.current;
     }, [
       workerState,
       preset,

@@ -102,7 +102,7 @@ describe('Worker coverage gaps', () => {
           }),
         },
         APP_VERSION: '1.1.0',
-        SCHEMA_VERSION: '8',
+        SCHEMA_VERSION: '9',
         MIN_CLIENT_SCHEMA: '1',
       },
       json: (body: unknown, status: number) =>

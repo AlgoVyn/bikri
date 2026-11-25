@@ -88,7 +88,8 @@ type WarmCatalogue = {
   rows: ProductListRow[];
 };
 let warmCatalogue: WarmCatalogue | null = null;
-let warmInFlight: Promise<WarmCatalogue> | null = null;
+let warmInFlight: { tenant: string; promise: Promise<WarmCatalogue> } | null =
+  null;
 
 /** Load the catalogue while the lock screen is visible; the PIN typing hides the read. */
 export function prewarmSellCatalogue(
@@ -101,27 +102,34 @@ export function prewarmSellCatalogue(
     now - warmCatalogue.at < WARM_TTL_MS
   )
     return Promise.resolve(warmCatalogue);
-  if (warmInFlight !== null) return warmInFlight;
-  warmInFlight = (async () => {
+  // An in-flight warm-up belongs to the tenant that started it. A shop switch must
+  // start a new read instead of returning the old tenant's promise.
+  if (warmInFlight?.tenant === db.tenantId) return warmInFlight.promise;
+  const tenant = db.tenantId;
+  let promise!: Promise<WarmCatalogue>;
+  promise = (async () => {
     const [master, levels, sold] = await Promise.all([
       loadCatalogueMaster(db),
       loadStockLevels(db),
       sold30For(db),
     ]);
     const index = buildCatalogueIndex(master, levels, sold, costMethod);
-    warmCatalogue = {
-      tenant: db.tenantId,
+    const result: WarmCatalogue = {
+      tenant,
       at: Date.now(),
       master,
       levels,
       sold,
       rows: index.rows,
     };
-    return warmCatalogue;
+    // A later tenant's warm-up may have replaced this one while it was reading.
+    if (warmInFlight?.promise === promise) warmCatalogue = result;
+    return result;
   })().finally(() => {
-    warmInFlight = null;
+    if (warmInFlight?.promise === promise) warmInFlight = null;
   });
-  return warmInFlight;
+  warmInFlight = { tenant, promise };
+  return promise;
 }
 
 export function getWarmCatalogue(

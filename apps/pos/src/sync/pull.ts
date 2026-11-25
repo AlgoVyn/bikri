@@ -18,7 +18,7 @@ import {
   clearInvoiceSearchCache,
 } from '../data/search.ts';
 import { clearSupplierDeliveryCache } from '../data/suppliers.ts';
-import { clearSoldCache } from '../state/catalogue.ts';
+import { clearSoldCache, clearWarmCatalogue } from '../state/catalogue.ts';
 import { SyncHttpError, tillAuth, tillRequest } from './client.ts';
 import { withSyncLock } from './lock.ts';
 import { mergeRows, mergeScope, type ServerRow } from './merge.ts';
@@ -129,6 +129,13 @@ const SEARCH_CATALOGUE_TABLES = new Set([
   'product_barcodes',
   'customers',
 ]);
+const WARM_TABLES = new Set([
+  'products',
+  'product_barcodes',
+  'bundle_items',
+  'categories',
+  'stock_movements',
+]);
 const SEARCH_INVOICE_TABLES = new Set(['sales', 'refunds', 'sale_voids']);
 const FIRST_DAY_TABLES = new Set([
   'sales',
@@ -143,17 +150,20 @@ const FIRST_DAY_TABLES = new Set([
 function clearReaderCaches(tables: Iterable<string>): void {
   let sold = false;
   let catalogue = false;
+  let warm = false;
   let invoice = false;
   let purchases = false;
   let firstDay = false;
   for (const table of tables) {
     if (SOLD_SOURCE_TABLES.has(table)) sold = true;
     if (SEARCH_CATALOGUE_TABLES.has(table)) catalogue = true;
+    if (WARM_TABLES.has(table) || SOLD_SOURCE_TABLES.has(table)) warm = true;
     if (SEARCH_INVOICE_TABLES.has(table)) invoice = true;
     if (table === 'purchases') purchases = true;
     if (FIRST_DAY_TABLES.has(table)) firstDay = true;
   }
   if (sold) clearSoldCache();
+  if (warm) clearWarmCatalogue();
   if (catalogue) clearCatalogueSearchCache();
   if (invoice) clearInvoiceSearchCache();
   if (purchases) clearSupplierDeliveryCache();
@@ -206,9 +216,18 @@ async function dropLosingSaleVoid(
     .toArray();
   if (claims.length === 0) return false;
   const txIds = new Set(claims.map((entry) => String(entry.tx_id)));
-  const losers = await db.outbox
-    .filter((entry) => txIds.has(String(entry.tx_id)))
-    .toArray();
+  // V14 added `outbox.tx_id` without backfilling existing rows. A pre-V14 pending
+  // claim has no tx_id and is not in the index; fall back to a filter so its losing
+  // transaction is still dropped.
+  const legacyClaim = claims.some((entry) => typeof entry.tx_id !== 'string');
+  const losers = legacyClaim
+    ? await db.outbox
+        .filter((entry) => txIds.has(String(entry.tx_id)))
+        .toArray()
+    : await db.outbox
+        .where('tx_id')
+        .anyOf([...txIds])
+        .toArray();
   await db.transaction('rw', db.tables, async () => {
     for (const entry of losers) {
       await db.table(entry.tbl).delete(entry.row_id);

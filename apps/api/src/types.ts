@@ -55,6 +55,7 @@ export type DeviceRow = {
   enrolled_by: string;
   revoked_at: number | null;
   last_seen_at: number | null;
+  last_report_at: number | null;
   last_invoice_seq: number;
   pending_ops: number;
   oldest_pending_at: number | null;

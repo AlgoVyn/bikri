@@ -37,13 +37,23 @@ const PDI = '\u2069';
  * (CORE-M5). Urdu digits are included because catalogs may use them.
  */
 const URDU_RANGE =
-  /[\d\u0660-\u0669\u06F0-\u06F9]+\s*[–×-]\s*[\d\u0660-\u0669\u06F0-\u06F9]+/gu;
+  /(?:[\d\u0660-\u0669\u06F0-\u06F9]+|\{\{[^{}]+\}\})\s*[–×-]\s*(?:[\d\u0660-\u0669\u06F0-\u06F9]+|\{\{[^{}]+\}\})/gu;
 
 function isolated(text: string, start: number, end: number): boolean {
-  const before = text.slice(0, start);
-  const open = before.lastIndexOf(LRI);
-  if (open < 0 || before.lastIndexOf(PDI) > open) return false;
-  return text.indexOf(PDI, end) >= 0;
+  let depth = 0;
+  for (let i = 0; i < start; i += 1) {
+    if (text[i] === LRI) depth += 1;
+    else if (text[i] === PDI && depth > 0) depth -= 1;
+  }
+  if (depth === 0) return false;
+  for (let i = end; i < text.length; i += 1) {
+    if (text[i] === LRI) depth += 1;
+    else if (text[i] === PDI) {
+      depth -= 1;
+      if (depth === 0) return true;
+    }
+  }
+  return false;
 }
 
 /** Keys in a `ur` catalog with a numeric range outside a U+2066…U+2069 isolate. */

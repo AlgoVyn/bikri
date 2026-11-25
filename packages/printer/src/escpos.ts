@@ -357,6 +357,7 @@ function encodeCommands(
             bold: command.bold,
             size: command.size,
             rtl: lineNeedsRtl(command.text),
+            cells: command.cells,
           });
           writeRaster(
             packMono(fitRasterToDots(rendered, state.dots), 'threshold'),

@@ -35,6 +35,7 @@ import {
 } from './applyOpsShared.ts';
 import {
   activeBundleComponents,
+  effectiveBundleItem,
   productDeletedInGroup,
   pushedProduct,
 } from './checks/bundles.ts';
@@ -114,6 +115,11 @@ export function checkOp(
   op: PushOp,
   costs: CostMap,
 ): void {
+  /** An insert for a row D1 already has writes nothing and never proves a companion exists. */
+  const existingLedgerInsert = (candidate: PushOp): boolean =>
+    candidate.kind === 'insert' &&
+    candidate.row?.id !== undefined &&
+    look.existingLedger.has(key(candidate.tbl, String(candidate.row.id)));
   if (!isMasterTable(op.tbl) && !isLedgerTable(op.tbl))
     throw new Reject('UNKNOWN_TABLE');
   if (isLedgerTable(op.tbl) && op.kind !== 'insert')
@@ -185,6 +191,7 @@ export function checkOp(
             (candidate) =>
               candidate.kind === 'insert' &&
               candidate.tbl === 'ledger_entries' &&
+              !existingLedgerInsert(candidate) &&
               candidate.row?.party_type === type &&
               candidate.row?.party_id === op.row_id,
           )
@@ -203,7 +210,16 @@ export function checkOp(
     throw new Reject('CONSTRAINT_FAILED');
   if ('business_date' in row && !isBusinessDate(row.business_date))
     throw new Reject('CONSTRAINT_FAILED');
-  if (op.tbl === 'promises' && !isBusinessDate(row.promised_on))
+  // A value the op will actually write (an insert, or an edit that lists the field).
+  // `planOp` writes only `changed_fields` for an existing master row.
+  const writesColumn = (tbl: string, id: string, field: string): boolean =>
+    !look.current.has(key(tbl, id)) ||
+    (op.changed_fields ?? []).includes(field);
+  if (
+    op.tbl === 'promises' &&
+    writesColumn('promises', String(row.id), 'promised_on') &&
+    !isBusinessDate(row.promised_on)
+  )
     throw new Reject('CONSTRAINT_FAILED');
   for (const field of ['created_at', 'updated_at', 'deleted_at'] as const) {
     if (!(field in row) || row[field] === null) continue;
@@ -655,14 +671,16 @@ export function checkOp(
         }
         if (purpose === 'customer_payment' || purpose === 'supplier_payment') {
           const paymentId = String(row.id);
-          const ledger = group.find(
+          const ledger = group.filter(
             (candidate) =>
               candidate.tbl === 'ledger_entries' &&
               candidate.kind === 'insert' &&
               candidate.row?.source_type === 'payment' &&
               candidate.row?.source_id === paymentId,
           );
-          if (!ledger) throw new Reject('CONSTRAINT_FAILED');
+          // One payment may move the party balance once. Multiple distinct ledger
+          // rows for the same payment would erase arbitrary khata debt.
+          if (ledger.length !== 1) throw new Reject('CONSTRAINT_FAILED');
         }
         break;
       }
@@ -842,7 +860,10 @@ export function checkOp(
       throw new Reject('FORBIDDEN');
   }
   if (op.tbl === 'branches') {
-    if (!/^[A-Z0-9]{1,6}$/u.test(String(row.bill_prefix ?? '')))
+    if (
+      writesColumn('branches', String(row.id), 'bill_prefix') &&
+      !/^[A-Z0-9]{1,6}$/u.test(String(row.bill_prefix ?? ''))
+    )
       throw new Reject('CONSTRAINT_FAILED');
   }
   if (op.tbl === 'shop') {
@@ -858,11 +879,6 @@ export function checkOp(
     )
       throw new Reject('CONSTRAINT_FAILED');
   }
-  // A value the op will actually write (an insert, or an edit that lists the field).
-  // `planOp` writes only `changed_fields` for an existing master row.
-  const writesColumn = (tbl: string, id: string, field: string): boolean =>
-    !look.current.has(key(tbl, id)) ||
-    (op.changed_fields ?? []).includes(field);
   if (
     op.tbl === 'shop' &&
     row.timezone !== undefined &&
@@ -926,6 +942,7 @@ export function checkOp(
       group.some(
         (candidate) =>
           candidate.kind === 'insert' &&
+          !existingLedgerInsert(candidate) &&
           candidate.row?.product_id === row.id &&
           ((candidate.tbl === 'purchase_lines' &&
             typeof candidate.row?.purchase_id === 'string') ||
@@ -986,9 +1003,12 @@ export function checkOp(
       throw new Reject('FORBIDDEN');
   }
   if (op.tbl === 'bundle_items') {
-    const bundleId = String(row.bundle_id ?? '');
-    const componentId = String(row.component_product_id ?? '');
-    const qty = Number(row.qty_milli ?? 0);
+    // Use the state `planOp` will actually write: an existing row updates only the
+    // listed columns and a stored soft delete is never cleared.
+    const item = effectiveBundleItem(look, group, String(row.id));
+    const bundleId = item?.bundle_id ?? '';
+    const componentId = item?.component_product_id ?? '';
+    const qty = item?.qty_milli ?? 0;
     const bundle =
       pushedProduct(look, group, bundleId) ?? look.products.get(bundleId);
     const component =
@@ -1107,6 +1127,7 @@ export function checkOp(
             (candidate) =>
               candidate.kind === 'insert' &&
               candidate.tbl === 'ledger_entries' &&
+              !existingLedgerInsert(candidate) &&
               candidate.row?.party_type === type &&
               candidate.row?.party_id === partyId,
           )

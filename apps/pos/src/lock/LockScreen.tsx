@@ -57,7 +57,13 @@ export function LockScreen() {
   // Hide the Sell catalogue's IndexedDB read and chunk load behind PIN entry. The
   // prewarmed rows are only a first render; the live queries still own freshness.
   useEffect(() => {
-    void prewarmSellCatalogue(db).catch(() => undefined);
+    void (async () => {
+      const shop = await db.shop.get('shop');
+      await prewarmSellCatalogue(
+        db,
+        String(shop?.cost_method) === 'last' ? 'last' : 'avg',
+      );
+    })().catch(() => undefined);
     void import('../sell/SellPage.tsx');
   }, [db]);
   const unlock = useSession((s) => s.unlock);

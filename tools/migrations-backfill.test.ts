@@ -262,6 +262,81 @@ describe('incremental migration backfills (OPS-M1)', () => {
     });
   });
 
+  it('applies 0032-0035 on the populated schema', () => {
+    applyThrough('0035');
+    expect(
+      one<{ n: number }>(
+        "SELECT COUNT(*) AS n FROM pragma_table_info('products') WHERE name = 'bundle_since'",
+      ).n,
+    ).toBe(1);
+  });
+
+  it('restores a converted bundle with its historical simple-product sale line', () => {
+    // A backup does not carry `bundle_since`; the insert trigger must use the
+    // product's last edit (the conversion point), not its original creation time.
+    insert('products', {
+      id: 'p-restored-bundle',
+      name_en: 'Converted product',
+      sku: 'RESTORE-BUNDLE',
+      kind: 'bundle',
+      track_stock: 0,
+      price: 100,
+      last_cost: 0,
+      avg_cost: 0,
+      created_at: 100,
+      updated_at: 200,
+      rev: 1,
+    });
+    insert('sales', {
+      id: 's-restored',
+      invoice_no: 'RESTORE-1',
+      invoice_seq: 999,
+      branch_id: 'br1',
+      device_id: 'dev1',
+      staff_id: 'st1',
+      business_date: DAY,
+      created_at: 150,
+      line_count: 1,
+      items_qty_milli: 1000,
+      gross_total: 100,
+      item_discount_total: 0,
+      subtotal: 100,
+      bill_discount: 0,
+      tax_rate_bp: 0,
+      tax: 0,
+      rounding: 0,
+      total: 100,
+      paid_total: 100,
+      udhaar_amount: 0,
+      cash_tendered: 100,
+      change_given: 0,
+      status: 'paid',
+      note: '',
+    });
+    expect(() =>
+      insert('sale_lines', {
+        id: 'sl-restored',
+        sale_id: 's-restored',
+        line_no: 1,
+        product_id: 'p-restored-bundle',
+        name_snapshot: 'Converted product',
+        sku_snapshot: 'RESTORE-BUNDLE',
+        qty_milli: 1000,
+        unit_price: 100,
+        gross: 100,
+        discount_value: 0,
+        discount: 0,
+        net: 100,
+        bill_discount_alloc: 0,
+        tax_alloc: 0,
+        rounding_alloc: 0,
+        unit_cost_snapshot: 0,
+        below_cost: 0,
+        created_at: 150,
+      }),
+    ).not.toThrow();
+  });
+
   it('leaves a costed product on hand and the database consistent', () => {
     const p1 = one<{ on_hand_milli: number }>(
       "SELECT on_hand_milli FROM products WHERE id = 'p1'",

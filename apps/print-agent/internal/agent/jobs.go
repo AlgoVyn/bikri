@@ -300,6 +300,19 @@ func (m *Manager) Cancel(ctx context.Context, id string) (*JobStatus, bool, erro
 		return &copy, true, nil
 	}
 	printer, spoolID := rec.Printer, rec.spoolID
+	if spoolID == "" {
+		// The backend has not returned a spool id yet. Mark the record terminal here,
+		// while the lock is held, so Submit observes `canceled` when Print returns and
+		// can cancel the OS job. Unlocking first left a window where a job could be
+		// reported canceled but still print.
+		rec.Status = "canceled"
+		rec.Error = ""
+		rec.Detail = ""
+		rec.UpdatedAt = m.now().UnixMilli()
+		copy := rec.JobStatus
+		m.mu.Unlock()
+		return &copy, true, nil
+	}
 	m.mu.Unlock()
 
 	if spoolID != "" {

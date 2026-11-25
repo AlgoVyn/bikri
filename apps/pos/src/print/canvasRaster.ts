@@ -1,8 +1,10 @@
 /** Browser text rasteriser for Urdu / non-ASCII receipt lines (06 §6). */
-import type {
-  RasterRenderer,
-  RasterSource,
-  RenderLineOptions,
+import {
+  columnWidths,
+  lineNeedsRtl,
+  type RasterRenderer,
+  type RasterSource,
+  type RenderLineOptions,
 } from '@bikri/printer';
 
 const PX: Record<RenderLineOptions['size'], number> = {
@@ -68,23 +70,92 @@ export function createCanvasRasterRenderer(
       ctx.fillRect(0, 0, o.dots, height);
       ctx.fillStyle = '#000';
       ctx.textBaseline = 'middle';
-      // ASCII lines are column-aligned; use the same monospace face as the PNG path.
-      ctx.font = `${o.bold ? 700 : 400} ${px}px ${
-        o.rtl
-          ? "'Noto Naskh Arabic UI', serif"
-          : "'JetBrains Mono', ui-monospace, monospace"
-      }`;
-      ctx.direction = o.rtl ? 'rtl' : 'ltr';
-      const align = o.rtl && o.align === 'left' ? 'right' : o.align;
-      ctx.textAlign = align;
-      const x =
-        align === 'center' ? o.dots / 2 : align === 'right' ? o.dots : 0;
-      ctx.save();
-      ctx.scale(1, tall);
-      // Keep deliberate leading spaces (bundle component indentation); maxWidth
-      // condenses a too-wide Urdu line instead of clipping it.
-      ctx.fillText(text, x, height / tall / 2, Math.max(1, o.dots));
-      ctx.restore();
+      // Draw explicit pair/item cells at real column boundaries. Space padding in a
+      // proportional Urdu font collapses the columns on these rows.
+      const drawCell = (
+        value: string,
+        cellX: number,
+        cellAlign: CanvasTextAlign,
+        cellRtl: boolean,
+      ): void => {
+        ctx.save();
+        ctx.scale(1, tall);
+        ctx.font = `${o.bold ? 700 : 400} ${px}px ${
+          cellRtl
+            ? "'Noto Naskh Arabic UI', serif"
+            : "'JetBrains Mono', ui-monospace, monospace"
+        }`;
+        ctx.direction = cellRtl ? 'rtl' : 'ltr';
+        ctx.textAlign = cellAlign;
+        ctx.fillText(value, cellX, height / tall / 2, Math.max(1, o.dots));
+        ctx.restore();
+      };
+      if (o.cells !== undefined && o.cells.length > 0) {
+        const cells = o.cells;
+        if (cells.length > 2) {
+          const chars = o.charsPerLine ?? 48;
+          const widths = columnWidths(chars);
+          const amountPx = (o.dots * widths.amount) / chars;
+          if (o.rtl) {
+            drawCell(cells[2]?.text ?? '', 0, 'left', false);
+            drawCell(
+              cells[1]?.text ?? '',
+              amountPx,
+              'left',
+              lineNeedsRtl(cells[1]?.text ?? ''),
+            );
+            drawCell(
+              cells[0]?.text ?? '',
+              o.dots,
+              'right',
+              lineNeedsRtl(cells[0]?.text ?? ''),
+            );
+          } else {
+            drawCell(
+              cells[0]?.text ?? '',
+              0,
+              'left',
+              lineNeedsRtl(cells[0]?.text ?? ''),
+            );
+            drawCell(
+              cells[1]?.text ?? '',
+              o.dots - amountPx,
+              'right',
+              lineNeedsRtl(cells[1]?.text ?? ''),
+            );
+            drawCell(cells[2]?.text ?? '', o.dots, 'right', false);
+          }
+        } else {
+          const left = cells[0];
+          const right = cells[1];
+          const leftRtl = lineNeedsRtl(left?.text ?? '');
+          const rightRtl = lineNeedsRtl(right?.text ?? '');
+          if (o.rtl) {
+            drawCell(left?.text ?? '', o.dots, 'right', leftRtl);
+            drawCell(right?.text ?? '', 0, 'left', rightRtl);
+          } else {
+            drawCell(left?.text ?? '', 0, 'left', leftRtl);
+            drawCell(right?.text ?? '', o.dots, 'right', rightRtl);
+          }
+        }
+      } else {
+        ctx.font = `${o.bold ? 700 : 400} ${px}px ${
+          o.rtl
+            ? "'Noto Naskh Arabic UI', serif"
+            : "'JetBrains Mono', ui-monospace, monospace"
+        }`;
+        ctx.direction = o.rtl ? 'rtl' : 'ltr';
+        const align = o.rtl && o.align === 'left' ? 'right' : o.align;
+        ctx.textAlign = align;
+        const x =
+          align === 'center' ? o.dots / 2 : align === 'right' ? o.dots : 0;
+        ctx.save();
+        ctx.scale(1, tall);
+        // Keep deliberate leading spaces (bundle component indentation); maxWidth
+        // condenses a too-wide Urdu line instead of clipping it.
+        ctx.fillText(text, x, height / tall / 2, Math.max(1, o.dots));
+        ctx.restore();
+      }
       const data = ctx.getImageData(0, 0, o.dots, height).data;
       return { width: o.dots, height, data, format: 'rgba' };
     },

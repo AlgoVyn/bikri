@@ -93,7 +93,12 @@ export const CLIENT_AUDIT_ACTIONS = new Set([
   'void',
 ]);
 export const SERVER_MANAGED: Partial<Record<string, ReadonlySet<string>>> = {
-  products: new Set(['avg_cost', 'on_hand_milli', 'cost_changed_at']),
+  products: new Set([
+    'avg_cost',
+    'on_hand_milli',
+    'cost_changed_at',
+    'bundle_since',
+  ]),
   sales: new Set(['status']),
 };
 export const DAY_MS = 86_400_000;
@@ -172,6 +177,16 @@ export type ProductLookupRow = {
   deleted_at: number | null;
   /** The product row was created or edited earlier in this push: the device knows it. */
   pushed: boolean;
+};
+
+export type BundleItemRow = {
+  id: string;
+  bundle_id: string;
+  component_product_id: string;
+  qty_milli: number;
+  sort_order: number;
+  updated_at: number;
+  deleted_at: number | null;
 };
 
 export type Lookups = {
@@ -266,6 +281,8 @@ export type Lookups = {
     string,
     { bundle_id: string; component_product_id: string }
   >;
+  /** Every stored recipe row (active or soft-deleted), for effective-state checks. */
+  bundleItemRows: Map<string, BundleItemRow>;
   /** Component product id → bundles that use it, for delete/kind-change checks. */
   bundleOfComponent: Map<string, string[]>;
   /** Bundle products already soft-deleted in D1. */

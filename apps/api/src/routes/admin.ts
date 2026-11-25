@@ -819,12 +819,16 @@ admin.get('/tenants/:id/export', async (c) => {
 admin.post('/tenants/:id/files/gc', async (c) => {
   const { tenant, db } = c.var;
   const body = z
-    .object({ dry_run: z.boolean().default(true) })
+    .object({
+      dry_run: z.boolean().default(true),
+      cursor: z.string().max(2048).optional(),
+    })
     .parse(await readOptionalJsonBody(c, 64 * 1024));
   const now = Date.now();
   const result = await gcTenantFiles(c.env, tenant, {
     now,
     dryRun: body.dry_run,
+    cursor: body.cursor,
   });
   await db.batch(
     auditStatements(db, {
