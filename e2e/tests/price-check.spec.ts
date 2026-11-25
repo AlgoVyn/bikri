@@ -75,6 +75,12 @@ test.describe('Price check (T-022)', () => {
     page,
   }) => {
     await shop(page);
+    // The lazy price-check chunk comes from the service-worker precache when offline.
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
+    await page.reload();
+    await expect(page.getByRole('navigation', { name: 'Main' })).toBeVisible();
     await page.context().setOffline(true);
     await page.keyboard.press('Control+Shift+KeyP');
     await expect(field(page)).toBeFocused();
