@@ -156,7 +156,8 @@ test.describe('deterministic visual snapshots', () => {
       await readyFonts(page);
       await page.waitForTimeout(400);
       await shot('home', [
-        page.locator('main header p').first(),
+        // Both the section label and the calendar date change with the run.
+        page.locator('main header p'),
         page.getByText(/Last bill/),
         page.locator('section[aria-labelledby="recent-heading"] bdi'),
       ]);
