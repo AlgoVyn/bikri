@@ -17,6 +17,7 @@ import {
   sideEffects,
   stockRepairStatements,
 } from './applyOpsServerRows.ts';
+import type { QuoteInfo, QuoteLineInfo } from './applyOpsShared.ts';
 import {
   type ApplyContext,
   type ApplyOutcome,
@@ -792,6 +793,61 @@ function applyCurrentChanges(look: Lookups, ops: PushOp[], now: number): void {
   }
 }
 
+/** Keep quote lookups current for a quote created earlier in the same push. */
+function applyQuoteChanges(look: Lookups, ops: PushOp[]): void {
+  for (const op of ops) {
+    if (op.tbl === 'quotations') {
+      const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+      if (typeof id !== 'string') continue;
+      if (op.kind === 'delete') {
+        look.quotes.delete(id);
+        continue;
+      }
+      const row = op.row ?? {};
+      const current = look.quotes.get(id);
+      const changed = new Set(op.changed_fields ?? []);
+      const next: Record<string, unknown> = current ? { ...current } : {};
+      for (const [field, value] of Object.entries(row)) {
+        if (changed.size === 0 || changed.has(field)) next[field] = value;
+      }
+      look.quotes.set(id, next as unknown as QuoteInfo);
+      continue;
+    }
+    if (op.tbl !== 'quotation_lines') continue;
+    if (op.kind === 'delete') {
+      for (const [quoteId, lines] of look.quoteLinesByQuote)
+        look.quoteLinesByQuote.set(
+          quoteId,
+          lines.filter((line) => line.id !== op.row_id),
+        );
+      continue;
+    }
+    const row = op.row ?? {};
+    const quoteId = String(row.quote_id ?? '');
+    const id = String(row.id ?? '');
+    if (!quoteId || !id) continue;
+    const lines = look.quoteLinesByQuote.get(quoteId) ?? [];
+    const index = lines.findIndex((line) => line.id === id);
+    const current = index >= 0 ? lines[index] : undefined;
+    const changed = new Set(op.changed_fields ?? []);
+    const next: Record<string, unknown> = current ? { ...current } : {};
+    for (const [field, value] of Object.entries(row)) {
+      if (changed.size === 0 || changed.has(field)) next[field] = value;
+    }
+    if (next.deleted_at !== null && next.deleted_at !== undefined) {
+      look.quoteLinesByQuote.set(
+        quoteId,
+        lines.filter((line) => line.id !== id),
+      );
+      continue;
+    }
+    const updated = next as unknown as QuoteLineInfo;
+    if (index >= 0) lines[index] = updated;
+    else lines.push(updated);
+    look.quoteLinesByQuote.set(quoteId, lines);
+  }
+}
+
 /**
  * Applies a list of ops for one device (03 §4.1 steps 3–7). Returns results in op order for the
  * processed ops; ops not processed (call budget, lost guard twice) are omitted.
@@ -930,6 +986,7 @@ export async function applyOps(
         applyShopChanges(look, appliedOps);
         applyLedgerChanges(look, appliedOps);
         applyCloseChanges(look, appliedOps);
+        applyQuoteChanges(look, appliedOps);
         groupAvg.commit();
       } catch (error) {
         if (!(error instanceof Reject)) throw error;
@@ -1075,6 +1132,27 @@ export async function applyOps(
       db.prepare(
         'UPDATE devices SET last_invoice_seq = MAX(last_invoice_seq, ?2) WHERE tenant_id = ?1 AND id = ?3',
         maxInvoiceSeq,
+        ctx.device.id,
+      ),
+    );
+  let maxQuoteSeq = 0;
+  for (const op of ops) {
+    if (
+      op.tbl !== 'quotations' ||
+      op.kind !== 'upsert' ||
+      !op.row ||
+      final.get(op.op_id)?.result !== 'applied'
+    )
+      continue;
+    const seq = Number(op.row.quote_seq);
+    if (Number.isSafeInteger(seq) && seq > 0)
+      maxQuoteSeq = Math.max(maxQuoteSeq, seq);
+  }
+  if (maxQuoteSeq > 0)
+    tail.push(
+      db.prepare(
+        'UPDATE devices SET last_quote_seq = MAX(last_quote_seq, ?2) WHERE tenant_id = ?1 AND id = ?3',
+        maxQuoteSeq,
         ctx.device.id,
       ),
     );

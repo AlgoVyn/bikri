@@ -29,6 +29,8 @@ import { Route as ProductsImportRouteImport } from './routes/products/import.tsx
 import { Route as ProductsNewRouteImport } from './routes/products/new.tsx';
 import { Route as ProductsPricesRouteImport } from './routes/products/prices.tsx';
 import { Route as ProductsSuggestedRouteImport } from './routes/products/suggested.tsx';
+import { Route as QuotationsIndexRouteImport } from './routes/quotations/index.tsx';
+import { Route as QuotationsIdRouteImport } from './routes/quotations/$id.tsx';
 import { Route as ReportsIndexRouteImport } from './routes/reports/index.tsx';
 import { Route as SalesIndexRouteImport } from './routes/sales/index.tsx';
 import { Route as SalesIdRouteImport } from './routes/sales/$id.tsx';
@@ -172,6 +174,20 @@ const ProductsSuggestedRoute = ProductsSuggestedRouteImport.update({
   path: '/products/suggested',
   getParentRoute: () => rootRouteImport,
 } as any);
+const QuotationsIndexRoute = QuotationsIndexRouteImport.update({
+  id: '/quotations/',
+  path: '/quotations/',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/quotations/index.lazy.tsx').then((d) => d.Route),
+);
+const QuotationsIdRoute = QuotationsIdRouteImport.update({
+  id: '/quotations/$id',
+  path: '/quotations/$id',
+  getParentRoute: () => rootRouteImport,
+} as any).lazy(() =>
+  import('./routes/quotations/$id.lazy.tsx').then((d) => d.Route),
+);
 const ReportsIndexRoute = ReportsIndexRouteImport.update({
   id: '/reports/',
   path: '/reports/',
@@ -391,6 +407,7 @@ export interface FileRoutesByFullPath {
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/quotations/$id': typeof QuotationsIdRoute;
   '/sales/$id': typeof SalesIdRouteWithChildren;
   '/settings/about': typeof SettingsAboutRoute;
   '/settings/activity': typeof SettingsActivityRoute;
@@ -410,6 +427,7 @@ export interface FileRoutesByFullPath {
   '/day-close/': typeof DayCloseIndexRoute;
   '/expenses/': typeof ExpensesIndexRoute;
   '/products/': typeof ProductsIndexRoute;
+  '/quotations/': typeof QuotationsIndexRoute;
   '/reports/': typeof ReportsIndexRoute;
   '/sales/': typeof SalesIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
@@ -444,6 +462,7 @@ export interface FileRoutesByTo {
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/quotations/$id': typeof QuotationsIdRoute;
   '/sales/$id': typeof SalesIdRouteWithChildren;
   '/settings/about': typeof SettingsAboutRoute;
   '/settings/activity': typeof SettingsActivityRoute;
@@ -462,6 +481,7 @@ export interface FileRoutesByTo {
   '/day-close': typeof DayCloseIndexRoute;
   '/expenses': typeof ExpensesIndexRoute;
   '/products': typeof ProductsIndexRoute;
+  '/quotations': typeof QuotationsIndexRoute;
   '/reports': typeof ReportsIndexRoute;
   '/sales': typeof SalesIndexRoute;
   '/settings': typeof SettingsIndexRoute;
@@ -498,6 +518,7 @@ export interface FileRoutesById {
   '/products/new': typeof ProductsNewRoute;
   '/products/prices': typeof ProductsPricesRoute;
   '/products/suggested': typeof ProductsSuggestedRoute;
+  '/quotations/$id': typeof QuotationsIdRoute;
   '/sales/$id': typeof SalesIdRouteWithChildren;
   '/settings/about': typeof SettingsAboutRoute;
   '/settings/activity': typeof SettingsActivityRoute;
@@ -517,6 +538,7 @@ export interface FileRoutesById {
   '/day-close/': typeof DayCloseIndexRoute;
   '/expenses/': typeof ExpensesIndexRoute;
   '/products/': typeof ProductsIndexRoute;
+  '/quotations/': typeof QuotationsIndexRoute;
   '/reports/': typeof ReportsIndexRoute;
   '/sales/': typeof SalesIndexRoute;
   '/settings/': typeof SettingsIndexRoute;
@@ -554,6 +576,7 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/quotations/$id'
     | '/sales/$id'
     | '/settings/about'
     | '/settings/activity'
@@ -573,6 +596,7 @@ export interface FileRouteTypes {
     | '/day-close/'
     | '/expenses/'
     | '/products/'
+    | '/quotations/'
     | '/reports/'
     | '/sales/'
     | '/settings/'
@@ -607,6 +631,7 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/quotations/$id'
     | '/sales/$id'
     | '/settings/about'
     | '/settings/activity'
@@ -625,6 +650,7 @@ export interface FileRouteTypes {
     | '/day-close'
     | '/expenses'
     | '/products'
+    | '/quotations'
     | '/reports'
     | '/sales'
     | '/settings'
@@ -660,6 +686,7 @@ export interface FileRouteTypes {
     | '/products/new'
     | '/products/prices'
     | '/products/suggested'
+    | '/quotations/$id'
     | '/sales/$id'
     | '/settings/about'
     | '/settings/activity'
@@ -679,6 +706,7 @@ export interface FileRouteTypes {
     | '/day-close/'
     | '/expenses/'
     | '/products/'
+    | '/quotations/'
     | '/reports/'
     | '/sales/'
     | '/settings/'
@@ -714,6 +742,7 @@ export interface RootRouteChildren {
   ProductsNewRoute: typeof ProductsNewRoute;
   ProductsPricesRoute: typeof ProductsPricesRoute;
   ProductsSuggestedRoute: typeof ProductsSuggestedRoute;
+  QuotationsIdRoute: typeof QuotationsIdRoute;
   SalesIdRoute: typeof SalesIdRouteWithChildren;
   SettingsAboutRoute: typeof SettingsAboutRoute;
   SettingsActivityRoute: typeof SettingsActivityRoute;
@@ -732,6 +761,7 @@ export interface RootRouteChildren {
   DayCloseIndexRoute: typeof DayCloseIndexRoute;
   ExpensesIndexRoute: typeof ExpensesIndexRoute;
   ProductsIndexRoute: typeof ProductsIndexRoute;
+  QuotationsIndexRoute: typeof QuotationsIndexRoute;
   ReportsIndexRoute: typeof ReportsIndexRoute;
   SalesIndexRoute: typeof SalesIndexRoute;
   SettingsIndexRoute: typeof SettingsIndexRoute;
@@ -882,6 +912,20 @@ declare module '@tanstack/react-router' {
       path: '/products/suggested';
       fullPath: '/products/suggested';
       preLoaderRoute: typeof ProductsSuggestedRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/quotations/': {
+      id: '/quotations/';
+      path: '/quotations';
+      fullPath: '/quotations/';
+      preLoaderRoute: typeof QuotationsIndexRouteImport;
+      parentRoute: typeof rootRouteImport;
+    };
+    '/quotations/$id': {
+      id: '/quotations/$id';
+      path: '/quotations/$id';
+      fullPath: '/quotations/$id';
+      preLoaderRoute: typeof QuotationsIdRouteImport;
       parentRoute: typeof rootRouteImport;
     };
     '/reports/': {
@@ -1175,6 +1219,7 @@ const rootRouteChildren: RootRouteChildren = {
   ProductsNewRoute: ProductsNewRoute,
   ProductsPricesRoute: ProductsPricesRoute,
   ProductsSuggestedRoute: ProductsSuggestedRoute,
+  QuotationsIdRoute: QuotationsIdRoute,
   SalesIdRoute: SalesIdRouteWithChildren,
   SettingsAboutRoute: SettingsAboutRoute,
   SettingsActivityRoute: SettingsActivityRoute,
@@ -1193,6 +1238,7 @@ const rootRouteChildren: RootRouteChildren = {
   DayCloseIndexRoute: DayCloseIndexRoute,
   ExpensesIndexRoute: ExpensesIndexRoute,
   ProductsIndexRoute: ProductsIndexRoute,
+  QuotationsIndexRoute: QuotationsIndexRoute,
   ReportsIndexRoute: ReportsIndexRoute,
   SalesIndexRoute: SalesIndexRoute,
   SettingsIndexRoute: SettingsIndexRoute,

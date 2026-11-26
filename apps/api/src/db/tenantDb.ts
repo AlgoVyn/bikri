@@ -36,6 +36,8 @@ export const TENANT_TABLES = [
   'suppliers',
   'expense_categories',
   'promises',
+  'quotations',
+  'quotation_lines',
   'sales',
   'sale_lines',
   'payments',

@@ -81,6 +81,10 @@ export {
   urduReceiptLabels,
   urduSupplierReturnLabels,
 } from './templates/labels.ts';
+export {
+  buildQuotationReceipt,
+  type QuotationReceiptInput,
+} from './templates/quotation.ts';
 export { buildRefundReceipt } from './templates/refund.ts';
 export { buildSaleReceipt, type SaleReceiptInput } from './templates/sale.ts';
 export { saleBasicInput } from './templates/saleBasicFixture.ts';

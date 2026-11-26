@@ -3,7 +3,12 @@ import { useLocation, useNavigate, useRouter } from '@tanstack/react-router';
 import { useTranslation } from 'react-i18next';
 import { type PeekOrigin, parseOrigin } from './peek.ts';
 
-export type ParentRoute = '/products' | '/sales' | '/udhaar' | '/suppliers';
+export type ParentRoute =
+  | '/products'
+  | '/sales'
+  | '/quotations'
+  | '/udhaar'
+  | '/suppliers';
 
 export type RecordBack = {
   /** Full accessible/visible label for the desktop back pill. */
@@ -19,6 +24,9 @@ export function recordBackForPath(
   pathname: string,
 ): { to: ParentRoute; shortLabelKey: string } | null {
   const clean = pathname.replace(/\/+$/u, '');
+  const quote = /^\/quotations\/([^/]+)$/u.exec(clean);
+  if (quote?.[1] && isUlid(quote[1]))
+    return { to: '/quotations', shortLabelKey: 'nav.sales' };
   const match = /^\/(products|sales|udhaar|suppliers)\/([^/]+)$/u.exec(clean);
   if (!match) return null;
   const [, section, id] = match;

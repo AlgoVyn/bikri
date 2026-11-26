@@ -34,6 +34,7 @@ Copy text in specs is the English source string; the implementer adds `en`, `ur`
 | 18 | Price | `/price-check` (modal) | [18-price-check.md](18-price-check.md) |
 | 19 | Operator console (platform operator, Cloudflare Access) | `/admin/*` | [19-admin.md](19-admin.md) |
 | 20 | Barcode labels (browser print) | `/labels` (modal) | [20-barcode-labels.md](20-barcode-labels.md) |
+| 21 | Quotations (list, detail, save/convert) | `/quotations`, `/quotations/:id` | [21-quotations.md](21-quotations.md) |
 
 ## CSV headers (REQ-B02, T-049)
 
@@ -44,6 +45,7 @@ Every list exports locally, offline. Amounts are rupees (list exports are compac
 | Products | `name_en,name_ur,category,brand,barcode,sku,price,cost,avg_cost,stock,unit,min_stock,track_stock,kind,sold_30_days` (`cost,avg_cost` only with `cost.view`) |
 | Product stock history | `date,reason,qty,balance_after,note,by` |
 | Sales | `invoice_no,date,time,customer,items,subtotal,discounts,tax,total,cash,card,bank_wallet,udhaar,refunded,status,cashier,device` |
+| Quotations | `quote_no,date,valid_until,customer,phone,items,subtotal,discounts,tax,total,status,staff,device` |
 | Customers | `name,phone,balance,oldest_unpaid_days,credit_limit,promise_on,last_activity` |
 | Customer statement | `date,description,debit,credit,balance` |
 | Chase list | `group,name,phone,balance,age_days,last_payment` |

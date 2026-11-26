@@ -24,6 +24,7 @@ import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading.tsx';
+import { SalesTabs } from '../components/SalesTabs.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
@@ -242,6 +243,14 @@ function SalesListContent({
       // A clock can return the same millisecond twice; a counter is strictly increasing.
       dataVersionRef.current += 1;
       return dataVersionRef.current;
+    }, [range.from, range.to, rangeError]) ?? 0;
+  const quotationCount =
+    useLiveQuery(async () => {
+      if (rangeError) return 0;
+      return getDb()
+        .quotations.where('business_date')
+        .between(range.from, range.to, true, true)
+        .count();
     }, [range.from, range.to, rangeError]) ?? 0;
   const [pageData, setPageData] = useState<{
     summary: SalesSummary;
@@ -494,6 +503,12 @@ function SalesListContent({
             ) : null}
           </div>
         }
+      />
+
+      <SalesTabs
+        active="bills"
+        billCount={pageData?.rowCount}
+        quotationCount={quotationCount}
       />
 
       {limited ? (

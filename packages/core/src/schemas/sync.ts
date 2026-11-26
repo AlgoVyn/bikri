@@ -13,6 +13,8 @@ export const MASTER_TABLES = [
   'suppliers',
   'expense_categories',
   'promises',
+  'quotations',
+  'quotation_lines',
 ] as const;
 
 /** Ledger (append-only) tables, 02 §1.1. */
@@ -58,6 +60,8 @@ export const SYNC_IMPORT_ORDER = [
   'expense_categories',
   'promises',
   'sales',
+  'quotations',
+  'quotation_lines',
   'sale_lines',
   'refunds',
   'refund_lines',

@@ -23,7 +23,7 @@ This document is the **source of truth** for table and column names. D1 (server)
 
 | Kind | Tables | Rules |
 |---|---|---|
-| **Master** (mutable) | `shop`, `branches`, `staff`, `categories`, `products`, `bundle_items`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises` | Have `created_at`, `updated_at`, `deleted_at`, `rev`, `updated_by`. Updated by `upsert` ops with optimistic `base_rev` ([03-sync §5](03-sync.md#5-conflict-rules)). Soft delete only. |
+| **Master** (mutable) | `shop`, `branches`, `staff`, `categories`, `products`, `bundle_items`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises`, `quotations`, `quotation_lines` | Have `created_at`, `updated_at`, `deleted_at`, `rev`, `updated_by`. Updated by `upsert` ops with optimistic `base_rev` ([03-sync §5](03-sync.md#5-conflict-rules)). Soft delete only. |
 | **Ledger** (append-only) | `sales`, `sale_lines`, `payments`, `refunds`, `refund_lines`, `sale_voids`, `ledger_entries`, `stock_movements`, `purchases`, `purchase_lines`, `supplier_returns`, `supplier_return_lines`, `expenses`, `cash_moves`, `day_closes`, `audit_log` | Insert only. Never updated or deleted, except the **derived cache** column `sales.status` which both sides recompute ([§4](#4-derived-values)). Migration `0010` enforces this with `BEFORE UPDATE`/`BEFORE DELETE` triggers; deletes are allowed only while the tenant is in `maintenance` (restore purge) or `deleting` (tenant deletion). |
 | **Server-owned** (tenant-scoped) | `devices`, `branch_device_codes`, `enrolment_codes`, `owner_email_codes`, `change_log`, `change_log_watermarks`, `applied_ops`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills (`devices` without `token_hash` and `enrolled_by`); `owner_email_codes` and `branch_device_codes` are never pulled or exported. |
 | **Platform** (not tenant-scoped) | `tenants`, `tenant_usage`, `expense_category_templates`, `meta`, `shop_requests`, `operator_audit` | Primary database only; written by the Worker and the operator console; never pulled by tills ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)). |
@@ -2541,13 +2541,127 @@ END;
 UPDATE meta SET value = '9' WHERE key = 'schema_version';
 ```
 
+### 2.35 Quotations (migration `0036_quotations.sql`)
+
+Quotations are a **master** document, not a ledger: an open quote can be edited, and a saved quote is kept forever (cancelled/expired are statuses, not deletes). The two tables are synced through the normal push/pull/snapshot path. They never write stock, payments, ledger entries or day closes.
+
+The quote number is independent of the invoice sequence: `QTN-<device_code>-<seq>`, with `quote_seq` from the device's `kv` and `devices.last_quote_seq` for enrolment/restore safety. A quote is not a tax invoice.
+
+```sql
+ALTER TABLE devices ADD COLUMN last_quote_seq INTEGER NOT NULL DEFAULT 0;
+
+CREATE TABLE quotations (
+  tenant_id           TEXT NOT NULL REFERENCES tenants(id),
+  id                  TEXT NOT NULL,
+  quote_no            TEXT NOT NULL CHECK (length(quote_no) BETWEEN 1 AND 64),
+  quote_seq           INTEGER NOT NULL CHECK (quote_seq > 0),
+  branch_id           TEXT NOT NULL,
+  device_id           TEXT NOT NULL,
+  staff_id            TEXT NOT NULL,
+  customer_id         TEXT,
+  customer_name       TEXT NOT NULL DEFAULT '' CHECK (length(customer_name) <= 60),
+  customer_phone      TEXT NOT NULL DEFAULT '' CHECK (length(customer_phone) <= 30),
+  business_date       TEXT NOT NULL,
+  valid_until         TEXT NOT NULL,
+  status              TEXT NOT NULL DEFAULT 'open' CHECK (status IN ('open','converted','cancelled')),
+  line_count          INTEGER NOT NULL CHECK (line_count > 0),
+  items_qty_milli     INTEGER NOT NULL CHECK (items_qty_milli > 0),
+  gross_total         INTEGER NOT NULL CHECK (gross_total >= 0),
+  item_discount_total INTEGER NOT NULL DEFAULT 0 CHECK (item_discount_total >= 0),
+  subtotal            INTEGER NOT NULL CHECK (subtotal >= 0),
+  bill_discount_type  TEXT CHECK (bill_discount_type IN ('rs','pct')),
+  bill_discount_value INTEGER NOT NULL DEFAULT 0 CHECK (bill_discount_value >= 0),
+  bill_discount       INTEGER NOT NULL DEFAULT 0 CHECK (bill_discount >= 0),
+  tax_rate_bp         INTEGER NOT NULL DEFAULT 0 CHECK (tax_rate_bp BETWEEN 0 AND 5000),
+  tax                 INTEGER NOT NULL DEFAULT 0 CHECK (tax >= 0),
+  tax_inclusive       INTEGER NOT NULL DEFAULT 0 CHECK (tax_inclusive IN (0,1)),
+  round_total_to      INTEGER NOT NULL DEFAULT 1 CHECK (round_total_to > 0),
+  rounding            INTEGER NOT NULL DEFAULT 0,
+  total               INTEGER NOT NULL CHECK (total >= 0),
+  note                TEXT NOT NULL DEFAULT '' CHECK (length(note) <= 500),
+  converted_sale_id   TEXT,
+  converted_at        INTEGER,
+  cancelled_reason    TEXT NOT NULL DEFAULT '' CHECK (length(cancelled_reason) <= 120),
+  cancelled_at        INTEGER,
+  created_at          INTEGER NOT NULL,
+  updated_at          INTEGER NOT NULL,
+  deleted_at          INTEGER,
+  rev                 INTEGER NOT NULL DEFAULT 1,
+  updated_by          TEXT,
+  CHECK (valid_until >= business_date),
+  CHECK (total = subtotal - bill_discount + (CASE WHEN tax_inclusive = 1 THEN 0 ELSE tax END) + rounding),
+  CHECK ((status = 'converted') = (converted_sale_id IS NOT NULL)),
+  CHECK ((status = 'converted') = (converted_at IS NOT NULL)),
+  CHECK ((status = 'cancelled') = (cancelled_at IS NOT NULL)),
+  CHECK (status <> 'cancelled' OR length(cancelled_reason) BETWEEN 1 AND 120),
+  CHECK (status = 'cancelled' OR cancelled_reason = ''),
+  UNIQUE (tenant_id, quote_no),
+  FOREIGN KEY (tenant_id, branch_id) REFERENCES branches(tenant_id, id),
+  FOREIGN KEY (tenant_id, staff_id) REFERENCES staff(tenant_id, id),
+  FOREIGN KEY (tenant_id, customer_id) REFERENCES customers(tenant_id, id),
+  FOREIGN KEY (tenant_id, converted_sale_id) REFERENCES sales(tenant_id, id),
+  PRIMARY KEY (tenant_id, id)
+) STRICT;
+CREATE INDEX quotations_date ON quotations (tenant_id, business_date, status);
+CREATE INDEX quotations_validity ON quotations (tenant_id, status, valid_until);
+CREATE INDEX quotations_customer ON quotations (tenant_id, customer_id, created_at) WHERE customer_id IS NOT NULL;
+CREATE INDEX quotations_sale ON quotations (tenant_id, converted_sale_id) WHERE converted_sale_id IS NOT NULL;
+
+CREATE TABLE quotation_lines (
+  tenant_id           TEXT NOT NULL REFERENCES tenants(id),
+  id                  TEXT NOT NULL,
+  quote_id            TEXT NOT NULL,
+  line_no             INTEGER NOT NULL CHECK (line_no > 0),
+  product_id          TEXT,
+  name_snapshot       TEXT NOT NULL CHECK (length(name_snapshot) BETWEEN 1 AND 120),
+  sku_snapshot        TEXT NOT NULL DEFAULT '' CHECK (length(sku_snapshot) <= 64),
+  qty_milli           INTEGER NOT NULL CHECK (qty_milli > 0),
+  unit_price          INTEGER NOT NULL CHECK (unit_price >= 0),
+  gross               INTEGER NOT NULL CHECK (gross >= 0),
+  discount_type       TEXT CHECK (discount_type IN ('rs','pct')),
+  discount_value      INTEGER NOT NULL DEFAULT 0 CHECK (discount_value >= 0),
+  discount            INTEGER NOT NULL DEFAULT 0 CHECK (discount >= 0),
+  net                 INTEGER NOT NULL CHECK (net >= 0),
+  note                TEXT NOT NULL DEFAULT '' CHECK (length(note) <= 60),
+  unit_cost_snapshot  INTEGER NOT NULL DEFAULT 0 CHECK (unit_cost_snapshot >= 0),
+  bundle_id           TEXT,
+  bundle_group        TEXT,
+  bundle_name         TEXT CHECK (bundle_name IS NULL OR length(bundle_name) BETWEEN 1 AND 80),
+  bundle_qty          INTEGER CHECK (bundle_qty IS NULL OR bundle_qty > 0),
+  bundle_price        INTEGER CHECK (bundle_price IS NULL OR bundle_price >= 0),
+  bundle_component_qty_milli INTEGER CHECK (bundle_component_qty_milli IS NULL OR bundle_component_qty_milli > 0),
+  bundle_discount     INTEGER NOT NULL DEFAULT 0 CHECK (bundle_discount >= 0),
+  created_at          INTEGER NOT NULL,
+  updated_at          INTEGER NOT NULL,
+  deleted_at          INTEGER,
+  rev                 INTEGER NOT NULL DEFAULT 1,
+  updated_by          TEXT,
+  CHECK (net = gross - discount),
+  UNIQUE (tenant_id, quote_id, line_no),
+  FOREIGN KEY (tenant_id, quote_id) REFERENCES quotations(tenant_id, id),
+  FOREIGN KEY (tenant_id, product_id) REFERENCES products(tenant_id, id),
+  PRIMARY KEY (tenant_id, id)
+) STRICT;
+CREATE INDEX quotation_lines_quote ON quotation_lines (tenant_id, quote_id);
+CREATE INDEX quotation_lines_product ON quotation_lines (tenant_id, product_id);
+
+UPDATE meta SET value = '10' WHERE key = 'schema_version';
+```
+
+- `quotation_lines.line_no` is never reused: a removed line is soft-deleted and keeps its number, so the unique key stays valid. The repository assigns `max(line_no) + 1`.
+- The Worker raises `devices.last_quote_seq` from an accepted quote's `quote_seq`, like `last_invoice_seq` for sales; enrolment and restore recovery set `kv.quote_seq` to the maximum of the local value and the server value, so a quote number is never reused.
+- A bundle stores one line per component, exactly like `sale_lines`; the bundle product itself is never a line. `bundle_id` has no composite FK (the historical bundle may be deleted), and the server checks the component group and group total.
+- The header totals are a snapshot computed by `computeCart()` from the cart; the Worker re-validates them against the non-deleted lines. `expired` is derived from `status = 'open'` and `valid_until < today` in `shop.timezone`; there is no cron and no stored expired status.
+- The quote tables are ordered **after `sales`** in `SYNC_IMPORT_ORDER` because `converted_sale_id` is a composite FK to `sales`; all other parent tables (products, customers, branches, staff) come before them.
+- Old clients below client schema 10 are gated out of `quotations`/`quotation_lines` in pull and snapshot, like the bundle gate ([03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500)).
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
 
 ```ts
 // Example only — exact index strings to implement.
-export const DEXIE_SCHEMA_V15 = {
+export const DEXIE_SCHEMA_V16 = {
   // master
   shop: 'id',
   branches: 'id, deleted_at',
@@ -2561,6 +2675,8 @@ export const DEXIE_SCHEMA_V15 = {
   suppliers: 'id',
   expense_categories: 'id, code, sort_order',
   promises: 'id, customer_id, [status+promised_on]',
+  quotations: 'id, quote_no, business_date, customer_id, [status+valid_until], converted_sale_id', // V16
+  quotation_lines: 'id, quote_id, product_id', // V16
   sync_conflicts: 'id, resolution',   // pulled read-only; V12 drops row_id/at
   // ledger
   sales: 'id, &invoice_no, business_date, created_at, [device_id+invoice_seq], status',
@@ -2586,7 +2702,7 @@ export const DEXIE_SCHEMA_V15 = {
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',
   file_queue: '++id, status, created_at, [status+created_at]', // V12 adds the retention index; status stays standalone for old rows without created_at
-  print_jobs: 'id, sale_id, refund_id, day_close_id, supplier_return_id, [status+created_at], created_at', // V3 document ids; V6 compound; V12 drops standalone status
+  print_jobs: 'id, sale_id, refund_id, quotation_id, day_close_id, supplier_return_id, [status+created_at], created_at', // V3 document ids; V6 compound; V12 drops standalone status; V16 quotation_id
   stock_levels: 'product_id',     // { product_id, on_hand_milli }
   party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at? } (V11 last payment)
   pull_shadow: '[tbl+id]',        // { row, source: 'local'|'server' } restore point or skipped server row (03 §4.2)
@@ -2609,6 +2725,8 @@ export const DEXIE_SCHEMA_V15 = {
 
 **Dexie V15 (D-297)** drops the unused `outbox.created_at` index. Every outbox read uses `seq`, `status`, the `[status+seq]` range or `[tbl+row_id]`, so the index only added a local write per queued op. Index-only upgrade; no row changes.
 
+**Dexie V16 (D-305)** adds the synced `quotations` and `quotation_lines` master tables and the local-only `print_jobs.quotation_id` index/column. No existing data is rewritten; a till that has never pulled a quotation has empty tables. The old-client gate lives on the Worker, not in Dexie.
+
 ### 3.1 Local-only tables
 
 | Table | Shape | Purpose |
@@ -2618,7 +2736,7 @@ export const DEXIE_SCHEMA_V15 = {
 | `carts` | `{ id: 'c1'|'c2'|'c3', customer_id?, lines: CartLine[], bill_discount?: {type, value}, note, updated_at }` | Open carts, survive reload |
 | `held_bills` | same as cart + `{ held_at, held_by, label }` | Parked bills |
 | `file_queue` | `{ id, kind: 'product_image'|'logo', target_id, blob, sha256, status, created_at? }` | Images waiting for upload; failed entries older than 30 days are trimmed |
-| `print_jobs` | `{ id, sale_id?, refund_id?, day_close_id?, supplier_return_id?, kind, status: 'queued'|'printing'|'done'|'failed', started_at?, error?, reprint?, created_at }` | Print history and retry; `done` jobs older than 90 days are trimmed |
+| `print_jobs` | `{ id, sale_id?, refund_id?, quotation_id?, day_close_id?, supplier_return_id?, kind: 'sale'|'refund'|'void'|'test'|'day_close'|'statement'|'supplier'|'quotation', status: 'queued'|'printing'|'done'|'failed', started_at?, error?, reprint?, created_at }` | Print history and retry; `done` jobs older than 90 days are trimmed |
 | `stock_levels` | `{ product_id, on_hand_milli }` | Cache = Σ `stock_movements.qty_delta_milli`; updated in the same transaction as each movement; rebuildable |
 | `party_balances` | `{ party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at? }` | Cache = Σ `ledger_entries.amount`; rebuildable |
 
@@ -2643,6 +2761,7 @@ Settings → Sync → "Rebuild local data" (owner only; [screens/17](screens/17-
 | Average cost | [07 §7](07-money-rules.md#7-cost-weighted-average) | Server recomputes and writes `products.avg_cost`; till computes provisionally |
 | Bundle availability | `min(floor(on_hand_milli_i / qty_milli_i))` over active tracked components (untracked components ignored; all untracked → "made to order") | Read-only derivation on the till for the Sell tile, product detail and cart warning; no stored counter |
 | Bundle sold count | count of distinct `bundle_group` in `sale_lines` for a `bundle_id` (minus fully refunded groups) | Bundle product detail and a later bundle report; never sum `sale_lines.qty_milli` or the component count |
+| Quote expired | `quotations.status = 'open' AND quotations.valid_until < today` in `shop.timezone` | Quotations list/detail badge and conversion prompt; not stored, no cron |
 
 ## 5. Record recipes (which rows each action writes)
 
@@ -2653,6 +2772,11 @@ All rows of one action are written in **one Dexie transaction** together with th
 | Bundle product create/edit | 1 `products` on create or when the bundle price/name changes (`kind='bundle'`, `track_stock=0`); 1..20 `bundle_items` upserts/soft deletes on a recipe edit; 1 `audit_log` `bundle_change` with the before/after recipe; a price edit also writes `price_change`. No stock movement |
 | Sale | 1 `sales`; n `sale_lines` (with `warranty_until` when the product has `warranty_days > 0`); a bundle sale writes one line per component, never a line for the bundle product itself, with the seven `bundle_*` fields; `sales.line_count` and `sales.items_qty_milli` count those component lines/units, not bundles (a 4-component bundle × 2 is 4 lines and 8 units; the bundle header is a UI grouping only); 0..3 `payments` (direction in, purpose sale, one per method used); 1 `ledger_entries` (+udhaar) if udhaar part > 0; n `stock_movements` (reason `sale`, −qty) for lines with `track_stock = 1`; `audit_log` if any discount exceeded the cashier limit (manager override) |
 | Backdated sale | Same rows as Sale, plus 1 `audit_log` `sale_backdated` (`after_json`: attributed staff, business date, reason, recorded_at). The sale is written on the owner's device with `business_date` = the chosen date and `created_at` = the entry time; the attributed `staff_id` is the cashier who made it ([D-173](decisions.md#decisions-log)) |
+| Save quote | 1 `quotations` upsert (create with `base_rev: 0`, or update with `rev`); 1..60 `quotation_lines` upserts and soft deletes for removed lines. No `payments`, `ledger_entries`, `stock_movements`, `party_balances` or day-close row. 1 `audit_log` `quote_create`/`quote_change` |
+| Edit quote | Same as Save quote on the existing `quotations` row; only while `status = 'open'`. Converted/cancelled quotes are immutable |
+| Cancel quote | 1 `quotations` upsert setting `status = 'cancelled'`, `cancelled_reason`, `cancelled_at`; 1 `audit_log` `quote_cancel`. No stock/money reversal because a quote never moved either |
+| Convert quote | 1 `quotations` upsert setting `status = 'converted'`, `converted_sale_id`, `converted_at`; the normal Sale recipe (stock movements, payments, ledger and audit as applicable); 1 `audit_log` `quote_convert`. The sale is a normal sale; the quote adds no money/stock rows itself |
+| Duplicate quote | New `quotations` row (new ULID and new `QTN-…` number) + new `quotation_lines`; same customer/terms/lines, `status = 'open'`, default validity; 1 `audit_log` `quote_create` |
 | Refund | 1 `refunds` (split into paid part and udhaar part, [07 §6.1](07-money-rules.md#61-refunds-on-udhaar-bills)); n `refund_lines`; a whole-bundle return writes one refund line per component and includes every component line of the touched `bundle_group` with the same `k` whole bundles; 1 `payments` (direction out, purpose refund, `method`, `amount`) if `amount > 0`; 1 `ledger_entries` (customer, −`udhaar_part`, source refund) if `udhaar_part > 0`; `stock_movements` (`refund_return`, +qty) for restocked lines; `audit_log` |
 | Void | 1 `sale_voids`; reversing `payments` (direction out, purpose void) for each original payment; reversing `ledger_entries` (−udhaar); `stock_movements` (`void_return`, +qty); `audit_log` |
 | Reissue | Void (above) + a new sale with `replaces_sale_id`, then `sale_voids.replacement_sale_id` is known up front because the new sale ID is generated before writing |

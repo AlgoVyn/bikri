@@ -117,8 +117,15 @@ export function BillDetail({
     if (!detail) return null;
     const timeZone = await shopTimeZone(db);
     const shop = await db.shop.get('shop');
+    const quote = await db.quotations
+      .where('converted_sale_id')
+      .equals(saleId)
+      .first();
     return {
       detail,
+      quote: quote
+        ? { id: String(quote.id), quote_no: String(quote.quote_no) }
+        : null,
       timeZone,
       today: businessDate(Date.now(), timeZone),
       taxLabel: String(shop?.tax_label ?? '') || t('office.bill.tax_label'),
@@ -506,6 +513,26 @@ export function BillDetail({
         more={moreActions}
         primaryLast={!(embedded && masterDetailWide)}
       />
+
+      {data.quote ? (
+        <div
+          data-testid="bill-from-quote"
+          className="rounded-control bg-success-subtle px-3 py-2 text-small text-success-subtle-ink"
+        >
+          {t('office.bill.quotation')}{' '}
+          <Link
+            to="/quotations/$id"
+            params={{ id: data.quote.id }}
+            className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+          >
+            {data.quote.quote_no}
+            <ChevronRightIcon
+              aria-hidden="true"
+              className="size-4 rtl:rotate-180"
+            />
+          </Link>
+        </div>
+      ) : null}
 
       {canVoid && blocker === 'same_day' ? (
         <p className="rounded-control bg-warning-subtle p-2 text-small text-warning-subtle-ink">

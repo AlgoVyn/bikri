@@ -4,7 +4,7 @@ import {
   mulDivRound,
   type QtyUnit,
 } from '@bikri/core';
-import type { Cart, CartBackdate, CartLine } from '@bikri/db';
+import type { Cart, CartBackdate, CartLine, CartQuote } from '@bikri/db';
 import { memo, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
@@ -65,6 +65,9 @@ export type CartPanelProps = {
   onBillDiscount: () => void;
   onHold: () => void;
   onClear: () => void;
+  quote: CartQuote | null;
+  onSaveQuote: () => void;
+  onCancelQuote: () => void;
   onPay: () => void;
   onAddItem: () => void;
   onHeld: () => void;
@@ -115,6 +118,47 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
   }
   return (
     <div className="flex min-h-0 flex-1 flex-col gap-1.5">
+      {p.quote?.mode === 'convert' ? (
+        <div
+          data-testid="quote-convert-banner"
+          className="rounded-control border border-primary bg-primary-subtle p-2 text-small text-primary-subtle-ink"
+        >
+          <p className="font-medium">
+            {t('sell.quote_converting', { quote: p.quote.quote_no ?? '' })}
+          </p>
+          <p>
+            {t('sell.quote_valid_until', { date: p.quote.valid_until ?? '' })}
+          </p>
+        </div>
+      ) : null}
+      {p.quote && p.quote.mode !== 'convert' ? (
+        <div
+          data-testid="quote-banner"
+          className="rounded-control border border-primary bg-primary-subtle p-2 text-small text-primary-subtle-ink"
+        >
+          <div className="flex items-start gap-2">
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">
+                {p.quote.mode === 'edit' && p.quote.quote_no
+                  ? t('sell.quote_editing', { quote: p.quote.quote_no })
+                  : t('sell.quote_new')}
+              </p>
+              <p className="truncate">
+                {t('sell.quote_valid_until', {
+                  date: p.quote.valid_until ?? '',
+                })}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="min-h-11 shrink-0 px-2 underline underline-offset-2"
+              onClick={p.onCancelQuote}
+            >
+              {t('sell.quote_cancel_edit')}
+            </button>
+          </div>
+        </div>
+      ) : null}
       {p.backdate ? (
         <div
           data-testid="backdate-banner"
@@ -375,36 +419,70 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
       </dl>
 
       <div className="flex flex-wrap items-center gap-1.5">
-        <button
-          type="button"
-          className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
-          disabled={cart.lines.length === 0}
-          onClick={p.onHold}
-        >
-          {t('sell.hold')}
-        </button>
-        <button
-          type="button"
-          className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
-          onClick={p.onHeld}
-        >
-          {t('sell.held_bills', { count: p.heldCount })}
-        </button>
-        <button
-          type="button"
-          className={`${buttonDangerQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
-          disabled={isEmptyCart(cart)}
-          onClick={p.onClear}
-        >
-          {t('sell.clear')}
-        </button>
-        <button
-          type="button"
-          className={`${buttonPrimary} max-sm:px-3 text-small lg:ms-auto lg:min-h-12 lg:px-3`}
-          onClick={isEmptyCart(cart) ? p.onAddItem : p.onPay}
-        >
-          {isEmptyCart(cart) ? t('sell.add_items') : t('sell.take_payment')}
-        </button>
+        {p.quote && p.quote.mode !== 'convert' ? (
+          <>
+            <button
+              type="button"
+              className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+              onClick={p.onCancelQuote}
+            >
+              {t('sell.quote_cancel_edit')}
+            </button>
+            <button
+              type="button"
+              data-testid="save-quote"
+              className={`${buttonPrimary} max-sm:px-3 text-small lg:ms-auto lg:min-h-12 lg:px-3`}
+              disabled={cart.lines.length === 0}
+              onClick={p.onSaveQuote}
+            >
+              {t('sell.save_quote')}
+            </button>
+          </>
+        ) : (
+          <>
+            <button
+              type="button"
+              className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+              disabled={cart.lines.length === 0}
+              onClick={p.onHold}
+            >
+              {t('sell.hold')}
+            </button>
+            <button
+              type="button"
+              className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+              onClick={p.onHeld}
+            >
+              {t('sell.held_bills', { count: p.heldCount })}
+            </button>
+            <button
+              type="button"
+              className={`${buttonDangerQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+              disabled={isEmptyCart(cart)}
+              onClick={p.onClear}
+            >
+              {t('sell.clear')}
+            </button>
+            {p.quote?.mode !== 'convert' ? (
+              <button
+                type="button"
+                data-testid="save-quote"
+                className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+                disabled={cart.lines.length === 0}
+                onClick={p.onSaveQuote}
+              >
+                {t('sell.save_quote')}
+              </button>
+            ) : null}
+            <button
+              type="button"
+              className={`${buttonPrimary} max-sm:px-3 text-small lg:ms-auto lg:min-h-12 lg:px-3`}
+              onClick={isEmptyCart(cart) ? p.onAddItem : p.onPay}
+            >
+              {isEmptyCart(cart) ? t('sell.add_items') : t('sell.take_payment')}
+            </button>
+          </>
+        )}
       </div>
     </div>
   );
@@ -796,6 +874,23 @@ function LineRow({
                 {qtyWithUnit(t, line.qty_milli, unit)} ×{' '}
                 <MoneyText paisa={line.unit_price} />
               </span>
+              {p.quote?.mode === 'convert' &&
+              typeof line.list_price === 'number' &&
+              line.list_price !== line.unit_price ? (
+                <>
+                  <span
+                    className="shrink-0 rounded-full bg-primary-subtle px-1.5 text-caption font-medium text-primary-subtle-ink"
+                    data-testid="badge-quoted"
+                  >
+                    {t('sell.quote_quoted')}
+                  </span>
+                  <span className="shrink-0" data-testid="quoted-now-price">
+                    {t('sell.quote_now_price', {
+                      amount: formatShopMoney(line.list_price),
+                    })}
+                  </span>
+                </>
+              ) : null}
               {result && result.discount > 0 ? (
                 <span
                   className="shrink-0 rounded-full bg-success-subtle px-1.5 text-caption text-success-subtle-ink"

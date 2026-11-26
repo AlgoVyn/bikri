@@ -14,6 +14,7 @@ export type MeResponse = {
     device_code: string;
     is_admin: boolean;
     last_invoice_seq: number;
+    last_quote_seq: number;
   };
   shop_setup_completed: boolean;
   server_time: number;

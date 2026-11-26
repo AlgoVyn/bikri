@@ -81,6 +81,11 @@ export const CLIENT_AUDIT_ACTIONS = new Set([
   'pin_reset',
   'price_change',
   'product_delete',
+  'quote_cancel',
+  'quote_change',
+  'quote_convert',
+  'quote_create',
+  'quote_expired_price_used',
   'refund',
   'reissue',
   'sale_backdated',
@@ -318,6 +323,10 @@ export type Lookups = {
   partyBalances: Map<string, number>;
   /** Current product price/cost/tracking, for sale price and cost checks. */
   products: Map<string, ProductLookupRow>;
+  /** Existing quotations touched by this push, for terminal/status/total checks. */
+  quotes: Map<string, QuoteInfo>;
+  /** Every stored line (including soft-deleted) of the quotes touched by this push. */
+  quoteLinesByQuote: Map<string, QuoteLineInfo[]>;
   /** The latest stored close of each device, for period chaining. */
   lastClose: Map<
     string,
@@ -367,6 +376,68 @@ export type SaleInfo = {
   customer_id: string | null;
   udhaar_amount: number;
   paid_total: number;
+};
+
+export type QuoteInfo = {
+  id: string;
+  rev: number;
+  deleted_at: number | null;
+  quote_no: string;
+  quote_seq: number;
+  branch_id: string;
+  device_id: string;
+  staff_id: string;
+  customer_id: string | null;
+  business_date: string;
+  valid_until: string;
+  status: string;
+  line_count: number;
+  items_qty_milli: number;
+  gross_total: number;
+  item_discount_total: number;
+  subtotal: number;
+  bill_discount_type: string | null;
+  bill_discount_value: number;
+  bill_discount: number;
+  tax_rate_bp: number;
+  tax: number;
+  tax_inclusive: number;
+  round_total_to: number;
+  rounding: number;
+  total: number;
+  converted_sale_id: string | null;
+  converted_at: number | null;
+  cancelled_reason: string;
+  cancelled_at: number | null;
+  updated_by: string | null;
+};
+
+export type QuoteLineInfo = {
+  id: string;
+  quote_id: string;
+  line_no: number;
+  product_id: string | null;
+  name_snapshot: string;
+  sku_snapshot: string;
+  qty_milli: number;
+  unit_price: number;
+  gross: number;
+  discount_type: string | null;
+  discount_value: number;
+  discount: number;
+  net: number;
+  note: string;
+  unit_cost_snapshot: number;
+  bundle_id: string | null;
+  bundle_group: string | null;
+  bundle_name: string | null;
+  bundle_qty: number | null;
+  bundle_price: number | null;
+  bundle_component_qty_milli: number | null;
+  bundle_discount: number;
+  deleted_at: number | null;
+  rev: number;
+  updated_by: string | null;
 };
 export type LinkedPayment = {
   direction: string;

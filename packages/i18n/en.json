@@ -603,6 +603,7 @@
     "kind_day_close": "Day close",
     "kind_refund": "Refund receipt",
     "kind_sale": "Sale receipt",
+    "kind_quotation": "Quotation",
     "kind_statement": "Statement",
     "kind_supplier": "Supplier slip",
     "kind_test": "Test page",
@@ -798,6 +799,14 @@
     "bundle_empty_recipe": "This bundle has no items. Edit it and add 1–20 items."
   },
   "sell": {
+    "quote_empty": "Add items before saving a quotation.",
+    "quote_saved": "Quote {{quote}} saved.",
+    "save_quote": "Save quote",
+    "quote_new": "New quotation · number assigned when you save",
+    "quote_editing": "Editing quotation {{quote}}",
+    "quote_converting": "From quotation {{quote}}",
+    "quote_valid_until": "Valid until {{date}}",
+    "quote_cancel_edit": "Cancel edit",
     "add_discount": "Add discount",
     "add_items": "Add items",
     "add_product": "Add product",
@@ -909,7 +918,12 @@
     "bundle_item_count": "{{count}} items",
     "bundle_price": "Bundle price",
     "bundle_list_price": "List {{amount}}",
-    "bundle_empty": "This bundle has no items. Add items in Products before selling it."
+    "bundle_empty": "This bundle has no items. Add items in Products before selling it.",
+    "quote_quoted": "Quoted",
+    "quote_now_price": "Now {{amount}}",
+    "quote_cancel_title": "Leave quotation mode?",
+    "quote_cancel_body": "The items in this cart will be removed. The quotation is not saved.",
+    "quote_cancel_confirm": "Leave quote mode"
   },
   "setup": {
     "add_one": "Add one product",

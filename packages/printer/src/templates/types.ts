@@ -84,6 +84,12 @@ export type ReceiptSale = {
 /** Visible strings. `{n}`, `{label}`, `{rate}`, `{name}`, `{days}`, `{date}` are filled in. */
 export type ReceiptLabels = {
   saleTitle: string;
+  quotationTitle: string;
+  quotationNumber: string;
+  validUntil: string;
+  terms: string;
+  quotationOnly: string;
+  pricesValidUntil: string;
   refundTitle: string;
   voidTitle: string;
   testTitle: string;

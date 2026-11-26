@@ -1,5 +1,5 @@
 /** Shop-admin endpoints on admin devices (04 §3.8) and owner email sign-in (05 §3.2). */
-import { newId } from '@bikri/core';
+import { CLIENT_SCHEMA_VERSION, newId } from '@bikri/core';
 import { type Context, Hono } from 'hono';
 import { z } from 'zod';
 import {
@@ -707,6 +707,7 @@ async function startOwnerExport(c: Context<AppEnv>) {
       db,
       tenant,
       500,
+      CLIENT_SCHEMA_VERSION,
     );
     const token = await signToken(ownerSessionKey(c.env), {
       kind: 'export',
@@ -761,6 +762,7 @@ shop.get('/export', async (c) => {
       db,
       tenant,
       500,
+      CLIENT_SCHEMA_VERSION,
     ),
   );
 });

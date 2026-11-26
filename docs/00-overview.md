@@ -22,6 +22,8 @@ The first tenant is a **cash-heavy electronics/mobile-accessories shop** with 1�
 
 **In v1.1:** fixed-recipe product bundles — a bundle product with a recipe, one bundle price, component sale lines and whole-bundle returns only ([07 §3.4](07-money-rules.md#34-bundles-v11), [screens/08](screens/08-products.md#bundles-v11), [screens/11](screens/11-refund.md#whole-bundle-returns-v11)); the fixed 1.0 scope is otherwise unchanged.
 
+**In v1.2:** quotations — a separate synced, non-financial price offer with its own `QTN-…` number, customer/validity/terms, bundle-aware lines, print/WhatsApp share and a one-click conversion into a normal sale ([screens/21](screens/21-quotations.md), [02 §2.35](02-data-model.md#235-quotations-migration-0036_quotationssql), D-305). A quote never moves stock, money or udhaar and does not appear in sales reports or day close.
+
 **In v2:** multiple branches with branch reports and stock transfers, per-product tax rates, serial/IMEI tracking and warranty lookup by IMEI (v1 already prints a warranty-until date per line), pack quantities on purchases, product variants (option matrix such as colour × length), direct label-printer commands (TSPL/ZPL), electronics starter catalogue, customer loyalty notes.
 
 **Later / optional:** FBR POS integration (only for Tier-1 retailers, see [12-fbr-later](12-fbr-later.md)), local LAN print bridge, Android TWA wrapper.
@@ -32,6 +34,7 @@ The first tenant is a **cash-heavy electronics/mobile-accessories shop** with 1�
 - No sharing of data between shops (no shared catalogue, customers or stock across tenants).
 - No double-entry accounting, payroll, restaurant/table features, e-commerce, loyalty points, multi-currency.
 - No batch/expiry tracking (pharmacy feature, not needed for electronics).
+- No quotation stock reservation, public quote link, online customer acceptance/e-signature or partial conversion in v1.2; quotes are printed/shared and converted at a till.
 - No native mobile or desktop apps; the PWA is the app.
 - No editing of saved bills (void and reissue instead).
 - No iOS printing/scanning hardware support (iPhone/iPad can view reports and sell without printing).
@@ -91,6 +94,7 @@ These come from hands-on review of Dukaan POS v1.1.2 (see [reference](reference/
 | REQ-B14 | **Below-cost warning.** Selling a line below its cost shows "Below cost" to everyone; cost and margin are shown only to roles with `cost.view`. | [screens/05](screens/05-sell.md) |
 | REQ-B15 | **Failed print never loses a bill.** The sale is saved before printing; failed prints are retried or reprinted from Sales. | [06 §9](06-printing.md#9-print-job-lifecycle-and-errors) |
 | REQ-B16 | **Product bundles.** A fixed-recipe bundle is one catalogue product with one price and a list of component products/quantities. A bundle sale writes real component sale lines (so stock, cost and refunds stay per product), prints one bundle header and its components on the receipt, and can only be returned as whole bundle units. Component revenue is allocated by cost; a bundle saving is not a staff discount. | [07 §3.4](07-money-rules.md#34-bundles-v11), [02 §2.16](02-data-model.md#216-bundles-migration-0017_bundlessql), [screens/05](screens/05-sell.md#bundles-v11), [screens/08](screens/08-products.md#bundles-v11), [screens/11](screens/11-refund.md#whole-bundle-returns-v11) |
+| REQ-B17 | **Quotations.** Create a price offer from the Sell cart, print/share it and convert it to a normal sale. A quotation has its own number, customer, validity and terms; it never moves stock, money or udhaar, never appears in sales/day-close totals, and is kept when converted or cancelled. Prices are honoured within validity; an expired quote is re-priced unless a manager approves the quoted prices. | [screens/21](screens/21-quotations.md), [02 §2.35](02-data-model.md#235-quotations-migration-0036_quotationssql), [07 §3.5](07-money-rules.md#35-quotation-totals-v12) |
 
 ## 7. Glossary
 
@@ -108,6 +112,7 @@ These come from hands-on review of Dukaan POS v1.1.2 (see [reference](reference/
 | **Godown** | Back-store / warehouse. The stock-in reason is labelled `Received from storage` in the app. |
 | **Quick sale** | A sale line for an item not in the catalogue (name + price typed). |
 | **Bundle** (بنڈل / سیٹ) | A fixed recipe of real products sold together for one bundle price. The bundle is a product (`kind='bundle'`) with `track_stock=0`; the bill stores one component sale line per item, so stock and refunds stay per product. Returns are whole-bundle only. |
+| **Quotation** (کوٹیشن) | A price offer to a customer, with its own `QTN-…` number and validity date. It does not move stock or money; converting it opens a normal sale. |
 | **Held bill** | A cart parked to serve another customer, resumed later. |
 | **Tenant / Shop** | One business on the deployment, with its own data. Row in `tenants`; every business row carries its `tenant_id`. |
 | **Platform operator** | Runs the deployment and the console; not a member of any shop. |

@@ -1,6 +1,6 @@
 # 16 — Reports
 
-**Route** `/reports`. Permission `report.view` (cashier: today only); profit figures need `cost.view`; export needs `export.data`. Formulas: [07 §9](../07-money-rules.md#9-reports-formulas). Computed on the device from Dexie (works offline, REQ-B02).
+**Route** `/reports`. Permission `report.view` (cashier: today only); profit figures need `cost.view`; export needs `export.data`. Formulas: [07 §9](../07-money-rules.md#9-reports-formulas). Computed on the device from Dexie (works offline, REQ-B02). Quotations are not sales and never appear in these tabs or in day close; they have their own list at [21](21-quotations.md).
 
 ## Reference
 
@@ -58,4 +58,4 @@ Generated with pdf-lib on the device: A4 portrait, shop logo + name, range, gene
 3. A refund today of a bill from yesterday reduces today's sold, not yesterday's.
 4. Cashier sees only Today and no profit cards or cost-derived supplier-return figures; day-close cash columns and totals need `dayclose.view_expected`.
 5. 90-day report with 20,000 bills renders in < 2 s on the reference PC.
-6. CSV export columns documented per tab are present and amounts are in rupees with 2 decimals (`43000.00`) — CSV never contains paisa integers.
+6. CSV share columns documented per tab are present and amounts are in rupees with 2 decimals (`43000.00`) — CSV never contains paisa integers.

@@ -20,6 +20,7 @@ export type EnrolResponse = {
     is_admin: boolean;
     kind: 'till' | 'support';
     last_invoice_seq: number;
+    last_quote_seq: number;
   };
   token: string;
   shop_setup_completed: boolean;
@@ -136,6 +137,7 @@ export async function enrolDevice(
       } satisfies TenantInfo,
     },
     { key: 'invoice_seq', value: res.device.last_invoice_seq },
+    { key: 'quote_seq', value: res.device.last_quote_seq },
     { key: 'pull_cursor', value: 0 },
     // The gate and the sync engine stay out of the way until the first snapshot has
     // finished (SYNC-H4): otherwise the new token flips the gate out of `enrol` mid-download,

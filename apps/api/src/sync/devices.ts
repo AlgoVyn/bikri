@@ -63,5 +63,6 @@ export function publicDevice(device: DeviceRow) {
     kind: device.kind,
     revoked: device.revoked_at !== null,
     last_invoice_seq: device.last_invoice_seq,
+    last_quote_seq: device.last_quote_seq,
   };
 }

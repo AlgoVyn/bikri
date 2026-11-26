@@ -1,5 +1,10 @@
 /** Operator endpoints behind Cloudflare Access (04 §3.7, screens/19). */
-import { isLedgerTable, isPinVerifierValid, isTimeZone } from '@bikri/core';
+import {
+  CLIENT_SCHEMA_VERSION,
+  isLedgerTable,
+  isPinVerifierValid,
+  isTimeZone,
+} from '@bikri/core';
 import { Hono, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import { type TenantDb, tenantDb } from '../db/tenantDb.ts';
@@ -792,7 +797,7 @@ admin.get('/tenants/:id/export', async (c) => {
     db,
     tenant,
     1000,
-    undefined,
+    CLIENT_SCHEMA_VERSION,
     false,
   );
   if (!c.req.query('tbl')) {

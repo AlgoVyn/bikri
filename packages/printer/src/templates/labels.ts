@@ -6,6 +6,12 @@ import type {
 
 export const englishReceiptLabels: ReceiptLabels = {
   saleTitle: 'SALE RECEIPT',
+  quotationTitle: 'QUOTATION',
+  quotationNumber: 'Quote',
+  validUntil: 'Valid until',
+  terms: 'Terms',
+  quotationOnly: 'This is a quotation, not a tax invoice.',
+  pricesValidUntil: 'Prices valid until {date}',
   refundTitle: 'REFUND RECEIPT',
   voidTitle: 'BILL CANCELLED',
   testTitle: 'BIKRI TEST PRINT',
@@ -60,6 +66,12 @@ export const englishReceiptLabels: ReceiptLabels = {
 /** Urdu labels for `shop.receipt_language = 'ur'`: the whole receipt is rasterised (06 §6). */
 export const urduReceiptLabels: ReceiptLabels = {
   saleTitle: 'رسید',
+  quotationTitle: 'کوٹیشن',
+  quotationNumber: 'کوٹیشن',
+  validUntil: 'درست تا',
+  terms: 'شرائط',
+  quotationOnly: 'یہ صرف کوٹیشن ہے، ٹیکس انوائس نہیں۔',
+  pricesValidUntil: 'قیمتیں {date} تک درست ہیں',
   refundTitle: 'واپسی کی رسید',
   voidTitle: 'بل منسوخ',
   testTitle: 'بکری ٹیسٹ پرنٹ',

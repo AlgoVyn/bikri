@@ -138,6 +138,7 @@ export async function enrol(c: Context<AppEnv>): Promise<Response> {
     last_seen_at: now,
     last_report_at: now,
     last_invoice_seq: 0,
+    last_quote_seq: 0,
     pending_ops: 0,
     oldest_pending_at: null,
     user_agent: parsed.data.user_agent,

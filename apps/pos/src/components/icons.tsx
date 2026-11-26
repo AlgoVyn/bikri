@@ -56,6 +56,17 @@ export function SalesIcon() {
   );
 }
 
+export function QuoteIcon() {
+  return (
+    <Svg>
+      <path d="M7 3.5h7l4 4V20.5H7v-17Z" />
+      <path d="M14 3.5V8h4" />
+      <path d="M9.5 12h5M9.5 15.5h3" />
+      <path d="M5 8H3.5v12.5H14" />
+    </Svg>
+  );
+}
+
 export function CountIcon() {
   return (
     <Svg>

@@ -21,6 +21,7 @@ import {
   op,
   productRow,
   pushOk,
+  quoteOps,
   saleOps,
 } from './helpers/ops.ts';
 
@@ -932,6 +933,100 @@ describe('operator export and restore (I17, I18, I27)', () => {
         b.tenantId,
       ),
     ).toBe(bBefore);
+  });
+
+  it('I28: export/restore includes A quotation rows only', async () => {
+    const a = await seedShop('Qtn exp A');
+    const b = await seedShop('Qtn exp B');
+    const sharedId = '01JB0000000000000000000100';
+    const sharedLine = '01JB0000000000000000000101';
+    const aQuote = quoteOps(a, a.till, 1, {
+      id: sharedId,
+      lineId: sharedLine,
+      note: 'A quote',
+    });
+    const bQuote = quoteOps(b, b.till, 1, {
+      id: sharedId,
+      lineId: sharedLine,
+      note: 'B quote',
+    });
+    await pushOk(a.till, aQuote.ops);
+    await pushOk(b.till, bQuote.ops);
+    const cutoff = Date.now() + 1;
+    const exportTable = async (tenantId: string, tbl: string) =>
+      (
+        await json<{ rows: Record<string, unknown>[] }>(
+          await api(
+            `/admin/tenants/${tenantId}/export?tbl=${tbl}&limit=1000&before=${cutoff}`,
+          ),
+        )
+      ).rows;
+    const quotes = await exportTable(a.tenantId, 'quotations');
+    expect(quotes).toHaveLength(1);
+    expect(quotes[0]).toMatchObject({
+      id: sharedId,
+      quote_no: 'QTN-B-1',
+      note: 'A quote',
+    });
+    const lines = await exportTable(a.tenantId, 'quotation_lines');
+    expect(lines).toHaveLength(1);
+    expect(lines[0]).toMatchObject({
+      id: sharedLine,
+      quote_id: sharedId,
+      name_snapshot: 'Phone',
+    });
+    expect((await exportTable(b.tenantId, 'quotations'))[0]?.note).toBe(
+      'B quote',
+    );
+
+    await api(`/admin/tenants/${a.tenantId}/maintenance`, {
+      method: 'POST',
+      json: { on: true },
+    });
+    await env.DB.prepare('DELETE FROM quotation_lines WHERE tenant_id = ?1')
+      .bind(a.tenantId)
+      .run();
+    await env.DB.prepare('DELETE FROM quotations WHERE tenant_id = ?1')
+      .bind(a.tenantId)
+      .run();
+    for (const [tbl, rows] of [
+      ['quotations', quotes],
+      ['quotation_lines', lines],
+    ] as const) {
+      const restored = await api(`/admin/tenants/${a.tenantId}/import`, {
+        method: 'POST',
+        json: { tbl, rows, reason: 'restore drill' },
+      });
+      expect(restored.status, await restored.clone().text()).toBe(200);
+    }
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM quotations WHERE tenant_id = ?1 AND note = ?2',
+        a.tenantId,
+        'A quote',
+      ),
+    ).toBe(1);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM quotation_lines WHERE tenant_id = ?1 AND quote_id = ?2',
+        a.tenantId,
+        sharedId,
+      ),
+    ).toBe(1);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM quotations WHERE tenant_id = ?1 AND note = ?2',
+        b.tenantId,
+        'B quote',
+      ),
+    ).toBe(1);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM quotations WHERE tenant_id = ?1 AND note = ?2',
+        b.tenantId,
+        'A quote',
+      ),
+    ).toBe(0);
   });
 
   it('restore import writes no change_log rows and caps a batch at 250', async () => {

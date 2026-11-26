@@ -52,7 +52,7 @@ describe('packages/db/src/tables.ts', () => {
       `SELECT ${rowJsonExpr('sales')} AS j FROM sales LIMIT 0`,
     ).all();
     const row = await env.DB.prepare(
-      `SELECT ${rowJsonExpr('devices')} AS j FROM (SELECT 'id1' AS id, 'n' AS name, 'b' AS branch_id, 'A' AS device_code, '' AS device_code_history, 0 AS is_admin, 'till' AS kind, NULL AS expires_at, NULL AS read_only_seen_at, 1 AS enrolled_at, 'x' AS enrolled_by, NULL AS revoked_at, NULL AS last_seen_at, 0 AS last_invoice_seq, 0 AS pending_ops, NULL AS oldest_pending_at, NULL AS user_agent, NULL AS app_version, 1 AS created_at, 2 AS updated_at)`,
+      `SELECT ${rowJsonExpr('devices')} AS j FROM (SELECT 'id1' AS id, 'n' AS name, 'b' AS branch_id, 'A' AS device_code, '' AS device_code_history, 0 AS is_admin, 'till' AS kind, NULL AS expires_at, NULL AS read_only_seen_at, 1 AS enrolled_at, 'x' AS enrolled_by, NULL AS revoked_at, NULL AS last_seen_at, 0 AS last_invoice_seq, 0 AS last_quote_seq, 0 AS pending_ops, NULL AS oldest_pending_at, NULL AS user_agent, NULL AS app_version, NULL AS last_report_at, 1 AS created_at, 2 AS updated_at)`,
     ).first<{ j: string }>();
     const parsed = JSON.parse(row?.j ?? '{}');
     expect(parsed).toHaveProperty('revoked_at', null);
