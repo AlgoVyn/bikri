@@ -6,7 +6,7 @@ const A = '01JB0000000000000000000001';
 const B = '01JB0000000000000000000002';
 
 describe('reference peek targets', () => {
-  it('accepts the four record kinds with a ULID', () => {
+  it('accepts the five record kinds with a ULID', () => {
     expect(parsePeekTarget(`product:${A}`)).toEqual({
       kind: 'product',
       id: A,
@@ -14,6 +14,10 @@ describe('reference peek targets', () => {
     expect(parsePeekTarget(`bill:${A}`)).toEqual({ kind: 'bill', id: A });
     expect(parsePeekTarget(`customer:${A}`)).toEqual({
       kind: 'customer',
+      id: A,
+    });
+    expect(parsePeekTarget(`quotation:${A}`)).toEqual({
+      kind: 'quotation',
       id: A,
     });
     expect(parsePeekTarget(`delivery:${A}`)).toEqual({

@@ -1342,6 +1342,9 @@
     "origin_bill": "بل {{invoice}}",
     "origin_product": "{{name}}",
     "origin_customer": "{{name}}",
-    "origin_delivery": "ڈیلیوری {{invoice}}"
+    "origin_delivery": "ڈیلیوری {{invoice}}",
+    "quotation_reference": "کوٹیشن حوالہ",
+    "open_quotation": "مکمل کوٹیشن کھولیں",
+    "origin_quotation": "کوٹیشن {{quote}}"
   }
 }

@@ -256,6 +256,7 @@ export function BillDetail({
   }
 
   const { detail, timeZone } = data;
+  const linkedQuote = data.quote;
   const sale = detail.sale;
   const backdate = backdateInfo(detail.audit);
   const status = String(sale.status);
@@ -514,7 +515,7 @@ export function BillDetail({
         primaryLast={!(embedded && masterDetailWide)}
       />
 
-      {data.quote ? (
+      {linkedQuote ? (
         <div
           data-testid="bill-from-quote"
           className="rounded-control bg-success-subtle px-3 py-2 text-small text-success-subtle-ink"
@@ -522,10 +523,20 @@ export function BillDetail({
           {t('office.bill.quotation')}{' '}
           <Link
             to="/quotations/$id"
-            params={{ id: data.quote.id }}
+            params={{ id: linkedQuote.id }}
             className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+            onClick={(event) =>
+              openPeek(
+                event,
+                { kind: 'quotation', id: linkedQuote.id },
+                {
+                  key: 'peek.origin_bill',
+                  params: { invoice: String(sale.invoice_no) },
+                },
+              )
+            }
           >
-            {data.quote.quote_no}
+            {linkedQuote.quote_no}
             <ChevronRightIcon
               aria-hidden="true"
               className="size-4 rtl:rotate-180"

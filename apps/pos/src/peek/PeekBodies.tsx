@@ -1,6 +1,7 @@
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { quoteStatus } from '../data/quotes.ts';
 import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
 import { isLatinName, qtyWithUnit } from '../products/format.ts';
 import { statusLabel, statusTone } from '../sales/format.ts';
@@ -12,6 +13,7 @@ import {
   type CustomerPeekData,
   type DeliveryPeekData,
   type ProductPeekData,
+  type QuotationPeekData,
 } from './data.ts';
 import {
   PeekEmpty,
@@ -286,6 +288,100 @@ export function BillPeekBody({ data }: { data: BillPeekData }) {
           <PeekEmpty>{t('office.bill.no_payments')}</PeekEmpty>
         ) : (
           <PeekRow label={method} value={<MoneyText paisa={paid} />} strong />
+        )}
+      </PeekSection>
+      <PeekNote>{t('peek.reference_only')}</PeekNote>
+    </>
+  );
+}
+
+export function QuotationPeekBody({ data }: { data: QuotationPeekData }) {
+  const { t, i18n } = useTranslation();
+  const display = quoteStatus(data.quote, data.today);
+  const tone =
+    display === 'open'
+      ? 'bg-primary-subtle text-primary-subtle-ink'
+      : display === 'converted'
+        ? 'bg-success-subtle text-success-subtle-ink'
+        : display === 'expired'
+          ? 'bg-warning-subtle text-warning-subtle-ink'
+          : 'bg-danger-subtle text-danger-subtle-ink';
+  const lines = data.lines.slice(0, 3);
+  const remaining = data.lines.length - lines.length;
+  return (
+    <>
+      <div className="flex flex-wrap items-center gap-2">
+        <span className={`rounded-full px-2 text-small font-medium ${tone}`}>
+          {t(`office.quotations.status_${display}`)}
+        </span>
+        <span className="text-small text-text-muted">
+          {formatTimestamp(
+            Number(data.quote.created_at),
+            i18n.language,
+            data.timeZone,
+          )}
+        </span>
+      </div>
+      <div className="grid grid-cols-3 gap-2">
+        <PeekFigure label={t('peek.total')}>
+          <MoneyText paisa={Number(data.quote.total)} />
+        </PeekFigure>
+        <PeekFigure label={t('peek.items')}>
+          {Number(data.quote.items_qty_milli) / 1000}
+        </PeekFigure>
+        <PeekFigure label={t('peek.lines')}>
+          {Number(data.quote.line_count)}
+        </PeekFigure>
+      </div>
+      <PeekFacts
+        rows={[
+          {
+            label: t('peek.customer'),
+            value: data.quote.customer_name
+              ? String(data.quote.customer_name)
+              : t('office.sales.walk_in'),
+          },
+          {
+            label: t('office.quotations.valid_until'),
+            value: formatBusinessDate(
+              String(data.quote.valid_until),
+              i18n.language,
+              data.timeZone,
+            ),
+          },
+          { label: t('peek.cashier'), value: data.staffName || dash },
+          { label: t('peek.device'), value: data.deviceName || dash },
+        ]}
+      />
+      <PeekSection title={t('peek.items_section')}>
+        {data.lines.length === 0 ? (
+          <PeekEmpty>{t('peek.none')}</PeekEmpty>
+        ) : (
+          <>
+            {lines.map((line) => (
+              <PeekRow
+                key={String(line.id)}
+                label={
+                  <>
+                    <span className="block font-medium">
+                      {String(line.name_snapshot)}
+                    </span>
+                    <span className="block text-caption text-text-muted">
+                      {Number(line.qty_milli) / 1000} ·{' '}
+                      <MoneyText paisa={Number(line.unit_price)} />
+                    </span>
+                  </>
+                }
+                value={<MoneyText paisa={Number(line.net)} />}
+              />
+            ))}
+            {remaining > 0 ? (
+              <PeekRow
+                label={t('peek.and_more', { count: remaining })}
+                value=""
+              />
+            ) : null}
+          </>
         )}
       </PeekSection>
       <PeekNote>{t('peek.reference_only')}</PeekNote>

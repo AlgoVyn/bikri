@@ -181,6 +181,12 @@ test.describe('Quotations (v1.2)', () => {
       await expect(
         page.getByTestId('bill-from-quote').getByRole('link'),
       ).toHaveText(String(converted?.quote_no));
+      await page.getByTestId('bill-from-quote').getByRole('link').click();
+      await expect(page.getByRole('dialog')).toContainText(
+        String(converted?.quote_no),
+      );
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
       await page.evaluate(
         (id) => window.__bikriTest?.navigate(`/quotations/${id}`),
         quoteId,
@@ -191,6 +197,15 @@ test.describe('Quotations (v1.2)', () => {
       await expect(
         page.getByTestId('quote-converted-banner').getByRole('link'),
       ).toHaveText(String(sales[0]?.invoice_no));
+      await page
+        .getByTestId('quote-converted-banner')
+        .getByRole('link')
+        .click();
+      await expect(page.getByRole('dialog')).toContainText(
+        String(sales[0]?.invoice_no),
+      );
+      await page.keyboard.press('Escape');
+      await expect(page.getByRole('dialog')).toHaveCount(0);
       await page.evaluate(() => window.__bikriTest?.navigate('/quotations'));
       const [listCsv] = await Promise.all([
         page.waitForEvent('download'),

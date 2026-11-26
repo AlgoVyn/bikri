@@ -48,6 +48,15 @@ export type BillPeekData = {
   today: string;
 };
 
+export type QuotationPeekData = {
+  quote: SyncedRow;
+  lines: SyncedRow[];
+  timeZone: string;
+  today: string;
+  staffName: string;
+  deviceName: string;
+};
+
 export type CustomerPeekData = {
   customer: MasterRow;
   balance: number;
@@ -233,6 +242,30 @@ export async function loadBillPeek(
   if (!detail) return null;
   const timeZone = await shopTimeZone(db);
   return { detail, timeZone, today: businessDate(Date.now(), timeZone) };
+}
+
+export async function loadQuotationPeek(
+  db: BikriDb,
+  id: string,
+): Promise<QuotationPeekData | null> {
+  const quote = await db.quotations.get(id);
+  if (!quote) return null;
+  const [lines, timeZone, staff, device] = await Promise.all([
+    db.quotation_lines.where('quote_id').equals(id).sortBy('line_no'),
+    shopTimeZone(db),
+    quote.staff_id ? db.staff.get(String(quote.staff_id)) : undefined,
+    quote.device_id ? db.devices.get(String(quote.device_id)) : undefined,
+  ]);
+  return {
+    quote,
+    lines: lines.filter(
+      (line) => line.deleted_at === null || line.deleted_at === undefined,
+    ),
+    timeZone,
+    today: businessDate(Date.now(), timeZone),
+    staffName: staff ? String(staff.name) : '',
+    deviceName: device ? String(device.name) : '',
+  };
 }
 
 export async function loadCustomerPeek(

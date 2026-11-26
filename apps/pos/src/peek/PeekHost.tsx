@@ -8,6 +8,7 @@ import {
   ChevronLeftIcon,
   CloseIcon,
   ProductsIcon,
+  QuoteIcon,
   SalesIcon,
   SuppliersIcon,
   UserIcon,
@@ -15,7 +16,7 @@ import {
 import { getDb } from '../data/db.ts';
 import { useAreaStrings } from '../i18n/areas.tsx';
 import { categoryName } from '../lib/category.ts';
-import { formatTimestamp } from '../lib/date.ts';
+import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
 import { isLatinName } from '../products/format.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { billVisible } from '../state/reportScope.ts';
@@ -27,13 +28,16 @@ import {
   loadCustomerPeek,
   loadDeliveryPeek,
   loadProductPeek,
+  loadQuotationPeek,
   type ProductPeekData,
+  type QuotationPeekData,
 } from './data.ts';
 import {
   BillPeekBody,
   CustomerPeekBody,
   DeliveryPeekBody,
   ProductPeekBody,
+  QuotationPeekBody,
 } from './PeekBodies.tsx';
 import { PeekNote } from './PeekLayout.tsx';
 import {
@@ -47,6 +51,7 @@ import { useClosePeek } from './usePeekNavigation.ts';
 type PeekResult =
   | { status: 'ok'; kind: 'product'; data: ProductPeekData }
   | { status: 'ok'; kind: 'bill'; data: BillPeekData }
+  | { status: 'ok'; kind: 'quotation'; data: QuotationPeekData }
   | { status: 'ok'; kind: 'customer'; data: CustomerPeekData }
   | { status: 'ok'; kind: 'delivery'; data: DeliveryPeekData }
   | { status: 'missing' | 'denied'; kind: PeekKind };
@@ -54,6 +59,7 @@ type PeekResult =
 function kindLabelKey(kind: PeekKind) {
   if (kind === 'product') return 'peek.product_reference';
   if (kind === 'bill') return 'peek.bill_reference';
+  if (kind === 'quotation') return 'peek.quotation_reference';
   if (kind === 'customer') return 'peek.customer_reference';
   return 'peek.delivery_reference';
 }
@@ -61,6 +67,7 @@ function kindLabelKey(kind: PeekKind) {
 function KindIcon({ kind }: { kind: PeekKind }) {
   if (kind === 'product') return <ProductsIcon />;
   if (kind === 'bill') return <SalesIcon />;
+  if (kind === 'quotation') return <QuoteIcon />;
   if (kind === 'customer') return <UserIcon />;
   return <SuppliersIcon />;
 }
@@ -68,6 +75,7 @@ function KindIcon({ kind }: { kind: PeekKind }) {
 function openFullLabel(kind: PeekKind) {
   if (kind === 'product') return 'peek.open_product';
   if (kind === 'bill') return 'peek.open_bill';
+  if (kind === 'quotation') return 'peek.open_quotation';
   if (kind === 'customer') return 'peek.open_khata';
   return 'peek.open_delivery';
 }
@@ -95,6 +103,7 @@ function PeekContent({ target }: { target: PeekTarget }) {
   );
   const close = useClosePeek();
   const { can, role, support, branchId } = useCurrentStaff();
+  const canQuote = can('sale.create');
   const canReport = can('report.view');
   const canCost = can('cost.view');
   const canCustomer = can('payment.receive');
@@ -120,6 +129,13 @@ function PeekContent({ target }: { target: PeekTarget }) {
       }
       return { status: 'ok', kind: 'bill', data };
     }
+    if (target.kind === 'quotation') {
+      if (!canQuote) return { status: 'denied', kind: 'quotation' };
+      const data = await loadQuotationPeek(db, target.id);
+      return data
+        ? { status: 'ok', kind: 'quotation', data }
+        : { status: 'missing', kind: 'quotation' };
+    }
     if (target.kind === 'customer') {
       if (!canCustomer) return { status: 'denied', kind: 'customer' };
       const data = await loadCustomerPeek(db, target.id);
@@ -142,6 +158,7 @@ function PeekContent({ target }: { target: PeekTarget }) {
     canCost,
     canCustomer,
     canDelivery,
+    canQuote,
   ]);
 
   if (target === null) return null;
@@ -171,6 +188,14 @@ function PeekContent({ target }: { target: PeekTarget }) {
       } else if (data.kind === 'bill') {
         void navigate({
           to: '/sales/$id',
+          params: { id: target.id },
+          search: {},
+          replace: true,
+          state: (previous) => ({ ...previous, bikriReturn: origin }),
+        });
+      } else if (data.kind === 'quotation') {
+        void navigate({
+          to: '/quotations/$id',
           params: { id: target.id },
           search: {},
           replace: true,
@@ -207,6 +232,13 @@ function PeekContent({ target }: { target: PeekTarget }) {
     } else if (data.kind === 'bill') {
       void navigate({
         to: '/sales/$id',
+        params: { id: target.id },
+        search: {},
+        replace: true,
+      });
+    } else if (data.kind === 'quotation') {
+      void navigate({
+        to: '/quotations/$id',
         params: { id: target.id },
         search: {},
         replace: true,
@@ -431,6 +463,39 @@ function PeekContent({ target }: { target: PeekTarget }) {
       '',
       null,
       <BillPeekBody data={result.data} />,
+      <button
+        type="button"
+        className={`${buttonPrimary} w-full xl:w-auto`}
+        onClick={(event) => openFull(event, result)}
+      >
+        {t(openFullLabel(target.kind))}
+      </button>,
+    );
+  }
+
+  if (result.kind === 'quotation') {
+    const { quote, timeZone } = result.data;
+    return shell(
+      <bdi dir="ltr" className="font-mono">
+        {String(quote.quote_no)}
+      </bdi>,
+      '',
+      <span className="flex flex-col gap-0.5">
+        <span className="block">
+          {quote.customer_name
+            ? String(quote.customer_name)
+            : t('office.sales.walk_in')}
+        </span>
+        <span className="block text-caption">
+          {t('office.quotations.valid_until')}{' '}
+          {formatBusinessDate(
+            String(quote.valid_until),
+            i18n.language,
+            timeZone,
+          )}
+        </span>
+      </span>,
+      <QuotationPeekBody data={result.data} />,
       <button
         type="button"
         className={`${buttonPrimary} w-full xl:w-auto`}
