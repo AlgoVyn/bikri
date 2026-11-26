@@ -40,6 +40,11 @@ import {
   pushedProduct,
 } from './checks/bundles.ts';
 import { checkLedgerEntry } from './checks/ledger.ts';
+import {
+  checkQuoteHeader,
+  checkQuoteLine,
+  checkQuoteLineDelete,
+} from './checks/quotes.ts';
 import { checkRefund, checkVoid } from './checks/refunds.ts';
 import {
   checkBackdatedSale,
@@ -94,6 +99,19 @@ const TEXT_CAPS: Readonly<Record<string, Readonly<Record<string, number>>>> = {
   supplier_returns: { reason: 120, note: 200 },
   ledger_entries: { note: 200 },
   promises: { note: 120 },
+  quotations: {
+    quote_no: 64,
+    customer_name: 60,
+    customer_phone: 30,
+    note: 500,
+    cancelled_reason: 120,
+  },
+  quotation_lines: {
+    name_snapshot: 120,
+    sku_snapshot: 64,
+    note: 60,
+    bundle_name: 80,
+  },
   cash_moves: { reason: 120 },
 };
 
@@ -130,6 +148,11 @@ export function checkOp(
     assertOwnerRemains(look, group);
   if (op.kind === 'delete') {
     if (!op.row_id) throw new Reject('CONSTRAINT_FAILED');
+    if (op.tbl === 'quotations') throw new Reject('CONSTRAINT_FAILED');
+    if (op.tbl === 'quotation_lines') {
+      checkQuoteLineDelete(look, group, op);
+      return;
+    }
     if (['staff', 'branches', 'shop'].includes(op.tbl)) {
       if (staffOf(look, group, op.updated_by)?.role !== 'owner')
         throw new Reject('FORBIDDEN');
@@ -1147,4 +1170,6 @@ export function checkOp(
       if (updater.role !== 'owner' && changed) throw new Reject('FORBIDDEN');
     }
   }
+  if (op.tbl === 'quotations') checkQuoteHeader(ctx, look, group, op, row);
+  if (op.tbl === 'quotation_lines') checkQuoteLine(look, group, op, row);
 }

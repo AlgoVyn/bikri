@@ -12,7 +12,7 @@ import {
   seedShop,
   setStatus,
 } from './helpers/fixtures.ts';
-import { saleOps } from './helpers/ops.ts';
+import { pushOk, quoteOps, saleOps } from './helpers/ops.ts';
 import {
   lastCode,
   ownerHeaders,
@@ -358,10 +358,23 @@ describe('shop admin (T-038, 04 §3.8)', () => {
     const b = await seedShop('Exp B');
     const sa = await ownerSession(a, a.ownerEmail ?? '');
     const sb = await ownerSession(b, b.ownerEmail ?? '');
+    const quote = quoteOps(b, b.till, 1);
+    await pushOk(b.till, quote.ops);
     const start = await json<{ export_id: string; tables: { tbl: string }[] }>(
       await shopApi(b, sb, '/shop/export', { method: 'POST' }),
     );
+    expect(start.tables.map((t) => t.tbl)).toContain('quotations');
+    expect(start.tables.map((t) => t.tbl)).toContain('quotation_lines');
     expect(start.tables.map((t) => t.tbl)).not.toContain('owner_email_codes');
+    const quotes = await json<{ rows: Record<string, unknown>[] }>(
+      await shopApi(
+        b,
+        sb,
+        `/shop/export?export_id=${encodeURIComponent(start.export_id)}&tbl=quotations`,
+      ),
+    );
+    expect(quotes.rows).toHaveLength(1);
+    expect(quotes.rows[0]?.quote_no).toBe('QTN-B-1');
     const page = await json<{ rows: Record<string, unknown>[] }>(
       await shopApi(
         b,

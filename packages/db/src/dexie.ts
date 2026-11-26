@@ -224,7 +224,17 @@ export const DEXIE_SCHEMA_V15 = {
   outbox: '++seq, &op_id, tx_id, [status+seq], [tbl+row_id]',
 } as const;
 
-export type DexieTableName = keyof typeof DEXIE_SCHEMA_V15;
+/** V16 adds quotations and the quotation print-job document id (D-305). */
+export const DEXIE_SCHEMA_V16 = {
+  ...DEXIE_SCHEMA_V15,
+  quotations:
+    'id, &quote_no, business_date, customer_id, [status+valid_until], converted_sale_id',
+  quotation_lines: 'id, quote_id, product_id',
+  print_jobs:
+    'id, sale_id, refund_id, quotation_id, day_close_id, supplier_return_id, [status+created_at], created_at',
+} as const;
+
+export type DexieTableName = keyof typeof DEXIE_SCHEMA_V16;
 
 export const LOCAL_ONLY_TABLES = [
   'outbox',
@@ -367,6 +377,19 @@ export type CartBackdate = {
   reason: string;
 };
 
+/**
+ * A cart opened in quotation mode (D-305). `new` creates a quote on save; `edit`
+ * updates an existing open quote; `convert` is a sale started from a quote and marks
+ * it converted in the same transaction.
+ */
+export type CartQuote = {
+  quote_id: string | null;
+  quote_no: string | null;
+  valid_until: string | null;
+  terms: string;
+  mode: 'new' | 'edit' | 'convert';
+};
+
 export type Cart = {
   id: 'c1' | 'c2' | 'c3';
   customer_id?: string | null;
@@ -377,6 +400,7 @@ export type Cart = {
   overrides?: CartOverride[];
   reissue?: CartReissue | null;
   backdate?: CartBackdate | null;
+  quote?: CartQuote | null;
 };
 
 export type HeldBill = Omit<Cart, 'id'> & {
@@ -391,12 +415,14 @@ export type PrintJob = {
   id: string;
   sale_id?: string;
   refund_id?: string;
+  quotation_id?: string;
   day_close_id?: string;
   supplier_return_id?: string;
   kind:
     | 'sale'
     | 'refund'
     | 'void'
+    | 'quotation'
     | 'test'
     | 'day_close'
     | 'statement'
@@ -465,6 +491,8 @@ export class BikriDb extends Dexie {
   suppliers!: Rows<MasterRow>;
   expense_categories!: Rows<MasterRow>;
   promises!: Rows<MasterRow>;
+  quotations!: Rows<MasterRow>;
+  quotation_lines!: Rows<MasterRow>;
   sync_conflicts!: Rows<SyncedRow>;
   sales!: Rows<SyncedRow>;
   sale_lines!: Rows<SyncedRow>;
@@ -594,6 +622,8 @@ export class BikriDb extends Dexie {
     this.version(14).stores(DEXIE_SCHEMA_V14);
     // V15 drops the unused outbox.created_at index (an index-only upgrade).
     this.version(15).stores(DEXIE_SCHEMA_V15);
+    // V16 adds quotations and the quotation print-job id (D-305).
+    this.version(16).stores(DEXIE_SCHEMA_V16);
   }
 }
 

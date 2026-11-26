@@ -246,6 +246,8 @@ function assertClientSchema(c: Context<AppEnv>): number {
 /** Bundle columns (and the bundle discount) require the current schema. */
 /** Bundles shipped in client schema 5; this gates the feature, not the current schema. */
 const BUNDLE_SCHEMA = 5;
+/** Quotations shipped in client schema 10 (D-305). */
+const QUOTE_SCHEMA = 10;
 
 /** `GET /api/sync/pull?since=&limit=` (03 §4.2). */
 export async function pull(c: Context<AppEnv>): Promise<Response> {
@@ -299,6 +301,11 @@ export async function pull(c: Context<AppEnv>): Promise<Response> {
   }
   const rawPage = rows.slice(0, q.limit);
   const page = rawPage.filter((row) => {
+    if (
+      clientSchema < QUOTE_SCHEMA &&
+      (row.tbl === 'quotations' || row.tbl === 'quotation_lines')
+    )
+      return false;
     if (clientSchema >= BUNDLE_SCHEMA) return true;
     if (row.tbl === 'bundle_items') return false;
     if (row.tbl !== 'products') return true;
@@ -369,10 +376,12 @@ export async function snapshotPayload(
   clientSchema = BUNDLE_SCHEMA,
   chargeReads = true,
 ): Promise<Record<string, unknown>> {
-  const tables =
-    clientSchema >= BUNDLE_SCHEMA
-      ? SNAPSHOT_TABLES
-      : SNAPSHOT_TABLES.filter((tbl) => tbl !== 'bundle_items');
+  const tables = SNAPSHOT_TABLES.filter(
+    (tbl) =>
+      (clientSchema >= BUNDLE_SCHEMA || tbl !== 'bundle_items') &&
+      (clientSchema >= QUOTE_SCHEMA ||
+        (tbl !== 'quotations' && tbl !== 'quotation_lines')),
+  );
   const q = SnapshotQuery.parse({
     tbl: query('tbl') || undefined,
     after: query('after') ?? '',
@@ -397,6 +406,16 @@ export async function snapshotPayload(
     };
   }
   if (q.tbl === 'bundle_items' && clientSchema < BUNDLE_SCHEMA)
+    return {
+      tbl: q.tbl,
+      rows: [],
+      next_after: q.after,
+      has_more: false,
+    };
+  if (
+    clientSchema < QUOTE_SCHEMA &&
+    (q.tbl === 'quotations' || q.tbl === 'quotation_lines')
+  )
     return {
       tbl: q.tbl,
       rows: [],

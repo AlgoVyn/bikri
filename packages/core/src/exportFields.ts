@@ -72,6 +72,8 @@ export const MONEY_FIELDS: ReadonlySet<string> = new Set([
 export const TIME_FIELDS: ReadonlySet<string> = new Set([
   'applied_at',
   'at',
+  'converted_at',
+  'cancelled_at',
   'cost_changed_at',
   'created_at',
   'deleted_at',

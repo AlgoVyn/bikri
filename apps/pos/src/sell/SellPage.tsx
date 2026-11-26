@@ -23,6 +23,7 @@ import { MoneyText } from '../components/MoneyText.tsx';
 import { OverrideDialog } from '../components/OverrideDialog.tsx';
 import { isRapidBarcode } from '../components/SearchBox.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { addDays } from '../data/backdate.ts';
 import {
   addBundle,
   addOverride,
@@ -59,8 +60,10 @@ import {
 import { loadBundleRecipe } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { deviceInfo } from '../data/localTenant.ts';
+import { saveQuote } from '../data/quotes.ts';
 import { belowCataloguePrices } from '../data/sale.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { QuoteDialog } from '../quotes/QuoteDialog.tsx';
 import { loadDevicePrefs } from '../shell/devicePrefs.ts';
 import { composing, flushFocusedField, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
@@ -124,6 +127,8 @@ export function SellPage() {
   const [selected, setSelected] = useState<string | null>(null);
   const [expanded, setExpanded] = useState<string | null>(null);
   const [sheet, setSheet] = useState(false);
+  const [quoteOpen, setQuoteOpen] = useState(false);
+  const [quoteSaving, setQuoteSaving] = useState(false);
   const [dialog, setDialog] = useState<
     | null
     | 'quick'
@@ -133,6 +138,7 @@ export function SellPage() {
     | 'held'
     | 'customer'
     | 'clear'
+    | 'cancel-quote'
     | 'pay'
   >(null);
   const [quickName, setQuickName] = useState('');
@@ -165,6 +171,8 @@ export function SellPage() {
     }
     return map;
   }, [cart.lines]);
+  const today = businessDate(Date.now(), timeZone);
+  const quoteDefaultDate = addDays(today, 7);
   const prefix = parseQtyPrefix(query);
   const term = prefix ? prefix.rest : query;
   // The barcode/scanner Enter path reads the input value synchronously; only the
@@ -668,6 +676,80 @@ export function SellPage() {
         })
       : '';
 
+  const openQuoteDialog = () => {
+    if (cart.lines.length === 0) {
+      toast.push(t('sell.quote_empty'), 'error');
+      return;
+    }
+    setQuoteOpen(true);
+  };
+
+  const onSaveQuote = async (input: { validUntil: string; terms: string }) => {
+    if (!staff) return;
+    if (readOnly) {
+      toast.push(t('tenant.readOnly.blocked'), 'error');
+      return;
+    }
+    const hadQuote = Boolean(cart.quote);
+    setQuoteSaving(true);
+    try {
+      const updated = await mutate((c) => ({
+        ...c,
+        quote: {
+          ...(c.quote ?? {
+            quote_id: null,
+            quote_no: null,
+            mode: 'new' as const,
+          }),
+          valid_until: input.validUntil,
+          terms: input.terms,
+        },
+      }));
+      if (!updated) return;
+      const result = await saveQuote(getDb(), {
+        cartId: active,
+        cart: updated,
+        money,
+        validUntil: input.validUntil,
+        terms: input.terms,
+        staffId: staff.id,
+      });
+      setQuoteOpen(false);
+      toast.push(
+        t('sell.quote_saved', {
+          quote: String(result.quote.quote_no),
+        }),
+      );
+      void navigate({
+        to: '/quotations/$id',
+        params: { id: String(result.quote.id) },
+      });
+    } catch {
+      if (!hadQuote)
+        await mutate((c) => ({ ...c, quote: null })).catch(() => undefined);
+      toast.push(t('errors.generic'), 'error');
+    } finally {
+      setQuoteSaving(false);
+    }
+  };
+
+  const clearQuoteMode = () => {
+    const quoteId = cart.quote?.quote_id;
+    void mutate((c) => emptyCart(c.id as CartId)).then(() => {
+      if (quoteId)
+        void navigate({ to: '/quotations/$id', params: { id: quoteId } });
+      else focusSearch();
+    });
+  };
+
+  const cancelQuoteMode = () => {
+    if (cart.lines.length > 0) {
+      setDialog('cancel-quote');
+      return;
+    }
+    clearQuoteMode();
+  };
+
   const onHold = async (label: string) => {
     await cartsSettled();
     const current = (await getDb().carts.get(active)) ?? cart;
@@ -1138,6 +1220,9 @@ export function SellPage() {
             onBillDiscount={stableOnBillDiscount}
             onHold={stableOpenHold}
             onClear={stableOnClear}
+            quote={cart.quote ?? null}
+            onSaveQuote={() => void openQuoteDialog()}
+            onCancelQuote={cancelQuoteMode}
             onPay={stableOnPay}
             onAddItem={stableOnAddItem}
             onHeld={stableOnHeld}
@@ -1151,6 +1236,24 @@ export function SellPage() {
         ) : null}
       </aside>
 
+      <QuoteDialog
+        open={quoteOpen}
+        onOpenChange={setQuoteOpen}
+        cart={cart}
+        total={totals.total}
+        itemCount={cartItemCount(cart.lines)}
+        customerName={customerName ?? ''}
+        defaultValidUntil={cart.quote?.valid_until ?? quoteDefaultDate}
+        minDate={today}
+        defaultTerms={cart.quote?.terms ?? ''}
+        editing={cart.quote?.mode === 'edit'}
+        saving={quoteSaving}
+        onSave={(input) => void onSaveQuote(input)}
+        onCustomer={() => {
+          setQuoteOpen(false);
+          setDialog('customer');
+        }}
+      />
       <QuickSaleDialog
         open={dialog === 'quick'}
         onOpenChange={(o) => setDialog(o ? 'quick' : null)}
@@ -1211,6 +1314,17 @@ export function SellPage() {
         onConfirm={() => {
           setDialog(null);
           clearCart();
+        }}
+      />
+      <ConfirmDialog
+        open={dialog === 'cancel-quote'}
+        onOpenChange={(o) => setDialog(o ? 'cancel-quote' : null)}
+        title={t('sell.quote_cancel_title')}
+        body={t('sell.quote_cancel_body')}
+        confirmLabel={t('sell.quote_cancel_confirm')}
+        onConfirm={() => {
+          setDialog(null);
+          clearQuoteMode();
         }}
       />
       <PayDialog

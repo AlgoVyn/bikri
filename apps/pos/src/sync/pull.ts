@@ -504,6 +504,7 @@ async function runSnapshotUnlocked(
     await db.kv.delete('snapshot_state');
   });
   await fixInvoiceSeq(db);
+  await fixQuoteSeq(db);
   await settleRecovery(db);
 }
 
@@ -521,6 +522,23 @@ export async function fixInvoiceSeq(db: BikriDb): Promise<void> {
   const current = await getKv<number>(db, 'invoice_seq', 0);
   const next = Math.max(current, Number(own?.invoice_seq ?? 0), server);
   if (next !== current) await setKv(db, 'invoice_seq', next);
+}
+
+/** Never lower the quote counter when a restore or a fresh snapshot replaces local rows. */
+export async function fixQuoteSeq(db: BikriDb): Promise<void> {
+  const device = await deviceInfo(db);
+  if (!device) return;
+  const own = await db.quotations
+    .filter((quote) => String(quote.device_id) === device.id)
+    .toArray();
+  const local = own.reduce(
+    (max, quote) => Math.max(max, Number(quote.quote_seq ?? 0)),
+    0,
+  );
+  const server = Number((await db.devices.get(device.id))?.last_quote_seq ?? 0);
+  const current = await getKv<number>(db, 'quote_seq', 0);
+  const next = Math.max(current, local, server);
+  if (next !== current) await setKv(db, 'quote_seq', next);
 }
 
 /**
@@ -674,6 +692,7 @@ export async function settleRecovery(db: BikriDb): Promise<void> {
   // Recovered sales are replayed after the snapshot's counter fix; include them before
   // the till allocates another invoice number.
   await fixInvoiceSeq(db);
+  await fixQuoteSeq(db);
   await db.kv.delete(RECOVERY_KEY);
 }
 

@@ -227,15 +227,18 @@ A bundle at 58 mm uses the same block: the bundle name and its amount on the hea
 | Cancellation notice | `BILL CANCELLED` | Original bill no, reason, replacement bill no if reissued |
 | Day close summary | `DAY CLOSE` | Device, staff, period, each formula line, expected, counted, difference, denominations |
 | Customer statement | `KHATA STATEMENT` | Customer name/phone, period, each entry (date, description, +/−, balance), closing balance. Usually shared as image, printable |
+| Quotation | `QUOTATION` | Quote no (`QTN-…`), date, `Valid until`, customer, staff, item lines and the bundle block, totals, terms, `This is a quotation, not a tax invoice` and `Prices valid until <date>`. No payments, change or udhaar rows; not a fiscal document |
 | Supplier payment slip | `PAYMENT TO SUPPLIER` | Supplier, amount, method, note, balance after |
 | Supplier return slip | `RETURN TO SUPPLIER` | Supplier, linked delivery no, lines with qty and credit, total credit, money received back and method, reason, balance after |
 | Barcode labels | — | Not ESC/POS: printed through the browser print dialog on a label printer or A4 sticker sheet, Code 128, see [screens/20](screens/20-barcode-labels.md) |
 | Test page (no "Powered by" line) | `BIKRI TEST PRINT` | Paper width ruler `123456789012…`, bold/double sample, an Urdu raster line `اردو ٹیسٹ پرنٹ`, QR, "If the drawer opened, the drawer works", then cut |
 
+A quotation uses the same shop header/footer, item table, bundle block and 58/80 mm rules as a sale, but its title is `QUOTATION` and it has a `Valid until` row. It prints no payment, change or udhaar rows; the total is the quote total. A bundle prints one priced header and the component names/quantities underneath, never component prices. The quote number is `QTN-<device_code>-<seq>`, never an invoice number.
+
 ### 4.4 "Powered by AlgoVyn" line (D-085)
 
 Owner decision (27 Oct 2026, supersedes the "no vendor branding" part of REQ-B03): every **customer receipt** ends with one small line `Powered by AlgoVyn`, centred, after the footer and the optional QR, before the feed and cut.
-- Documents: sale receipt (also reprints and the reissued bill of a cancel-and-reissue), refund receipt, cancellation notice, and their shared image and A4 versions. Not on internal slips (day close, supplier payment and return slips), barcode labels or the test page.
+- Documents: sale receipt (also reprints and the reissued bill of a cancel-and-reissue), refund receipt, cancellation notice, quotation slip, and their shared image and A4 versions. Not on internal slips (day close, supplier payment and return slips), barcode labels or the test page.
 - ESC/POS: block `{ t: 'text', text: 'Powered by AlgoVyn', align: 'center', size: 'small' }` → `1B 61 01`, `1B 4D 01`, text, `0A`, `1B 4D 00`, `1B 61 00`. Same on 58 mm and 80 mm (18 characters fit every width).
 - Raster receipts (Urdu, §6): the same line drawn in Inter at about 70 % of the body size, centred, as the last row of the bitmap.
 - Browser print (`window.print` fallback, §5.3) and the Settings preview: `<p class="powered-by">Powered by AlgoVyn</p>` with `.powered-by { text-align: center; font-size: 8px; margin-top: 2mm }` (58 mm and 80 mm CSS) and 9 pt on A4.
@@ -330,7 +333,7 @@ Other fields: auto-print after sale (default on), copies (1–3), print logo on 
 
 REQ-B15: the sale is committed to IndexedDB **before** any print attempt.
 
-1. After the sale transaction commits, create `print_jobs { id, sale_id, kind: 'sale', status: 'queued' }` in a **separate** Dexie transaction (best effort: if it fails, the sale is still saved and can be reprinted from Sales).
+1. After the sale transaction commits, create `print_jobs { id, sale_id, kind: 'sale', status: 'queued' }` in a **separate** Dexie transaction (best effort: if it fails, the sale is still saved and can be reprinted from Sales). A quotation is never auto-printed: when the user taps `Print`, create `print_jobs { id, quotation_id, kind: 'quotation', status: 'queued' }`; a failed quote print is retried from the quotation detail or Settings → Printer → Recent prints.
 2. Print service picks jobs FIFO; status `printing`; timeout 8 s per job (a serial job's write timeout scales to the payload at the configured baud rate plus 1 s).
 3. Success → `done`. Failure → `failed` with error code (`NO_PRINTER`, `PERMISSION`, `DISCONNECTED`, `TIMEOUT`, `PAPER_OUT` if status known).
 4. UI on failure: a non-blocking toast "Receipt didn't print — <reason>" with **Retry** and **Print later**; the success sheet stays usable for the next sale.
@@ -339,7 +342,7 @@ REQ-B15: the sale is committed to IndexedDB **before** any print attempt.
 
 ## 10. Tests
 
-- `escpos.test.ts`: byte-exact snapshots for the 80 mm and 58 mm sale templates above (fixture sale in `e2e/fixtures/sale-basic.json`), ending with the Font B "Powered by AlgoVyn" line (§4.4); the day-close template snapshot has no such line. Add a bundle sale fixture with a 4-component bundle at 80 mm and 58 mm and a whole-bundle refund receipt; assert the bundle header, indented components, no component prices and no double-counted total.
+- `escpos.test.ts`: byte-exact snapshots for the 80 mm and 58 mm sale templates above (fixture sale in `e2e/fixtures/sale-basic.json`), ending with the Font B "Powered by AlgoVyn" line (§4.4); the day-close template snapshot has no such line. Add a bundle sale fixture with a 4-component bundle at 80 mm and 58 mm and a whole-bundle refund receipt; assert the bundle header, indented components, no component prices and no double-counted total. Add a quotation template at both widths with a bundle line group, a `Valid until` row, no payment rows and the `Powered by AlgoVyn` line.
 - `layout.test.ts`: long names wrap, amounts right-align, pair overflow, 24/32/40/42/48/69 widths.
 - `raster.test.ts`: 1-bit packing of a known 16×2 bitmap; band splitting at 255 rows.
 - `transports.test.ts`: fake `navigator.usb` and `navigator.serial` record bytes; both produce identical bytes for the same job; chunking ≤ 4096 bytes; timeout → `TIMEOUT`.

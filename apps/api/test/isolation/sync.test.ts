@@ -19,6 +19,7 @@ import {
   pullAll,
   push,
   pushOk,
+  quoteOps,
   saleOps,
 } from '../helpers/ops.ts';
 
@@ -599,6 +600,100 @@ describe('sync isolation', () => {
         .bind(a.tenantId)
         .first<{ n: number }>(),
     ).toEqual({ n: 4 });
+  });
+
+  it('I28: quotations and lines stay inside their tenant; read-only shops can read but not write them', async () => {
+    const a = await seedShop('Quote iso A');
+    const b = await seedShop('Quote iso B');
+    const sharedId = '01JB0000000000000000000100';
+    const sharedLine = '01JB0000000000000000000101';
+    const aQuote = quoteOps(a, a.till, 1, {
+      id: sharedId,
+      lineId: sharedLine,
+      note: 'A quote',
+    });
+    const bQuote = quoteOps(b, b.till, 1, {
+      id: sharedId,
+      lineId: sharedLine,
+      note: 'B quote',
+    });
+    const aOnly = quoteOps(a, a.till, 2, { note: 'A only' });
+    await pushOk(a.till, [...aQuote.ops, ...aOnly.ops]);
+    await pushOk(b.till, bQuote.ops);
+
+    const pulled = await pullAll(b.till);
+    const quoteChanges = pulled.filter((c) => c.tbl === 'quotations');
+    expect(quoteChanges).toHaveLength(1);
+    expect(quoteChanges[0]?.row).toMatchObject({
+      id: sharedId,
+      quote_no: 'QTN-B-1',
+      note: 'B quote',
+    });
+    expect(quoteChanges[0]?.row).not.toHaveProperty('tenant_id');
+    expect(pulled.filter((c) => c.tbl === 'quotation_lines')).toHaveLength(1);
+
+    const snap = await snapshotRows(b.till.token);
+    expect(snap.get('quotations')).toHaveLength(1);
+    expect(snap.get('quotations')?.[0]?.note).toBe('B quote');
+    expect(snap.get('quotation_lines')).toHaveLength(1);
+    for (const rows of [snap.get('quotations'), snap.get('quotation_lines')])
+      for (const row of rows ?? []) expect(row).not.toHaveProperty('tenant_id');
+
+    // A line that names a quote id which exists only in A cannot be written by B.
+    const cross = await pushOk(b.till, [
+      op(
+        'quotation_lines',
+        'upsert',
+        { ...bQuote.line, id: newId(), quote_id: aOnly.quoteId },
+        { base_rev: 0 },
+      ),
+    ]);
+    expect(cross.results[0]).toMatchObject({
+      result: 'rejected',
+      error_code: 'FOREIGN_KEY',
+    });
+    expect(
+      await env.DB.prepare(
+        'SELECT COUNT(*) AS n FROM quotation_lines WHERE tenant_id = ?1 AND quote_id = ?2',
+      )
+        .bind(b.tenantId, aOnly.quoteId)
+        .first<{ n: number }>(),
+    ).toEqual({ n: 0 });
+    expect(
+      await env.DB.prepare(
+        'SELECT note, total FROM quotations WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(a.tenantId, aOnly.quoteId)
+        .first<{ note: string; total: number }>(),
+    ).toEqual({ note: 'A only', total: 150000 });
+
+    // read-only: pull and snapshot keep returning the quote; a new write is refused.
+    const r = await seedShop('Quote read only');
+    await pushOk(r.till, quoteOps(r, r.till, 1).ops);
+    const roStart = Date.now();
+    await setStatus(r.tenantId, 'read_only', roStart);
+    expect((await pullAll(r.till)).some((c) => c.tbl === 'quotations')).toBe(
+      true,
+    );
+    expect((await snapshotRows(r.till.token)).get('quotations')).toHaveLength(
+      1,
+    );
+    const denied = await push(
+      r.till,
+      quoteOps(r, r.till, 2, { now: roStart + READ_ONLY_GRACE_MS + 60_000 })
+        .ops,
+    );
+    expect(denied.status).toBe(403);
+    expect((await json<{ error: { code: string } }>(denied)).error.code).toBe(
+      'TENANT_READ_ONLY',
+    );
+    expect(
+      await env.DB.prepare(
+        'SELECT COUNT(*) AS n FROM quotations WHERE tenant_id = ?1',
+      )
+        .bind(r.tenantId)
+        .first<{ n: number }>(),
+    ).toEqual({ n: 1 });
   });
 
   it('M3 tables: purchases, returns, refunds and day closes stay inside their tenant', async () => {

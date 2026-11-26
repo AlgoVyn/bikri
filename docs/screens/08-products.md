@@ -14,7 +14,7 @@
 | ![Dukaan app-product-detail-earbuds](../reference/dukaan/app-product-detail-earbuds.png) | Detail for another product |
 | ![Dukaan app-setup-4-first-product](../reference/dukaan/app-setup-4-first-product.png) | Product form fields |
 
-Bikri differences: photos (REQ-B10), weighted-average cost shown next to last cost (REQ-B11), CSV export of the list (REQ-B02), barcode labels from the browser ([screens/20](20-barcode-labels.md)), no "Batches & expiry" in v1 (v2).
+Bikri differences: photos (REQ-B10), weighted-average cost shown next to last cost (REQ-B11), CSV share of the list (REQ-B02), barcode labels from the browser ([screens/20](20-barcode-labels.md)), no "Batches & expiry" in v1 (v2).
 
 **One product per variant (v1):** every sellable variant is its own product with its own SKU, barcode(s), price and stock, e.g. "Type-C cable 1 m white" and "Type-C cable 1 m black". There is no variant/option model in v1 (deferred to v2, T-110). To make this quick, product detail has `Duplicate` (copies every field except SKU, barcodes, photo and stock, opens the form with the name selected) and the list search matches every word, so "cable white" finds the variant.
 

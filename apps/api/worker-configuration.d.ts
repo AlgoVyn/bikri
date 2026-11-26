@@ -9,8 +9,8 @@ interface __BaseEnv_Env {
 	REGISTER_LIMIT: RateLimit;
 	ENROL_LIMIT: RateLimit;
 	ASSETS: Fetcher;
-	APP_VERSION: "1.0.0";
-	SCHEMA_VERSION: "2";
+	APP_VERSION: "1.1.0";
+	SCHEMA_VERSION: "10";
 	MIN_CLIENT_SCHEMA: "1";
 	MAINTENANCE: "0";
 	ACCESS_TEAM_DOMAIN: "odd-rain-0287.cloudflareaccess.com";

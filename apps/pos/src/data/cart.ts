@@ -81,6 +81,7 @@ export function emptyCart(id: CartId, now = Date.now()): Cart {
     updated_at: now,
     reissue: null,
     backdate: null,
+    quote: null,
   };
 }
 
@@ -579,6 +580,7 @@ export function cartSignature(cart: Cart): string {
     customer: cart.customer_id ?? null,
     reissue: cart.reissue?.sale_id ?? null,
     backdate: cart.backdate ?? null,
+    quote: cart.quote ?? null,
     discount: cart.bill_discount ?? null,
     lines: cart.lines.map((line) => [
       line.key,

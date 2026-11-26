@@ -603,6 +603,7 @@
     "kind_day_close": "دن کا اختتام",
     "kind_refund": "واپسی کی رسید",
     "kind_sale": "فروخت کی رسید",
+    "kind_quotation": "کوٹیشن",
     "kind_statement": "کھاتہ اسٹیٹمنٹ",
     "kind_supplier": "سپلائر پرچی",
     "kind_test": "ٹیسٹ صفحہ",
@@ -798,6 +799,14 @@
     "bundle_empty_recipe": "اس بنڈل میں کوئی چیز نہیں۔ اسے ایڈٹ کر کے 1 سے 20 اشیاء شامل کریں۔"
   },
   "sell": {
+    "quote_empty": "کوٹیشن محفوظ کرنے سے پہلے اشیاء شامل کریں۔",
+    "quote_saved": "کوٹیشن {{quote}} محفوظ ہو گیا۔",
+    "save_quote": "کوٹیشن محفوظ کریں",
+    "quote_new": "نیا کوٹیشن · محفوظ کرنے پر نمبر ملے گا",
+    "quote_editing": "کوٹیشن {{quote}} میں ترمیم",
+    "quote_converting": "کوٹیشن {{quote}} سے",
+    "quote_valid_until": "درست تا {{date}}",
+    "quote_cancel_edit": "ترمیم منسوخ کریں",
     "add_discount": "رعایت شامل کریں",
     "add_items": "اشیاء شامل کریں",
     "add_product": "پروڈکٹ شامل کریں",
@@ -909,7 +918,12 @@
     "bundle_item_count": "{{count}} اشیاء",
     "bundle_price": "بنڈل کی قیمت",
     "bundle_list_price": "فہرست {{amount}}",
-    "bundle_empty": "اس بنڈل میں کوئی چیز نہیں۔ فروخت سے پہلے پروڈکٹس میں اشیاء شامل کریں۔"
+    "bundle_empty": "اس بنڈل میں کوئی چیز نہیں۔ فروخت سے پہلے پروڈکٹس میں اشیاء شامل کریں۔",
+    "quote_quoted": "کوٹ شدہ",
+    "quote_now_price": "اب {{amount}}",
+    "quote_cancel_title": "کوٹیشن موڈ چھوڑیں؟",
+    "quote_cancel_body": "اس کارٹ کی اشیاء ہٹ جائیں گی۔ کوٹیشن محفوظ نہیں ہوگی۔",
+    "quote_cancel_confirm": "کوٹیشن موڈ چھوڑیں"
   },
   "setup": {
     "add_one": "ایک مصنوع شامل کریں",

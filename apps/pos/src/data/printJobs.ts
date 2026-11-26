@@ -60,6 +60,7 @@ export async function recoverInterruptedPrintJobs(
 const documentKey = (job: {
   sale_id?: string;
   refund_id?: string;
+  quotation_id?: string;
   day_close_id?: string;
   supplier_return_id?: string;
 }): string | null =>
@@ -67,11 +68,13 @@ const documentKey = (job: {
     ? `sale:${job.sale_id}`
     : job.refund_id
       ? `refund:${job.refund_id}`
-      : job.day_close_id
-        ? `day:${job.day_close_id}`
-        : job.supplier_return_id
-          ? `return:${job.supplier_return_id}`
-          : null;
+      : job.quotation_id
+        ? `quote:${job.quotation_id}`
+        : job.day_close_id
+          ? `day:${job.day_close_id}`
+          : job.supplier_return_id
+            ? `return:${job.supplier_return_id}`
+            : null;
 
 function unresolvedFailed(jobs: readonly PrintJob[]): PrintJob[] {
   const lastDone = new Map<string, number>();
@@ -99,6 +102,7 @@ export function latestUnresolvedFailed(
 function documentIndex(job: PrintJob): { index: string; id: string } | null {
   if (job.sale_id) return { index: 'sale_id', id: job.sale_id };
   if (job.refund_id) return { index: 'refund_id', id: job.refund_id };
+  if (job.quotation_id) return { index: 'quotation_id', id: job.quotation_id };
   if (job.day_close_id) return { index: 'day_close_id', id: job.day_close_id };
   if (job.supplier_return_id)
     return { index: 'supplier_return_id', id: job.supplier_return_id };

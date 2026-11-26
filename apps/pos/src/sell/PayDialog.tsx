@@ -289,6 +289,7 @@ function PayStep({
           note: cart.note,
           print: printOn,
           maxDiscountBp: Number(seller?.max_discount_bp ?? 0),
+          quoteId: cart.quote?.mode === 'convert' ? cart.quote.quote_id : null,
         },
         ctx,
       );

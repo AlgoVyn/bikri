@@ -158,6 +158,12 @@ The residual is stored as an ordinary line discount with `discount_type='rs'` an
 
 **Worked vectors.** `money-bundles.json` B1–B8 cover an exact split, a split at cost, a below-cost bundle, fractional quantities, residual paisa, all-zero costs (shelf-price fallback), a zero-weight free component, and scaling to two bundles. `money-bundle-refunds.json` R-B1–R-B7 cover incremental whole-bundle refunds.
 
+### 3.5 Quotation totals (v1.2)
+
+A quotation is priced with the same `computeCart()`/`cartTotals()` call as the sale it could become, including line discounts, bill discount, tax mode/rate and cash rounding, and stores the result as a snapshot (`gross_total`, `item_discount_total`, `subtotal`, `bill_discount`, `tax`, `rounding`, `total`). It has no payments, udhaar or change. The Worker recreates the total from the quote's non-deleted lines and rejects a mismatch.
+
+Converting a quote opens Sell at the quoted prices and recalculates the normal sale total at payment time. If the catalogue, tax settings or bundle recipe changed, the cart shows the difference; the customer-facing quote is not silently changed. A quote never creates a `payments`, `ledger_entries` or `stock_movements` row; only the converted sale does.
+
 ## 4. Payments
 
 - Methods: `cash`, `card`, `bank_wallet` (JazzCash, Easypaisa, NayaPay, bank transfer), and **udhaar** (not a payment row; a ledger entry).

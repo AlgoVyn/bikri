@@ -46,6 +46,8 @@ const OFFICE_DIRS = new Set([
   'labels',
   'settings',
   'peek',
+  'quotes',
+  'quotations',
 ]);
 
 /** Which catalogs a source file may use: base + its feature area. */
@@ -59,7 +61,8 @@ function allowedKeys(file) {
   // A few shared components are only mounted from office screens.
   const officeComponent =
     rel === 'components/PastDatePicker.tsx' ||
-    rel === 'components/ListPager.tsx';
+    rel === 'components/ListPager.tsx' ||
+    rel === 'components/SalesTabs.tsx';
   if (
     officeComponent ||
     OFFICE_DIRS.has(area) ||

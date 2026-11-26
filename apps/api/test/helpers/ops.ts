@@ -272,6 +272,98 @@ export function bundleSaleOps(
   ];
 }
 
+/** A valid quotation header + one line, as the till writes them in one transaction. */
+export function quoteOps(
+  shop: Shop,
+  dev: Dev,
+  seq: number,
+  opts: {
+    id?: string;
+    lineId?: string;
+    now?: number;
+    note?: string;
+    staffId?: string;
+    status?: 'open' | 'converted' | 'cancelled';
+  } = {},
+) {
+  const now = opts.now ?? Date.now();
+  const quoteId = opts.id ?? newId(now);
+  const total = 150000;
+  const tx = newId(now);
+  const row = {
+    id: quoteId,
+    quote_no: `QTN-${dev.code}-${seq}`,
+    quote_seq: seq,
+    branch_id: shop.branchId,
+    device_id: dev.id,
+    staff_id: opts.staffId ?? IDS.owner,
+    customer_id: IDS.customer,
+    customer_name: 'Test customer',
+    customer_phone: '+923001234567',
+    business_date: businessDate(now),
+    valid_until: businessDate(now + 7 * 86_400_000),
+    status: opts.status ?? 'open',
+    line_count: 1,
+    items_qty_milli: 1000,
+    gross_total: total,
+    item_discount_total: 0,
+    subtotal: total,
+    bill_discount_type: null,
+    bill_discount_value: 0,
+    bill_discount: 0,
+    tax_rate_bp: 0,
+    tax: 0,
+    tax_inclusive: 0,
+    round_total_to: 1,
+    rounding: 0,
+    total,
+    note: opts.note ?? '',
+    converted_sale_id: null,
+    converted_at: null,
+    cancelled_reason: '',
+    cancelled_at: null,
+    created_at: now,
+    updated_at: now,
+    updated_by: opts.staffId ?? IDS.owner,
+  };
+  const line = {
+    id: opts.lineId ?? newId(now),
+    quote_id: quoteId,
+    line_no: 1,
+    product_id: IDS.product,
+    name_snapshot: 'Phone',
+    sku_snapshot: 'PHN-0001',
+    qty_milli: 1000,
+    unit_price: total,
+    gross: total,
+    discount_type: null,
+    discount_value: 0,
+    discount: 0,
+    net: total,
+    note: '',
+    unit_cost_snapshot: 0,
+    bundle_id: null,
+    bundle_group: null,
+    bundle_name: null,
+    bundle_qty: null,
+    bundle_price: null,
+    bundle_component_qty_milli: null,
+    bundle_discount: 0,
+    created_at: now,
+    updated_at: now,
+    updated_by: opts.staffId ?? IDS.owner,
+  };
+  return {
+    quoteId,
+    row,
+    line,
+    ops: [
+      op('quotations', 'upsert', row, { tx_id: tx, base_rev: 0 }),
+      op('quotation_lines', 'upsert', line, { tx_id: tx, base_rev: 0 }),
+    ],
+  };
+}
+
 export type PushResponse = {
   results: Array<{
     op_id: string;

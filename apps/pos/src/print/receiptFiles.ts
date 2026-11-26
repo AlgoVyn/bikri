@@ -4,11 +4,13 @@ import type { BikriDb, PrintJob } from '@bikri/db';
 import {
   type Block,
   buildDayClose,
+  buildQuotationReceipt,
   buildRefundReceipt,
   buildSaleReceipt,
   buildSupplierReturn,
   buildVoidNotice,
   type DayCloseReceipt,
+  type QuotationReceiptInput,
   type RasterSource,
   type ReceiptLabels,
   type RefundReceipt,
@@ -18,6 +20,7 @@ import {
   type VoidReceipt,
 } from '@bikri/printer';
 import { loadDayCloseReceipt } from '../data/dayCloseReceipt.ts';
+import { loadQuotationReceipt } from '../data/quotationReceipt.ts';
 import {
   loadSaleReceipt,
   type PrinterKv,
@@ -50,6 +53,10 @@ export type DayClosePrint = ReceiptLayout & { input: DayCloseReceipt };
 
 export type SupplierReturnPrint = ReceiptLayout & {
   input: SupplierReturnReceipt;
+};
+
+export type QuotationPrint = ReceiptLayout & {
+  input: QuotationReceiptInput;
 };
 
 async function layoutOf(db: BikriDb) {
@@ -185,12 +192,30 @@ export async function supplierReturnReceipt(
   return { input, blocks, paper, logo, printer };
 }
 
+export async function quotationReceipt(
+  db: BikriDb,
+  quoteId: string,
+): Promise<QuotationPrint | null> {
+  const input = await loadQuotationReceipt(db, quoteId);
+  if (!input) return null;
+  const { printer, paper, logo } = await layoutOf(db);
+  const blocks = buildQuotationReceipt(input, {
+    paperMm: paper.paperMm,
+    charsPerLine: paper.charsPerLine,
+    dots: paper.dots,
+    printLogo: printer?.print_logo !== false,
+    drawer: false,
+  });
+  return { input, blocks, paper, logo, printer };
+}
+
 /** What a print job prints (the print service, T-020, sends these blocks). */
 export function jobReceipt(
   db: BikriDb,
   job: PrintJob,
 ): Promise<
   | SaleReceipt
+  | QuotationPrint
   | RefundPrint
   | VoidPrint
   | DayClosePrint
@@ -198,6 +223,7 @@ export function jobReceipt(
   | null
 > {
   if (job.kind === 'void' && job.sale_id) return voidReceipt(db, job.sale_id);
+  if (job.quotation_id) return quotationReceipt(db, job.quotation_id);
   if (job.sale_id)
     return saleReceipt(db, job.sale_id, { reprint: job.reprint === true });
   if (job.refund_id)

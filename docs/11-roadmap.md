@@ -154,6 +154,18 @@ The feature is specified in [07 §3.4](07-money-rules.md#34-bundles-v11) and [§
 
 **T-118 — implemented. Whole-bundle refunds and release.** Refund row, whole-bundle stepper, all-component server check, refund receipt, old-client refund gate, E2E, analytics note, owner-guide/help copy and release. AC: screens/11 AC 9–12; a partial group is rejected; 1-of-3 then 2-of-3 returns exactly the component finals; udhaar split and rounding pass; refund receipt grouped; docs/decisions and the owner guide updated; the full definition of done in AGENTS.md.
 
+## v1.2 — Quotations (after v1.1)
+
+The feature is specified in [screens/21](screens/21-quotations.md), [02 §2.35](02-data-model.md#235-quotations-migration-0036_quotationssql), [03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500), [06 §4.3](06-printing.md#43-other-documents) and [07 §3.5](07-money-rules.md#35-quotation-totals-v12). Decision: D-305. The four tasks are one feature and can ship together; do not start until v1.1 is released.
+
+**T-119 Core, schema and sync (MT) — implemented.** Migration `0036_quotations.sql` (`quotations`, `quotation_lines`, `devices.last_quote_seq`, indexes/FKs), `MASTER_TABLES`/`TENANT_TABLES`/import-export order, Dexie V16, `CLIENT_SCHEMA_VERSION` 10, old-client pull/snapshot gate, quote totals/expiry helpers in `packages/core`, Worker checks (permissions, totals, terminal status, conversion sale, quote number/validity), `TEXT_CAPS`, audit actions and isolation I28. AC: migration applies to an empty DB and a DB with sales; a quote round-trips between two tills; schema 9 receives no quote rows; I28 and the full isolation suite pass; no quote row changes stock or money.
+
+**T-120 Sell quote mode, save/edit and numbering — implemented.** `Save quote` on Sell, quote-mode banner, save dialog (customer, valid until, terms), quote numbering (`kv.quote_seq`/`devices.last_quote_seq`), edit/duplicate/convert-to-cart repository, read-only guard, audit rows, offline queue and unit/integration tests. AC: screens/21 AC 1–3, 8, 11; no `payments`/`stock_movements`/`ledger_entries` from a quote; 60-line/bundle/discount rules match Sell; a double-click on Done creates one sale.
+
+**T-121 Quotations list, detail and share — implemented.** Sales `Bills | Quotations` tabs, `/quotations` and `/quotations/:id`, master–detail, filters/summary/status/expiry, detail with bundle grouping and totals, convert/duplicate/cancel dialogs, converted-sale link, print/share/PDF and empty/read-only states, i18n in en/ur/roman-ur. AC: screens/21 AC 4–9, 10, 12–16; Playwright EN/UR at 1280×800 and 390×844; offline create/convert.
+
+**T-122 Quotation printing, share and export — implemented (release tasks remain).** `buildQuotationReceipt` in `packages/printer`, `print_jobs.quotation_id`/kind, 58/80 mm + HTML/raster, Web Share text, full export/restore tables, docs/decisions/owner guide, E2E journey 28 and release. AC: screens/21 AC 5, 11, 14; quotation receipt unit tests; the suite in [10 §5](10-testing.md#5-e2e-journeys-each-in-en-and-ur-desktop-1280800-and-phone-390844) passes in EN and UR.
+
 ## v2 backlog (ordered by value)
 
 | ID | Feature | Notes |

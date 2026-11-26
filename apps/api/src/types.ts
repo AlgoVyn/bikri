@@ -57,6 +57,7 @@ export type DeviceRow = {
   last_seen_at: number | null;
   last_report_at: number | null;
   last_invoice_seq: number;
+  last_quote_seq: number;
   pending_ops: number;
   oldest_pending_at: number | null;
   user_agent: string | null;

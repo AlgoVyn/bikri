@@ -48,6 +48,7 @@ export async function loadLookups(
     supplier: new Set<string>(),
   };
   const closeDevices = new Set<string>();
+  const quoteIds = new Set<string>();
   let closeStart = Number.POSITIVE_INFINITY;
   let closeEnd = Number.NEGATIVE_INFINITY;
   for (const op of ops) {
@@ -64,6 +65,12 @@ export async function loadLookups(
       typeof op.row?.replaces_sale_id === 'string'
     )
       saleIds.add(op.row.replaces_sale_id);
+    if (
+      op.tbl === 'quotations' &&
+      op.kind !== 'delete' &&
+      typeof op.row?.converted_sale_id === 'string'
+    )
+      saleIds.add(op.row.converted_sale_id);
     if (op.tbl === 'sale_voids' && typeof op.row?.sale_id === 'string')
       voidSaleIds.add(op.row.sale_id);
     if (op.tbl === 'sales' && typeof op.row?.customer_id === 'string')
@@ -79,11 +86,17 @@ export async function loadLookups(
       refundIds.add(op.row.id);
     if (op.tbl === 'refund_lines' && typeof op.row?.sale_line_id === 'string')
       refundLineIds.add(op.row.sale_line_id);
-    if (op.tbl === 'sale_lines' && typeof op.row?.product_id === 'string') {
+    if (
+      (op.tbl === 'sale_lines' || op.tbl === 'quotation_lines') &&
+      typeof op.row?.product_id === 'string'
+    ) {
       saleProductIds.add(op.row.product_id);
       products.add(op.row.product_id);
     }
-    if (op.tbl === 'sale_lines' && typeof op.row?.bundle_id === 'string')
+    if (
+      (op.tbl === 'sale_lines' || op.tbl === 'quotation_lines') &&
+      typeof op.row?.bundle_id === 'string'
+    )
       saleProductIds.add(op.row.bundle_id);
     if (op.tbl === 'sale_lines' && typeof op.row?.bundle_id === 'string')
       bundleIds.add(op.row.bundle_id);
@@ -164,6 +177,12 @@ export async function loadLookups(
           partyId,
         );
     }
+    if (op.tbl === 'quotations') {
+      const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+      if (typeof id === 'string') quoteIds.add(id);
+    }
+    if (op.tbl === 'quotation_lines' && typeof op.row?.quote_id === 'string')
+      quoteIds.add(op.row.quote_id);
     if (isMasterTable(op.tbl)) {
       const id =
         op.kind === 'delete'
@@ -221,6 +240,8 @@ export async function loadLookups(
   const kinds: Array<
     | { tbl: string }
     | { productRows: true }
+    | { quotes: true }
+    | { quoteLines: true }
     | { sales: true }
     | { refundUdhaar: true }
     | { payments: 'refund' | 'sret' | 'purchase' | 'sale' }
@@ -324,6 +345,29 @@ export async function loadLookups(
       kinds.push(kind);
     }
   };
+  chunked(
+    quoteIds,
+    (p) =>
+      `SELECT id, rev, deleted_at, quote_no, quote_seq, branch_id, device_id, staff_id,
+        customer_id, business_date, valid_until, status, line_count, items_qty_milli,
+        gross_total, item_discount_total, subtotal, bill_discount_type,
+        bill_discount_value, bill_discount, tax_rate_bp, tax, tax_inclusive,
+        round_total_to, rounding, total, converted_sale_id, converted_at,
+        cancelled_reason, cancelled_at, updated_by
+       FROM quotations WHERE tenant_id = ?1 AND id IN (${p})`,
+    { quotes: true },
+  );
+  chunked(
+    quoteIds,
+    (p) =>
+      `SELECT id, quote_id, line_no, product_id, name_snapshot, sku_snapshot,
+        qty_milli, unit_price, gross, discount_type, discount_value, discount,
+        net, note, unit_cost_snapshot, bundle_id, bundle_group, bundle_name,
+        bundle_qty, bundle_price, bundle_component_qty_milli, bundle_discount,
+        deleted_at, rev, updated_by
+       FROM quotation_lines WHERE tenant_id = ?1 AND quote_id IN (${p})`,
+    { quoteLines: true },
+  );
   chunked(
     saleIds,
     (p) =>
@@ -549,6 +593,8 @@ export async function loadLookups(
     shop,
     partyBalances: new Map(),
     products: new Map(),
+    quotes: new Map(),
+    quoteLinesByQuote: new Map(),
     lastClose: new Map(),
     pushedCloses: new Map(),
     closePayments: new Map(),
@@ -625,6 +671,87 @@ export async function loadLookups(
             (r.setup_completed_at as number | null | undefined) ?? null,
           hard_limit: (r.hard_limit as number | null | undefined) ?? null,
         });
+      } else if ('quotes' in k) {
+        look.quotes.set(String(r.id), {
+          id: String(r.id),
+          rev: Number(r.rev),
+          deleted_at: (r.deleted_at as number | null) ?? null,
+          quote_no: String(r.quote_no),
+          quote_seq: Number(r.quote_seq),
+          branch_id: String(r.branch_id),
+          device_id: String(r.device_id),
+          staff_id: String(r.staff_id),
+          customer_id: typeof r.customer_id === 'string' ? r.customer_id : null,
+          business_date: String(r.business_date),
+          valid_until: String(r.valid_until),
+          status: String(r.status),
+          line_count: Number(r.line_count),
+          items_qty_milli: Number(r.items_qty_milli),
+          gross_total: Number(r.gross_total),
+          item_discount_total: Number(r.item_discount_total),
+          subtotal: Number(r.subtotal),
+          bill_discount_type:
+            typeof r.bill_discount_type === 'string'
+              ? r.bill_discount_type
+              : null,
+          bill_discount_value: Number(r.bill_discount_value),
+          bill_discount: Number(r.bill_discount),
+          tax_rate_bp: Number(r.tax_rate_bp),
+          tax: Number(r.tax),
+          tax_inclusive: Number(r.tax_inclusive),
+          round_total_to: Number(r.round_total_to ?? 1),
+          rounding: Number(r.rounding),
+          total: Number(r.total),
+          converted_sale_id:
+            typeof r.converted_sale_id === 'string'
+              ? r.converted_sale_id
+              : null,
+          converted_at:
+            typeof r.converted_at === 'number' ? r.converted_at : null,
+          cancelled_reason: String(r.cancelled_reason ?? ''),
+          cancelled_at:
+            typeof r.cancelled_at === 'number' ? r.cancelled_at : null,
+          updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
+        });
+      } else if ('quoteLines' in k) {
+        const quoteId = String(r.quote_id);
+        const list = look.quoteLinesByQuote.get(quoteId) ?? [];
+        list.push({
+          id: String(r.id),
+          quote_id: quoteId,
+          line_no: Number(r.line_no),
+          product_id: typeof r.product_id === 'string' ? r.product_id : null,
+          name_snapshot: String(r.name_snapshot),
+          sku_snapshot: String(r.sku_snapshot ?? ''),
+          qty_milli: Number(r.qty_milli),
+          unit_price: Number(r.unit_price),
+          gross: Number(r.gross),
+          discount_type:
+            typeof r.discount_type === 'string' ? r.discount_type : null,
+          discount_value: Number(r.discount_value ?? 0),
+          discount: Number(r.discount ?? 0),
+          net: Number(r.net),
+          note: String(r.note ?? ''),
+          unit_cost_snapshot: Number(r.unit_cost_snapshot ?? 0),
+          bundle_id: typeof r.bundle_id === 'string' ? r.bundle_id : null,
+          bundle_group:
+            typeof r.bundle_group === 'string' ? r.bundle_group : null,
+          bundle_name: typeof r.bundle_name === 'string' ? r.bundle_name : null,
+          bundle_qty:
+            typeof r.bundle_qty === 'number' ? Number(r.bundle_qty) : null,
+          bundle_price:
+            typeof r.bundle_price === 'number' ? Number(r.bundle_price) : null,
+          bundle_component_qty_milli:
+            typeof r.bundle_component_qty_milli === 'number'
+              ? Number(r.bundle_component_qty_milli)
+              : null,
+          bundle_discount: Number(r.bundle_discount ?? 0),
+          deleted_at:
+            typeof r.deleted_at === 'number' ? Number(r.deleted_at) : null,
+          rev: Number(r.rev),
+          updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
+        });
+        look.quoteLinesByQuote.set(quoteId, list);
       } else if ('sales' in k) {
         look.sales.set(String(r.id), {
           business_date: String(r.business_date),

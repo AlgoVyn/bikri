@@ -142,6 +142,8 @@ export type SaleInput = {
   print: boolean;
   /** Staff limit, to log `discount_over_limit` (07 §3.1). */
   maxDiscountBp: number;
+  /** The open quote this sale converts; marked converted in the same transaction. */
+  quoteId?: string | null;
 };
 
 export type SaleResult = { sale: SyncedRow; created: boolean };
@@ -435,6 +437,10 @@ export async function completeSale(
   const writes = new Set<DexieTableName>(['carts', 'sales', 'sale_lines']);
   if (s.applied.cash + s.applied.card + s.applied.bank_wallet > 0)
     writes.add('payments');
+  if (input.quoteId) {
+    writes.add('quotations');
+    writes.add('audit_log');
+  }
   const tracked = cart.lines.some((line) => {
     const product = line.product_id ? products.get(line.product_id) : undefined;
     return product?.track_stock === 1;
@@ -504,6 +510,7 @@ export async function completeSale(
           bill_discount: value.bill_discount ?? null,
           reissue: value.reissue ?? null,
           backdate: value.backdate ?? null,
+          quote: value.quote ?? null,
         });
       if (
         live &&
@@ -822,6 +829,36 @@ export async function completeSale(
           reason: backdate.reason.trim(),
           recorded_at: now,
         });
+      if (input.quoteId) {
+        const quote = await w
+          .table<SyncedRow, string>('quotations')
+          .get(input.quoteId);
+        if (!quote) throw new SaleInvalidError('quote');
+        if (String(quote.status) === 'cancelled')
+          throw new SaleInvalidError('quote cancelled');
+        await w.update('quotations', input.quoteId, {
+          status: 'converted',
+          converted_sale_id: input.saleId,
+          converted_at: now,
+        });
+        auditRows.push({
+          id: newId(now),
+          action: 'quote_convert',
+          entity: 'quotations',
+          entity_id: input.quoteId,
+          before_json: JSON.stringify({
+            status: quote.status,
+            converted_sale_id: quote.converted_sale_id ?? null,
+          }),
+          after_json: JSON.stringify({
+            sale_id: input.saleId,
+            invoice_no: saleRow.invoice_no,
+          }),
+          device_id: ctx.device_id,
+          staff_id: ctx.staff_id,
+          created_at: now,
+        });
+      }
       if (auditRows.length > 0) await w.insertMany('audit_log', auditRows);
       if (reissue && reissuePlan) {
         await writeVoidRows(w, reissuePlan, ctx, {

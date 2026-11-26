@@ -20,7 +20,7 @@ describe('ids', () => {
 
 describe('op tables (02 §1.1)', () => {
   it('splits master and ledger tables without overlap', () => {
-    expect(MASTER_TABLES).toHaveLength(11);
+    expect(MASTER_TABLES).toHaveLength(13);
     expect(LEDGER_TABLES).toHaveLength(16);
     for (const t of MASTER_TABLES) expect(isLedgerTable(t)).toBe(false);
     expect(isMasterTable('products')).toBe(true);

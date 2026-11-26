@@ -603,6 +603,7 @@
     "kind_day_close": "Din ka ikhtitam",
     "kind_refund": "Wapsi ki raseed",
     "kind_sale": "Farokht ki raseed",
+    "kind_quotation": "Quotation",
     "kind_statement": "Khata statement",
     "kind_supplier": "Supplier parchi",
     "kind_test": "Test safha",
@@ -798,6 +799,14 @@
     "bundle_empty_recipe": "Is bundle mein koi cheez nahi. Ise edit kar ke 1 se 20 items shamil karein."
   },
   "sell": {
+    "quote_empty": "Quotation save karne se pehle items shamil karein.",
+    "quote_saved": "Quotation {{quote}} save ho gaya.",
+    "save_quote": "Quotation save karein",
+    "quote_new": "Naya quotation · save karne par number milega",
+    "quote_editing": "Quotation {{quote}} mein tabdeeli",
+    "quote_converting": "Quotation {{quote}} se",
+    "quote_valid_until": "Durust ta {{date}}",
+    "quote_cancel_edit": "Tabdeeli mansookh karein",
     "add_discount": "Discount lagayein",
     "add_items": "Items shamil karein",
     "add_product": "Product shamil karein",
@@ -909,7 +918,12 @@
     "bundle_item_count": "{{count}} items",
     "bundle_price": "Bundle price",
     "bundle_list_price": "List {{amount}}",
-    "bundle_empty": "Is bundle mein koi cheez nahi. Sell se pehle Products mein items shamil karein."
+    "bundle_empty": "Is bundle mein koi cheez nahi. Sell se pehle Products mein items shamil karein.",
+    "quote_quoted": "Quoted",
+    "quote_now_price": "Ab {{amount}}",
+    "quote_cancel_title": "Quotation mode chhor dein?",
+    "quote_cancel_body": "Is cart ki cheezein hata di jayengi. Quotation save nahin hogi.",
+    "quote_cancel_confirm": "Quotation mode chhor dein"
   },
   "setup": {
     "add_one": "Aik product shamil karein",

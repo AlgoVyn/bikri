@@ -107,6 +107,10 @@ export const NAV: readonly NavItem[] = [
 export function navItemFor(pathname: string): NavItem | undefined {
   const path = pathname.replace(/\/+$/u, '') || '/';
   if (path === '/') return NAV[0];
+  // Quotations live under the Sales rail item (screens/21).
+  if (path === '/quotations' || path.startsWith('/quotations/')) {
+    return NAV.find((item) => item.to === '/sales');
+  }
   return NAV.find(
     (item) =>
       item.to !== '/' && (path === item.to || path.startsWith(`${item.to}/`)),
