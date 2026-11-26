@@ -1,6 +1,6 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useDeferredValue, useMemo, useRef, useState } from 'react';
+import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -33,6 +33,7 @@ import { rangeFor } from '../data/salesHistory.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { formatBusinessDate } from '../lib/date.ts';
+import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { useSellStore } from '../sell/sellStore.ts';
@@ -59,6 +60,8 @@ const STATUS_FILTERS: Array<'' | QuoteDisplayStatus> = [
 
 const SORT_OPTIONS = ['date', 'total', 'validity'] as const;
 type QuoteSort = (typeof SORT_OPTIONS)[number];
+
+const PRESET_IDS = PRESETS.map((option) => option.id);
 
 const selectClass =
   'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
@@ -116,10 +119,15 @@ export function QuotesList({
   const [sort, setSort] = useState<QuoteSort>('date');
   const [direction, setDirection] = useState<'asc' | 'desc'>('desc');
   const [filtersOpen, setFiltersOpen] = useState(false);
-  const [preset, setPreset] = useState<(typeof PRESETS)[number]['id']>('30d');
+  const [stored] = useState(() =>
+    readDateFilter('sales', PRESET_IDS, 'today', today),
+  );
+  const [preset, setPreset] = useState<(typeof PRESETS)[number]['id']>(
+    stored.preset,
+  );
   const [custom, setCustom] = useState({
-    from: addDays(today, -30),
-    to: today,
+    from: stored.from,
+    to: stored.to,
   });
   const [selected, setSelected] = useState<string | null>(null);
   const selectedId = routeSelectedId ?? selected;
@@ -132,6 +140,13 @@ export function QuotesList({
     () => rangeFor(preset, Date.now(), timeZone, custom),
     [preset, custom, timeZone],
   );
+  useEffect(() => {
+    if (!limited) rememberDateFilter('sales', preset, custom.from, custom.to);
+  }, [preset, custom.from, custom.to, limited]);
+  const runPreset = (next: (typeof PRESETS)[number]['id']) => {
+    setPreset(next);
+    if (next !== 'custom') setCustom({ from: today, to: today });
+  };
 
   const data = useLiveQuery(async () => {
     const db = getDb();
@@ -389,7 +404,7 @@ export function QuotesList({
               type="button"
               aria-pressed={preset === option.id}
               className={`${buttonQuiet} px-3 aria-pressed:bg-primary-subtle aria-pressed:text-primary-subtle-ink`}
-              onClick={() => setPreset(option.id)}
+              onClick={() => runPreset(option.id)}
             >
               {t(option.key)}
             </button>

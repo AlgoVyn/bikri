@@ -58,7 +58,7 @@ The Sales page gains a compact segmented tab row under its page header:
 ### Quotations list
 
 1. **Page header**: pastel quote icon, title `Quotations`, subtitle “Prices you have given to customers”. `New quote` is the one filled primary action, with `Export CSV` quiet beside it.
-2. **Date range** (remembered on this device, default `Last 30 days`): Today, Yesterday, 7 days, 30 days, This month, Custom. Dates before the shop's first business day or after today are clamped. It filters both the list and the summary.
+2. **Date range** (shared with Bills, remembered on this device, default `Today`): Today, Yesterday, 7 days, 30 days, This month, Custom. Dates after today are clamped. It filters both the list and the summary.
 3. **Surface**: one list surface containing the toolbar, summary strip and rows, never three separate cards.
 4. **Toolbar**: search (quote no, customer name/phone, product name) with `F2`; status (All, Open, Converted, Expired, Cancelled); sort (Newest first, Oldest first, Total highest, Total lowest, Valid until soonest). The search is debounced at 0 ms because it reads Dexie locally.
 5. **Summary strip**: `Open quotes` (count), `Open value` (Σ open totals), `Converted this month` (count and value) and `Expiring soon` (count in warning colour when non-zero; `valid_until` within 7 days). Figures respect the salary/privacy mask ([08 §4](../08-ux-guidelines.md#4-language-rtl-and-numbers)).

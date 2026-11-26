@@ -18,6 +18,21 @@ test.describe('remembered date filters', () => {
     );
   });
 
+  test('Sales and Quotations share the same date range', async ({ page }) => {
+    await openReadyShop(page, '/bikri/sales');
+    await page.getByRole('button', { name: '7 days' }).click();
+    await page.getByRole('tab', { name: /Quotations/u }).click();
+    await expect(page.getByRole('button', { name: '7 days' })).toHaveAttribute(
+      'aria-pressed',
+      'true',
+    );
+    await page.getByRole('button', { name: 'Today', exact: true }).click();
+    await page.getByRole('tab', { name: /Bills/u }).click();
+    await expect(
+      page.getByRole('button', { name: 'Today', exact: true }),
+    ).toHaveAttribute('aria-pressed', 'true');
+  });
+
   test('Expenses offers last month and a remembered custom range', async ({
     page,
   }) => {
