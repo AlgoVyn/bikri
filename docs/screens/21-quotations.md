@@ -72,7 +72,7 @@ The Sales page gains a compact segmented tab row under its page header:
 - Quote icon, quote number in mono (`QTN-A-1042`), status pill.
 - Created date/time, valid-until date with `n days left` or `Expired`, staff, device, branch.
 - Actions: `Convert to sale` (filled primary; hidden when converted/cancelled), `Print`, `Share` and `PDF` (quiet), and a `More` menu with `Edit`, `Duplicate` and `Cancel`. On phones `Print` and `PDF` move into the `More` menu; the row keeps `Convert`, `Share` and `More`. The `More` menu keeps `Duplicate` for converted/cancelled quotes.
-- A green `Converted to INV-A-1048` bar with the invoice number itself linking to the sale, when applicable.
+- A green `Converted to INV-A-1048` bar with the invoice number opening a read-only bill peek; `Open full bill` opens the sale, when applicable.
 
 **Body**
 
@@ -128,7 +128,7 @@ When the cart was opened from `New quote`, `Edit` or `Duplicate`, Sell shows a q
 
 - The cart line prices are the **quoted prices**. A line whose current catalogue price differs shows a `Quoted` badge and `Now Rs X`; if the quoted price is below today's catalogue, the normal `catalog.edit`/override rule applies, exactly like a manual price in Sell. A price approval given when the quote was saved is not a sale approval; the conversion re-runs the sale checks.
 - If the quote is **expired**, a confirmation appears before the cart opens: `This quotation expired on 22 Nov 2026. Convert at today's prices?` `Convert at today's prices` is primary. `Use quoted prices` is available only to a user with `catalog.edit` or after the normal manager override, and writes `audit_log quote_expired_price_used`.
-- Payment is the normal Pay flow. On `Done`, the sale and the quote status update are written in the same Dexie transaction: the quote becomes `converted`, `converted_sale_id` points at the sale, `converted_at` is set, and the sale detail shows a green `Quotation QTN-A-1042` bar linking back (a reverse lookup on `quotations.converted_sale_id`).
+- Payment is the normal Pay flow. On `Done`, the sale and the quote status update are written in the same Dexie transaction: the quote becomes `converted`, `converted_sale_id` points at the sale, `converted_at` is set, and the sale detail shows a green `Quotation QTN-A-1042` bar opening a read-only quotation peek (a reverse lookup on `quotations.converted_sale_id`).
 - Abandoning the cart writes nothing and leaves the quote open.
 - Converting does not reserve stock. Normal stock warnings and negative-stock rules apply; a quote can be converted after stock changed.
 - If two tills convert the same quote offline, both sales are real and both are accepted. The quote points to the latest conversion; the first is still visible in audit and on its own bill. Never reject a sale because a quotation status changed.

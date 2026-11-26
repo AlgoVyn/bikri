@@ -1,7 +1,12 @@
 import { BASE_PATH, isUlid } from '@bikri/core';
 
 /** What a reference peek can show. The URL uses `<kind>:<ulid>`. */
-export type PeekKind = 'product' | 'bill' | 'customer' | 'delivery';
+export type PeekKind =
+  | 'product'
+  | 'bill'
+  | 'quotation'
+  | 'customer'
+  | 'delivery';
 
 export type PeekTarget = {
   kind: PeekKind;
@@ -23,7 +28,13 @@ export type PeekOrigin = {
   mode: 'history' | 'replace';
 };
 
-const KINDS = new Set<PeekKind>(['product', 'bill', 'customer', 'delivery']);
+const KINDS = new Set<PeekKind>([
+  'product',
+  'bill',
+  'quotation',
+  'customer',
+  'delivery',
+]);
 
 function isRecord(value: unknown): value is Record<string, unknown> {
   return value !== null && typeof value === 'object' && !Array.isArray(value);

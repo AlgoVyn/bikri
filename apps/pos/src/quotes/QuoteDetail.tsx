@@ -32,6 +32,7 @@ import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { formatBusinessDate } from '../lib/date.ts';
 import { useRecordBack } from '../peek/recordBack.ts';
+import { useOpenPeek } from '../peek/usePeekNavigation.ts';
 import {
   closeShareWindow,
   navigateShareWindow,
@@ -110,6 +111,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
   const readOnly = useReadOnly();
   const canQuote = can('sale.create');
   const recordBack = useRecordBack('/quotations', 'nav.sales');
+  const openPeek = useOpenPeek();
   const wide = useMasterDetailWide();
   const desktop = useIsDesktop();
   const timeZone = useShopTimeZone();
@@ -470,6 +472,16 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
             to="/sales/$id"
             params={{ id: String(quote.converted_sale_id) }}
             className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+            onClick={(event) =>
+              openPeek(
+                event,
+                { kind: 'bill', id: String(quote.converted_sale_id) },
+                {
+                  key: 'peek.origin_quotation',
+                  params: { quote: String(quote.quote_no) },
+                },
+              )
+            }
           >
             {data.convertedInvoice ?? ''}
             <ChevronRightIcon

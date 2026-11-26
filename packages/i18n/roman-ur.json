@@ -1342,6 +1342,9 @@
     "origin_bill": "Bill {{invoice}}",
     "origin_product": "{{name}}",
     "origin_customer": "{{name}}",
-    "origin_delivery": "Delivery {{invoice}}"
+    "origin_delivery": "Delivery {{invoice}}",
+    "quotation_reference": "Quotation reference",
+    "open_quotation": "Mukammal quotation kholein",
+    "origin_quotation": "Quotation {{quote}}"
   }
 }
