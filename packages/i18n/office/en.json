@@ -295,7 +295,8 @@
       "bundle_qty_value": "Return {{qty}} whole bundles",
       "bundle_includes": "Includes:",
       "bundle_whole_only": "Whole bundle only — the items cannot be returned separately.",
-      "error_bundle": "Return whole bundle units only; every item in the bundle must be included."
+      "error_bundle": "Return whole bundle units only; every item in the bundle must be included.",
+      "restock_hint": "The returned items are added back into stock."
     },
     "udhaar": {
       "add_promise": "Add promise",

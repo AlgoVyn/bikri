@@ -50,6 +50,38 @@ type Choice = { saleLineId: string; qtyMilli: number; restock: boolean };
 type SelectableLine = { line: SyncedRow; keptMilli: number };
 
 /**
+ * The stock-handling choice is a separate document-level decision, not a third column
+ * beside quantity and amount. Keep it full width and visually distinct from the numeric
+ * controls so it reads as a choice, not a value.
+ */
+function RestockOption({
+  checked,
+  onChange,
+  label,
+  hint,
+}: {
+  checked: boolean;
+  onChange: (checked: boolean) => void;
+  label: string;
+  hint: string;
+}) {
+  return (
+    <label
+      className="mt-1 flex min-h-9 cursor-pointer items-center gap-2 rounded-control bg-surface-2/60 px-2.5 text-small transition-colors hover:bg-surface-2"
+      title={hint}
+    >
+      <input
+        type="checkbox"
+        className="size-4 shrink-0"
+        checked={checked}
+        onChange={(event) => onChange(event.target.checked)}
+      />
+      <span className="min-w-0 truncate">{label}</span>
+    </label>
+  );
+}
+
+/**
  * The refund lines a set of checked rows and draft quantities describes (UI-H3).
  * Checked state is separate from the draft: clearing or backspacing a `QtyInput`
  * empties that row's draft (`null`) without unchecking it or unmounting the input.
@@ -559,22 +591,19 @@ export function RefundDialog({
                           <MoneyText paisa={amount} />
                         </p>
                       </div>
-                      <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control border border-border bg-surface-2/60 px-2.5 text-small">
-                        <input
-                          type="checkbox"
-                          className="size-4 shrink-0"
-                          checked={restock[block.key] !== false}
-                          onChange={(e) =>
-                            setRestock((current) => ({
-                              ...current,
-                              [block.key]: e.target.checked,
-                            }))
-                          }
-                        />
-                        {t('office.refund.bundle_restock', {
+                      <RestockOption
+                        checked={restock[block.key] !== false}
+                        onChange={(next) =>
+                          setRestock((current) => ({
+                            ...current,
+                            [block.key]: next,
+                          }))
+                        }
+                        label={t('office.refund.bundle_restock', {
                           count: block.lines.length,
                         })}
-                      </label>
+                        hint={t('office.refund.restock_hint')}
+                      />
                     </div>
                   ) : selected ? (
                     <div className="flex flex-col gap-2">
@@ -586,22 +615,19 @@ export function RefundDialog({
                         </p>
                         <MoneyText paisa={amount} />
                       </div>
-                      <label className="flex min-h-11 cursor-pointer items-center gap-2 rounded-control border border-border bg-surface-2/60 px-2.5 text-small">
-                        <input
-                          type="checkbox"
-                          className="size-4 shrink-0"
-                          checked={restock[block.key] !== false}
-                          onChange={(e) =>
-                            setRestock((current) => ({
-                              ...current,
-                              [block.key]: e.target.checked,
-                            }))
-                          }
-                        />
-                        {t('office.refund.bundle_restock', {
+                      <RestockOption
+                        checked={restock[block.key] !== false}
+                        onChange={(next) =>
+                          setRestock((current) => ({
+                            ...current,
+                            [block.key]: next,
+                          }))
+                        }
+                        label={t('office.refund.bundle_restock', {
                           count: block.lines.length,
                         })}
-                      </label>
+                        hint={t('office.refund.restock_hint')}
+                      />
                     </div>
                   ) : null}
                   <p className="text-small text-text-muted">
@@ -677,50 +703,50 @@ export function RefundDialog({
                   </bdi>
                 </div>
                 {open ? (
-                  <div className="flex flex-wrap items-end gap-2">
-                    {mode === 'items' ? (
-                      <div className="w-36">
-                        <QtyInput
-                          label={t('office.refund.qty')}
-                          unit={qtyUnit}
-                          value={qty[line.id] ?? null}
-                          onChange={(milli) =>
-                            setQty((current) => ({
-                              ...current,
-                              [line.id]:
-                                milli === null
-                                  ? null
-                                  : Math.min(Math.max(0, milli), keptMilli),
-                            }))
-                          }
-                        />
-                      </div>
-                    ) : (
-                      <p className="text-small text-text-muted">
-                        {t('office.refund.qty')}:{' '}
-                        <bdi dir="ltr">
-                          {formatQtyFromMilli(keptMilli, qtyUnit)}
-                        </bdi>{' '}
-                        {t(`unit.${qtyUnit}`)}
+                  <>
+                    <div className="flex flex-wrap items-end gap-2">
+                      {mode === 'items' ? (
+                        <div className="w-36">
+                          <QtyInput
+                            label={t('office.refund.qty')}
+                            unit={qtyUnit}
+                            value={qty[line.id] ?? null}
+                            onChange={(milli) =>
+                              setQty((current) => ({
+                                ...current,
+                                [line.id]:
+                                  milli === null
+                                    ? null
+                                    : Math.min(Math.max(0, milli), keptMilli),
+                              }))
+                            }
+                          />
+                        </div>
+                      ) : (
+                        <p className="text-small text-text-muted">
+                          {t('office.refund.qty')}:{' '}
+                          <bdi dir="ltr">
+                            {formatQtyFromMilli(keptMilli, qtyUnit)}
+                          </bdi>{' '}
+                          {t(`unit.${qtyUnit}`)}
+                        </p>
+                      )}
+                      <p className="ms-auto text-end">
+                        <MoneyText paisa={amount} />
                       </p>
-                    )}
-                    <p className="ms-auto text-end">
-                      <MoneyText paisa={amount} />
-                    </p>
-                    <label className="flex min-h-11 items-center gap-1 text-small">
-                      <input
-                        type="checkbox"
-                        checked={restock[line.id] !== false}
-                        onChange={(e) =>
-                          setRestock((current) => ({
-                            ...current,
-                            [line.id]: e.target.checked,
-                          }))
-                        }
-                      />
-                      {t('office.refund.restock')}
-                    </label>
-                  </div>
+                    </div>
+                    <RestockOption
+                      checked={restock[line.id] !== false}
+                      onChange={(next) =>
+                        setRestock((current) => ({
+                          ...current,
+                          [line.id]: next,
+                        }))
+                      }
+                      label={t('office.refund.restock')}
+                      hint={t('office.refund.restock_hint')}
+                    />
+                  </>
                 ) : null}
               </li>
             );
