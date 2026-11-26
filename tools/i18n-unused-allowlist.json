@@ -1,0 +1,5 @@
+{
+  "note": "Keys that are intentionally not referenced by a literal t('key') call. The unused audit (node tools/check-i18n-keys.mjs --unused) reports every catalog key not found in apps/pos/src; add keys or prefixes here only with a reason in the PR. Use --unused=strict to fail CI on the remaining list.",
+  "keys": [],
+  "prefixes": []
+}

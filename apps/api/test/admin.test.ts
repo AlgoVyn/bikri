@@ -1029,6 +1029,65 @@ describe('operator export and restore (I17, I18, I27)', () => {
     ).toBe(0);
   });
 
+  it('I28: purge removes a converted quotation child-first and keeps the audit log', async () => {
+    const shop = await seedShop('Qtn purge');
+    const sale = saleOps(shop, shop.till, 1);
+    const saleId = String(sale[0]?.row?.id);
+    await pushOk(shop.till, sale);
+    const quote = quoteOps(shop, shop.till, 1);
+    await pushOk(shop.till, quote.ops);
+    const now = Date.now();
+    await pushOk(shop.till, [
+      op(
+        'quotations',
+        'upsert',
+        {
+          ...quote.row,
+          status: 'converted',
+          converted_sale_id: saleId,
+          converted_at: now,
+        },
+        {
+          tx_id: newId(now),
+          base_rev: 1,
+          changed_fields: ['status', 'converted_sale_id', 'converted_at'],
+        },
+      ),
+    ]);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM quotations WHERE tenant_id = ?1',
+        shop.tenantId,
+      ),
+    ).toBe(1);
+    await api(`/admin/tenants/${shop.tenantId}/maintenance`, {
+      method: 'POST',
+      json: { on: true },
+    });
+    let remaining = 1;
+    while (remaining > 0) {
+      const purged = await json<{ remaining: number }>(
+        await api(`/admin/tenants/${shop.tenantId}/purge`, { method: 'POST' }),
+      );
+      remaining = purged.remaining;
+    }
+    for (const tbl of ['quotations', 'quotation_lines', 'sales']) {
+      expect(
+        await n(
+          `SELECT COUNT(*) AS n FROM ${tbl} WHERE tenant_id = ?1`,
+          shop.tenantId,
+        ),
+        tbl,
+      ).toBe(0);
+    }
+    expect(
+      await n(
+        "SELECT COUNT(*) AS n FROM audit_log WHERE tenant_id = ?1 AND action = 'tenant_purge'",
+        shop.tenantId,
+      ),
+    ).toBe(1);
+  });
+
   it('restore import writes no change_log rows and caps a batch at 250', async () => {
     const shop = await seedShop('Import quiet');
     await api(`/admin/tenants/${shop.tenantId}/maintenance`, {

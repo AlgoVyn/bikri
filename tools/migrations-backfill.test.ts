@@ -337,6 +337,42 @@ describe('incremental migration backfills (OPS-M1)', () => {
     ).not.toThrow();
   });
 
+  it('applies every migration through 0038 and records schema 10', () => {
+    applyThrough('9999');
+    expect(applied).toBe(FILES.length);
+    expect(
+      one<{ value: string }>(
+        "SELECT value FROM meta WHERE key = 'schema_version'",
+      ).value,
+    ).toBe('10');
+    expect(
+      one<{ last_quote_seq: number }>(
+        "SELECT last_quote_seq FROM devices WHERE id = 'dev1'",
+      ).last_quote_seq,
+    ).toBe(0);
+
+    const dropped = db
+      .prepare(
+        `SELECT name FROM sqlite_master WHERE type = 'index' AND name IN (
+          'quotation_lines_quote', 'quotation_lines_product', 'quotations_date',
+          'quotations_validity', 'quotations_customer', 'quotations_sale'
+        ) ORDER BY name`,
+      )
+      .all();
+    expect(dropped).toEqual([]);
+    const triggers = db
+      .prepare(
+        "SELECT name FROM sqlite_master WHERE type = 'trigger' AND name LIKE 'quotation%' ORDER BY name",
+      )
+      .all()
+      .map((row) => String(row.name));
+    expect(triggers).toContain('quotations_round_total_to_insert');
+    expect(triggers).toContain(
+      'quotation_lines_bundle_metadata_complete_insert',
+    );
+    expect(triggers).toContain('quotation_lines_no_bundle_product_insert');
+  });
+
   it('leaves a costed product on hand and the database consistent', () => {
     const p1 = one<{ on_hand_milli: number }>(
       "SELECT on_hand_milli FROM products WHERE id = 'p1'",

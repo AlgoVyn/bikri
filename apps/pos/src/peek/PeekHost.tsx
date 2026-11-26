@@ -19,7 +19,7 @@ import { categoryName } from '../lib/category.ts';
 import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
 import { isLatinName } from '../products/format.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
-import { billVisible } from '../state/reportScope.ts';
+import { billVisible, quoteVisible } from '../state/reportScope.ts';
 import {
   type BillPeekData,
   type CustomerPeekData,
@@ -132,9 +132,24 @@ function PeekContent({ target }: { target: PeekTarget }) {
     if (target.kind === 'quotation') {
       if (!canQuote) return { status: 'denied', kind: 'quotation' };
       const data = await loadQuotationPeek(db, target.id);
-      return data
+      if (!data) return { status: 'missing', kind: 'quotation' };
+      const visible = quoteVisible({
+        role,
+        support,
+        canViewReports: canReport,
+        canQuote,
+        status: String(data.quote.status),
+        businessDate: String(data.quote.business_date),
+        branchId,
+        quoteBranchId: String(data.quote.branch_id ?? ''),
+        today: data.today,
+        timeZone: data.timeZone,
+        convertedAt: Number(data.quote.converted_at ?? 0) || null,
+        cancelledAt: Number(data.quote.cancelled_at ?? 0) || null,
+      });
+      return visible
         ? { status: 'ok', kind: 'quotation', data }
-        : { status: 'missing', kind: 'quotation' };
+        : { status: 'denied', kind: 'quotation' };
     }
     if (target.kind === 'customer') {
       if (!canCustomer) return { status: 'denied', kind: 'customer' };

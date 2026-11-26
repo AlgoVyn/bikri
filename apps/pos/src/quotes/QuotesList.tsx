@@ -31,15 +31,19 @@ import {
 } from '../data/quotes.ts';
 import { rangeFor } from '../data/salesHistory.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
-import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import {
+  useShopTimeZone,
+  useShopTimeZoneReady,
+} from '../data/useShopTimeZone.ts';
 import { formatBusinessDate } from '../lib/date.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { useSellStore } from '../sell/sellStore.ts';
-import { plainKey, useHotkey } from '../shell/hotkeys.ts';
+import { interactiveTarget, plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import { quoteVisible, seesAllDates } from '../state/reportScope.ts';
 
 const PRESETS = [
   { id: 'today', key: 'office.sales.range_today' },
@@ -84,6 +88,9 @@ type QuoteRow = {
   status: string;
   staff_id: string;
   device_id: string;
+  branch_id: string;
+  converted_at: number | null;
+  cancelled_at: number | null;
 };
 
 function statusTone(display: QuoteDisplayStatus): string {
@@ -94,7 +101,16 @@ function statusTone(display: QuoteDisplayStatus): string {
   return 'bg-danger-subtle text-danger-subtle-ink';
 }
 
-export function QuotesList({
+export function QuotesList(props: {
+  embedded?: boolean;
+  detailOpen?: boolean;
+  selectedId?: string;
+}) {
+  const ready = useShopTimeZoneReady();
+  return ready ? <QuotesListContent {...props} /> : <PageLoading compact />;
+}
+
+function QuotesListContent({
   embedded = false,
   detailOpen = false,
   selectedId: routeSelectedId,
@@ -106,7 +122,7 @@ export function QuotesList({
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
-  const { can } = useCurrentStaff();
+  const { can, role, support, branchId } = useCurrentStaff();
   const readOnly = useReadOnly();
   const canQuote = can('sale.create');
   const setActive = useSellStore((s) => s.setActive);
@@ -131,15 +147,15 @@ export function QuotesList({
   });
   const [selected, setSelected] = useState<string | null>(null);
   const selectedId = routeSelectedId ?? selected;
-  const limited = !can('report.view');
+  const limited = !seesAllDates(role, support, can('report.view'));
   const activeFilters =
-    (status ? 1 : 0) +
-    (query.trim() ? 1 : 0) +
-    (sort === 'date' && direction === 'desc' ? 0 : 1);
+    (status ? 1 : 0) + (sort === 'date' && direction === 'desc' ? 0 : 1);
+  // biome-ignore lint/correctness/useExhaustiveDependencies: `today` changes at midnight and must rebuild the range
   const range = useMemo(
     () => rangeFor(preset, Date.now(), timeZone, custom),
-    [preset, custom, timeZone],
+    [preset, custom, timeZone, today],
   );
+  const rangeError = preset === 'custom' && custom.from > custom.to;
   useEffect(() => {
     if (!limited) rememberDateFilter('sales', preset, custom.from, custom.to);
   }, [preset, custom.from, custom.to, limited]);
@@ -149,26 +165,40 @@ export function QuotesList({
   };
 
   const data = useLiveQuery(async () => {
+    const empty = {
+      quotes: [] as QuoteRow[],
+      names: new Map<string, string[]>(),
+      staff: new Map<string, string>(),
+      devices: new Map<string, string>(),
+      billCount: 0,
+    };
+    if (rangeError) return empty;
     const db = getDb();
     let quotes: QuoteRow[];
     if (limited) {
-      // A cashier can convert an open quote from any date, but sees converted and
-      // cancelled history for today only (screens/21 permissions).
+      // A cashier can convert an open quote from any date, and sees converted or
+      // cancelled history from today only. The terminal ranges are filtered in memory
+      // by `quoteVisible` because `converted_at`/`cancelled_at` are timestamps; the
+      // ±2-day window covers every shop time zone around the business date.
+      const todayRange = rangeFor('today', Date.now(), timeZone);
+      const dayMs = 86_400_000;
+      const from = Date.parse(`${todayRange.from}T00:00:00Z`) - 2 * dayMs;
+      const to = Date.parse(`${todayRange.to}T00:00:00Z`) + 2 * dayMs;
       const open = (await db.quotations
         .where('[status+valid_until]')
         .between(['open', ''], ['open', '\uffff'], true, true)
         .toArray()) as unknown as QuoteRow[];
-      const todayRows = (await db.quotations
-        .where('business_date')
-        .equals(today)
-        .filter(
-          (quote) =>
-            quote.status === 'converted' || quote.status === 'cancelled',
-        )
+      const converted = (await db.quotations
+        .where('[status+converted_at]')
+        .between(['converted', from], ['converted', to], true, true)
+        .toArray()) as unknown as QuoteRow[];
+      const cancelled = (await db.quotations
+        .where('[status+cancelled_at]')
+        .between(['cancelled', from], ['cancelled', to], true, true)
         .toArray()) as unknown as QuoteRow[];
       const seen = new Set<string>();
       quotes = [];
-      for (const quote of [...open, ...todayRows]) {
+      for (const quote of [...open, ...converted, ...cancelled]) {
         if (seen.has(quote.id)) continue;
         seen.add(quote.id);
         quotes.push(quote);
@@ -180,11 +210,33 @@ export function QuotesList({
         .toArray()) as unknown as QuoteRow[];
     }
     const billCount = limited
-      ? await db.sales.where('business_date').equals(today).count()
+      ? await db.sales
+          .where('business_date')
+          .equals(today)
+          .filter(
+            (sale) => branchId === null || String(sale.branch_id) === branchId,
+          )
+          .count()
       : await db.sales
           .where('business_date')
           .between(range.from, range.to, true, true)
           .count();
+    quotes = quotes.filter((quote) =>
+      quoteVisible({
+        role,
+        support,
+        canViewReports: can('report.view'),
+        canQuote,
+        status: String(quote.status),
+        businessDate: String(quote.business_date),
+        branchId,
+        quoteBranchId: String(quote.branch_id ?? ''),
+        today,
+        timeZone,
+        convertedAt: Number(quote.converted_at ?? 0) || null,
+        cancelledAt: Number(quote.cancelled_at ?? 0) || null,
+      }),
+    );
     const ids = quotes.map((quote) => quote.id);
     const names = new Map<string, string[]>();
     if (ids.length > 0) {
@@ -198,6 +250,9 @@ export function QuotesList({
         names.set(quoteId, [
           ...(names.get(quoteId) ?? []),
           String(line.name_snapshot ?? ''),
+          ...(typeof line.bundle_name === 'string' && line.bundle_name !== ''
+            ? [line.bundle_name]
+            : []),
         ]);
       }
     }
@@ -211,7 +266,18 @@ export function QuotesList({
       ]),
     );
     return { quotes, names, staff, devices, billCount };
-  }, [range.from, range.to, today, limited]);
+  }, [
+    range.from,
+    range.to,
+    today,
+    limited,
+    role,
+    support,
+    branchId,
+    canQuote,
+    timeZone,
+    rangeError,
+  ]);
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -278,14 +344,17 @@ export function QuotesList({
       !event.ctrlKey &&
       !event.metaKey &&
       !event.altKey &&
+      !event.shiftKey &&
       event.key.toLowerCase() === 'n',
     () => void newQuote(),
+    { enabled: !readOnly && canQuote },
   );
   useHotkey(
     (event) =>
       event.key === 'F2' ||
       ((event.ctrlKey || event.metaKey) && event.key.toLowerCase() === 'f'),
     () => searchRef.current?.focus(),
+    { inFields: true },
   );
   const moveSelection = (delta: number) => {
     if (rows.length === 0) return;
@@ -299,7 +368,10 @@ export function QuotesList({
   useHotkey(plainKey('arrowdown'), () => moveSelection(1));
   useHotkey(plainKey('arrowup'), () => moveSelection(-1));
   useHotkey(
-    (event) => event.key === 'Enter' && selectedId !== null,
+    (event) =>
+      event.key === 'Enter' &&
+      selectedId !== null &&
+      !interactiveTarget(event.target),
     () => {
       if (selectedId)
         void navigate({
@@ -392,9 +464,15 @@ export function QuotesList({
         quotationCount={data.quotes.length}
       />
 
+      {rangeError ? (
+        <p role="alert" className="text-small text-danger">
+          {t('office.sales.range_invalid')}
+        </p>
+      ) : null}
+
       {limited ? (
         <p className="rounded-control bg-surface-2 px-3 py-2 text-small text-text-muted">
-          {t('office.sales.cashier_limited')}
+          {t('office.quotations.cashier_limited')}
         </p>
       ) : (
         <ScrollStrip className="items-center">
@@ -547,7 +625,7 @@ export function QuotesList({
               value={<MoneyText paisa={summary.openValue} />}
             />
             <Metric
-              label={t('office.quotations.converted_month')}
+              label={t('office.quotations.converted')}
               value={summary.converted}
               hint={
                 <p className="text-small text-text-muted">

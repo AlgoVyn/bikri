@@ -2,6 +2,7 @@ import {
   APP_VERSION,
   DEFAULT_TIME_ZONE,
   EXPORT_HIDDEN_COLUMNS,
+  EXPORT_JSON_SERVER_COLUMNS,
   isTimeZone,
   SYNC_EXPORT_ORDER,
 } from '@bikri/core';
@@ -167,6 +168,10 @@ async function buildOnce(
   // same export token is cheap enough and keeps the archive complete.
   for (const [index, table] of tables.entries()) {
     const hidden = new Set(EXPORT_HIDDEN_COLUMNS[table.tbl] ?? []);
+    const keepJson = new Set(EXPORT_JSON_SERVER_COLUMNS[table.tbl] ?? []);
+    const hiddenJson = new Set(
+      [...hidden].filter((field) => !keepJson.has(field)),
+    );
     const json = new JsonStream();
     const csv = new ExportStream();
     let columns: string[] | null = null;
@@ -186,7 +191,7 @@ async function buildOnce(
       for (const row of result.rows) {
         const copy = { ...row };
         delete copy.tenant_id;
-        for (const field of hidden) delete copy[field];
+        for (const field of hiddenJson) delete copy[field];
         clean.push(copy);
       }
       if (clean.length > 0) {

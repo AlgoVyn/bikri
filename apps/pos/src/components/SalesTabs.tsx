@@ -6,10 +6,12 @@ export function SalesTabs({
   active,
   billCount,
   quotationCount,
+  showQuotations = true,
 }: {
   active: 'bills' | 'quotations';
   billCount?: number;
   quotationCount?: number;
+  showQuotations?: boolean;
 }) {
   const { t } = useTranslation();
   const base =
@@ -33,20 +35,22 @@ export function SalesTabs({
         {t('office.quotations.tab_bills')}
         {billCount !== undefined ? ` (${billCount})` : ''}
       </Link>
-      <Link
-        to="/quotations"
-        search={{ quote: undefined }}
-        role="tab"
-        aria-selected={active === 'quotations'}
-        className={`${base} ${
-          active === 'quotations'
-            ? 'bg-surface text-text shadow-card'
-            : 'text-text-muted hover:text-text'
-        }`}
-      >
-        {t('office.quotations.tab_quotations')}
-        {quotationCount !== undefined ? ` (${quotationCount})` : ''}
-      </Link>
+      {showQuotations ? (
+        <Link
+          to="/quotations"
+          search={{ quote: undefined }}
+          role="tab"
+          aria-selected={active === 'quotations'}
+          className={`${base} ${
+            active === 'quotations'
+              ? 'bg-surface text-text shadow-card'
+              : 'text-text-muted hover:text-text'
+          }`}
+        >
+          {t('office.quotations.tab_quotations')}
+          {quotationCount !== undefined ? ` (${quotationCount})` : ''}
+        </Link>
+      ) : null}
     </div>
   );
 }

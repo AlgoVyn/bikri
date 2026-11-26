@@ -105,3 +105,15 @@ export const EXPORT_HIDDEN_COLUMNS: Readonly<
   devices: ['token_hash', 'enrolled_by', 'last_report_at'],
   products: ['on_hand_milli', 'cost_changed_at', 'bundle_since'],
 };
+
+/**
+ * Server-only columns that JSON backups/restores must keep even though CSV and till
+ * sync hide them. `bundle_since` is the only proof that a bundle was still a simple
+ * product when an old sale line was written (CORE-M2); losing it makes the restore
+ * trigger ambiguous and lets a synthetic bundle sale line pass.
+ */
+export const EXPORT_JSON_SERVER_COLUMNS: Readonly<
+  Record<string, readonly string[]>
+> = {
+  products: ['bundle_since'],
+};

@@ -9,7 +9,7 @@ import {
   DEXIE_SCHEMA_V9,
   DEXIE_SCHEMA_V10,
   DEXIE_SCHEMA_V12,
-  DEXIE_SCHEMA_V16,
+  DEXIE_SCHEMA_V17,
   deleteTenantDb,
   LOCAL_ONLY_TABLES,
   openTenantDb,
@@ -41,7 +41,7 @@ describe('Dexie schema (02 §3)', () => {
   });
 
   it('has every synced table plus devices, sync_conflicts and the local-only tables', () => {
-    const tables = Object.keys(DEXIE_SCHEMA_V16).sort();
+    const tables = Object.keys(DEXIE_SCHEMA_V17).sort();
     expect(tables).toEqual(
       [
         ...MASTER_TABLES,
@@ -148,7 +148,7 @@ describe('Dexie schema (02 §3)', () => {
     const db = open('upgrade-v12');
     await db.open();
     expect((await db.refund_lines.get('l1'))?.business_date).toBe('2026-10-27');
-    expect(db.verno).toBe(16);
+    expect(db.verno).toBe(17);
   });
 
   it('upgrades a V9 database: backfills refund line dates from their refunds', async () => {
@@ -234,6 +234,12 @@ describe('Dexie schema (02 §3)', () => {
       db.product_barcodes.schema.indexes.find((i) => i.name === 'barcode')
         ?.unique,
     ).toBe(false);
+    const quoteIndexes = db.quotations.schema.indexes.map((i) => i.name);
+    expect(quoteIndexes).toContain('[device_id+quote_seq]');
+    expect(quoteIndexes).not.toContain('customer_id');
+    expect(db.quotation_lines.schema.indexes.map((i) => i.name)).not.toContain(
+      'product_id',
+    );
     for (const t of db.tables) {
       expect(
         t.schema.indexes.some((i) => i.name.includes('tenant_id')),

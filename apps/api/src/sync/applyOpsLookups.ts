@@ -9,10 +9,45 @@ import {
   asPayment,
   key,
   type Lookups,
+  type QuoteLineInfo,
   type ShopRules,
   type StaffRow,
 } from './applyOpsShared.ts';
 import type { PushOp } from './opSchema.ts';
+
+function quoteLineFromRow(r: Record<string, unknown>): QuoteLineInfo {
+  return {
+    id: String(r.id),
+    quote_id: String(r.quote_id),
+    line_no: Number(r.line_no),
+    product_id: typeof r.product_id === 'string' ? r.product_id : null,
+    name_snapshot: String(r.name_snapshot),
+    sku_snapshot: String(r.sku_snapshot ?? ''),
+    qty_milli: Number(r.qty_milli),
+    unit_price: Number(r.unit_price),
+    gross: Number(r.gross),
+    discount_type: typeof r.discount_type === 'string' ? r.discount_type : null,
+    discount_value: Number(r.discount_value ?? 0),
+    discount: Number(r.discount ?? 0),
+    net: Number(r.net),
+    note: String(r.note ?? ''),
+    unit_cost_snapshot: Number(r.unit_cost_snapshot ?? 0),
+    bundle_id: typeof r.bundle_id === 'string' ? r.bundle_id : null,
+    bundle_group: typeof r.bundle_group === 'string' ? r.bundle_group : null,
+    bundle_name: typeof r.bundle_name === 'string' ? r.bundle_name : null,
+    bundle_qty: typeof r.bundle_qty === 'number' ? Number(r.bundle_qty) : null,
+    bundle_price:
+      typeof r.bundle_price === 'number' ? Number(r.bundle_price) : null,
+    bundle_component_qty_milli:
+      typeof r.bundle_component_qty_milli === 'number'
+        ? Number(r.bundle_component_qty_milli)
+        : null,
+    bundle_discount: Number(r.bundle_discount ?? 0),
+    deleted_at: typeof r.deleted_at === 'number' ? Number(r.deleted_at) : null,
+    rev: Number(r.rev),
+    updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
+  };
+}
 
 export async function loadLookups(
   ctx: ApplyContext,
@@ -49,6 +84,8 @@ export async function loadLookups(
   };
   const closeDevices = new Set<string>();
   const quoteIds = new Set<string>();
+  /** Lines whose stored row id is needed even when the op names another quote. */
+  const quoteLineIds = new Set<string>();
   let closeStart = Number.POSITIVE_INFINITY;
   let closeEnd = Number.NEGATIVE_INFINITY;
   for (const op of ops) {
@@ -183,6 +220,10 @@ export async function loadLookups(
     }
     if (op.tbl === 'quotation_lines' && typeof op.row?.quote_id === 'string')
       quoteIds.add(op.row.quote_id);
+    if (op.tbl === 'quotation_lines') {
+      const id = op.kind === 'delete' ? op.row_id : op.row?.id;
+      if (typeof id === 'string' && id !== '') quoteLineIds.add(id);
+    }
     if (isMasterTable(op.tbl)) {
       const id =
         op.kind === 'delete'
@@ -226,6 +267,59 @@ export async function loadLookups(
         partyIds.supplier.add(op.row.party_id);
     }
   }
+  const preloadedQuoteLines = new Map<string, QuoteLineInfo>();
+  let preRowsRead = 0;
+  if (quoteLineIds.size > 0) {
+    const ids = [...quoteLineIds];
+    for (let i = 0; i < ids.length; i += 90) {
+      const chunk = ids.slice(i, i + 90);
+      const rows = await db
+        .prepare(
+          `SELECT id, quote_id, line_no, product_id, name_snapshot, sku_snapshot,
+            qty_milli, unit_price, gross, discount_type, discount_value, discount,
+            net, note, unit_cost_snapshot, bundle_id, bundle_group, bundle_name,
+            bundle_qty, bundle_price, bundle_component_qty_milli, bundle_discount,
+            deleted_at, rev, updated_by
+           FROM quotation_lines WHERE tenant_id = ?1 AND id IN (${chunk
+             .map((_, j) => `?${j + 2}`)
+             .join(', ')})`,
+          ...chunk,
+        )
+        .all<Record<string, unknown>>();
+      preRowsRead += Number(rows.meta.rows_read ?? rows.results.length);
+      for (const row of rows.results) {
+        const line = quoteLineFromRow(row);
+        preloadedQuoteLines.set(line.id, line);
+        quoteIds.add(line.quote_id);
+      }
+    }
+  }
+  // A header-only edit still validates every stored line, so its product and bundle
+  // rows must be in `look.products`; the op payload carries no line columns (API-M2).
+  if (quoteIds.size > 0) {
+    const ids = [...quoteIds];
+    for (let i = 0; i < ids.length; i += 90) {
+      const chunk = ids.slice(i, i + 90);
+      const rows = await db
+        .prepare(
+          `SELECT product_id, bundle_id FROM quotation_lines WHERE tenant_id = ?1 AND quote_id IN (${chunk
+            .map((_, j) => `?${j + 2}`)
+            .join(', ')})`,
+          ...chunk,
+        )
+        .all<{ product_id: string | null; bundle_id: string | null }>();
+      preRowsRead += Number(rows.meta.rows_read ?? rows.results.length);
+      for (const row of rows.results) {
+        if (typeof row.product_id === 'string') {
+          products.add(row.product_id);
+          saleProductIds.add(row.product_id);
+        }
+        if (typeof row.bundle_id === 'string')
+          saleProductIds.add(row.bundle_id);
+      }
+    }
+  }
+
   const stmts: D1PreparedStatement[] = [
     db.prepare(
       'SELECT id, role, permissions_json, max_discount_bp, active, deleted_at, created_at, updated_at, rev FROM staff WHERE tenant_id = ?1',
@@ -595,16 +689,22 @@ export async function loadLookups(
     products: new Map(),
     quotes: new Map(),
     quoteLinesByQuote: new Map(),
+    quoteLineById: new Map(),
     lastClose: new Map(),
     pushedCloses: new Map(),
     closePayments: new Map(),
     closeCashMoves: new Map(),
     closeExpenses: new Map(),
-    rowsRead: res.reduce(
-      (sum, result) => sum + (result.meta.rows_read ?? 0),
-      0,
-    ),
+    rowsRead:
+      preRowsRead +
+      res.reduce((sum, result) => sum + (result.meta.rows_read ?? 0), 0),
   };
+  for (const line of preloadedQuoteLines.values()) {
+    look.quoteLineById.set(line.id, line);
+    const list = look.quoteLinesByQuote.get(line.quote_id) ?? [];
+    if (!list.some((candidate) => candidate.id === line.id)) list.push(line);
+    look.quoteLinesByQuote.set(line.quote_id, list);
+  }
   for (const s of (res[0]?.results ?? []) as StaffRow[])
     look.staff.set(s.id, s);
   for (const b of (res[1]?.results ?? []) as {
@@ -714,44 +814,14 @@ export async function loadLookups(
           updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
         });
       } else if ('quoteLines' in k) {
-        const quoteId = String(r.quote_id);
+        const line = quoteLineFromRow(r);
+        const quoteId = line.quote_id;
         const list = look.quoteLinesByQuote.get(quoteId) ?? [];
-        list.push({
-          id: String(r.id),
-          quote_id: quoteId,
-          line_no: Number(r.line_no),
-          product_id: typeof r.product_id === 'string' ? r.product_id : null,
-          name_snapshot: String(r.name_snapshot),
-          sku_snapshot: String(r.sku_snapshot ?? ''),
-          qty_milli: Number(r.qty_milli),
-          unit_price: Number(r.unit_price),
-          gross: Number(r.gross),
-          discount_type:
-            typeof r.discount_type === 'string' ? r.discount_type : null,
-          discount_value: Number(r.discount_value ?? 0),
-          discount: Number(r.discount ?? 0),
-          net: Number(r.net),
-          note: String(r.note ?? ''),
-          unit_cost_snapshot: Number(r.unit_cost_snapshot ?? 0),
-          bundle_id: typeof r.bundle_id === 'string' ? r.bundle_id : null,
-          bundle_group:
-            typeof r.bundle_group === 'string' ? r.bundle_group : null,
-          bundle_name: typeof r.bundle_name === 'string' ? r.bundle_name : null,
-          bundle_qty:
-            typeof r.bundle_qty === 'number' ? Number(r.bundle_qty) : null,
-          bundle_price:
-            typeof r.bundle_price === 'number' ? Number(r.bundle_price) : null,
-          bundle_component_qty_milli:
-            typeof r.bundle_component_qty_milli === 'number'
-              ? Number(r.bundle_component_qty_milli)
-              : null,
-          bundle_discount: Number(r.bundle_discount ?? 0),
-          deleted_at:
-            typeof r.deleted_at === 'number' ? Number(r.deleted_at) : null,
-          rev: Number(r.rev),
-          updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
-        });
+        const index = list.findIndex((candidate) => candidate.id === line.id);
+        if (index >= 0) list[index] = line;
+        else list.push(line);
         look.quoteLinesByQuote.set(quoteId, list);
+        look.quoteLineById.set(line.id, line);
       } else if ('sales' in k) {
         look.sales.set(String(r.id), {
           business_date: String(r.business_date),

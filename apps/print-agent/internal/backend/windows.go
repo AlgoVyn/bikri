@@ -146,7 +146,7 @@ type printerInfo4 struct {
 func (b *windowsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	b.printersMu.Lock()
 	if b.printers != nil && time.Since(b.printersAt) < windowsPrinterTTL {
-		list := append([]Printer(nil), b.printers...)
+		list := clonePrinters(b.printers)
 		b.printersMu.Unlock()
 		return b.decorate(list), nil
 	}
@@ -166,7 +166,7 @@ func (b *windowsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	b.refreshDone = make(chan struct{})
 	done := b.refreshDone
 	hasStale := b.printers != nil
-	stale := append([]Printer(nil), b.printers...)
+	stale := clonePrinters(b.printers)
 	b.printersMu.Unlock()
 
 	// The refresh is shared by every waiter; do not inherit the first caller's
@@ -198,7 +198,7 @@ func (b *windowsBackend) wait(ctx context.Context, done chan struct{}) ([]Printe
 		return nil, nil, ctx.Err()
 	}
 	b.printersMu.Lock()
-	list := append([]Printer(nil), b.printers...)
+	list := clonePrinters(b.printers)
 	refreshErr := b.refreshErr
 	b.printersMu.Unlock()
 	return list, refreshErr, nil
@@ -213,7 +213,7 @@ func (b *windowsBackend) refresh(ctx context.Context, done chan struct{}) (list 
 		}
 		b.printersMu.Lock()
 		if err == nil {
-			b.printers = append([]Printer{}, list...)
+			b.printers = clonePrinters(list)
 			b.printersAt = time.Now()
 		}
 		b.refreshErr = err

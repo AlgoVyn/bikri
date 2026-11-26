@@ -667,6 +667,134 @@ describe('sync isolation', () => {
         .first<{ note: string; total: number }>(),
     ).toEqual({ note: 'A only', total: 150000 });
 
+    // Cross-tenant references: a B quote cannot name A's customer, sale or product.
+    const aCustomer = '01JB00000000000000000001A0';
+    await env.DB.prepare(
+      'INSERT INTO customers (tenant_id, id, name, created_at, updated_at) VALUES (?1, ?2, ?3, ?4, ?4)',
+    )
+      .bind(a.tenantId, aCustomer, 'A only customer', Date.now())
+      .run();
+    const aProduct = '01JB00000000000000000001A1';
+    await env.DB.prepare(
+      `INSERT INTO products (tenant_id, id, name_en, sku, price, created_at, updated_at)
+       VALUES (?1, ?2, 'A only product', 'A-ONLY-1', 100, ?3, ?3)`,
+    )
+      .bind(a.tenantId, aProduct, Date.now())
+      .run();
+    const aSaleId = '01JB00000000000000000001A2';
+    await pushOk(a.till, saleOps(a, a.till, 9, { saleId: aSaleId }));
+
+    const badCustomer = quoteOps(b, b.till, 3, { customerId: aCustomer });
+    const customerRes = await pushOk(b.till, badCustomer.ops);
+    expect(
+      customerRes.results.find(
+        (row) => row.op_id === badCustomer.ops[0]?.op_id,
+      ),
+    ).toMatchObject({ result: 'rejected', error_code: 'FOREIGN_KEY' });
+    const missingCustomer = quoteOps(b, b.till, 4, { customerId: newId() });
+    const missingCustomerRes = await pushOk(b.till, missingCustomer.ops);
+    expect(
+      missingCustomerRes.results.find(
+        (row) => row.op_id === missingCustomer.ops[0]?.op_id,
+      ),
+    ).toMatchObject({ result: 'rejected', error_code: 'FOREIGN_KEY' });
+
+    const badProduct = quoteOps(b, b.till, 5, { productId: aProduct });
+    const productRes = await pushOk(b.till, badProduct.ops);
+    expect(
+      productRes.results.find((row) => row.op_id === badProduct.ops[1]?.op_id),
+    ).toMatchObject({ result: 'rejected', error_code: 'FOREIGN_KEY' });
+    expect(
+      await env.DB.prepare(
+        'SELECT COUNT(*) AS n FROM quotation_lines WHERE tenant_id = ?1 AND product_id = ?2',
+      )
+        .bind(b.tenantId, aProduct)
+        .first<{ n: number }>(),
+    ).toEqual({ n: 0 });
+
+    // A conversion can only point at a sale of the same tenant; unknown and A-only
+    // sale ids fail with the same error.
+    const bOpen = quoteOps(b, b.till, 6);
+    await pushOk(b.till, bOpen.ops);
+    const conversion = (saleId: string) =>
+      op(
+        'quotations',
+        'upsert',
+        {
+          ...bOpen.row,
+          status: 'converted',
+          converted_sale_id: saleId,
+          converted_at: Date.now(),
+        },
+        {
+          tx_id: newId(),
+          base_rev: 1,
+          changed_fields: ['status', 'converted_sale_id', 'converted_at'],
+        },
+      );
+    const crossSale = await pushOk(b.till, [conversion(aSaleId)]);
+    const missingSale = await pushOk(b.till, [conversion(newId())]);
+    expect(crossSale.results[0]).toMatchObject({
+      result: 'rejected',
+      error_code: 'CONSTRAINT_FAILED',
+    });
+    expect(missingSale.results[0]).toMatchObject({
+      result: 'rejected',
+      error_code: 'CONSTRAINT_FAILED',
+    });
+
+    // Cancelling a quote id B does not have fails exactly like an unknown id; then
+    // editing an A-only quote id creates/edits only B's own row.
+    const cancel = (id: string) =>
+      op(
+        'quotations',
+        'upsert',
+        {
+          ...aOnly.row,
+          id,
+          status: 'cancelled',
+          cancelled_reason: 'No',
+          cancelled_at: Date.now(),
+        },
+        {
+          tx_id: newId(),
+          base_rev: 0,
+          changed_fields: ['status', 'cancelled_reason', 'cancelled_at'],
+        },
+      );
+    const cancelAToo = await pushOk(b.till, [cancel(aOnly.quoteId)]);
+    const cancelUnknown = await pushOk(b.till, [cancel(newId())]);
+    expect(cancelAToo.results[0]).toMatchObject({
+      result: 'rejected',
+      error_code: 'CONSTRAINT_FAILED',
+    });
+    expect(cancelUnknown.results[0]).toMatchObject({
+      result: 'rejected',
+      error_code: 'CONSTRAINT_FAILED',
+    });
+    expect(
+      await env.DB.prepare(
+        'SELECT status FROM quotations WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(a.tenantId, aOnly.quoteId)
+        .first<{ status: string }>(),
+    ).toEqual({ status: 'open' });
+
+    const shadow = quoteOps(b, b.till, 7, {
+      id: aOnly.quoteId,
+      note: 'B shadow',
+    });
+    expect((await pushOk(b.till, shadow.ops)).results[0]?.result).toBe(
+      'applied',
+    );
+    expect(
+      await env.DB.prepare(
+        'SELECT note FROM quotations WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(a.tenantId, aOnly.quoteId)
+        .first<{ note: string }>(),
+    ).toEqual({ note: 'A only' });
+
     // read-only: pull and snapshot keep returning the quote; a new write is refused.
     const r = await seedShop('Quote read only');
     await pushOk(r.till, quoteOps(r, r.till, 1).ops);

@@ -6,7 +6,6 @@
 
 import {
   type Block,
-  columnWidths,
   type ItemLayout,
   layOut,
   lineNeedsRtl,
@@ -15,6 +14,7 @@ import {
 } from '@bikri/printer';
 import qrcode from 'qrcode-generator';
 import { prepareRasterFonts } from './canvasRaster.ts';
+import { cellBoxes } from './cellLayout.ts';
 
 export type ImageOptions = {
   dots: number;
@@ -191,12 +191,12 @@ export async function renderReceiptCanvas(
       const rtl = lineNeedsRtl(row.text);
       const px =
         font * (row.size === 'small' ? 0.75 : row.size === 'double' ? 2 : 1);
-      const maxWidth = Math.max(1, options.dots);
       const drawCell = (
         value: string,
         cellX: number,
         cellAlign: CanvasTextAlign,
         cellRtl: boolean,
+        maxWidth: number,
       ): void => {
         ctx.save();
         ctx.font = `${row.bold ? 700 : 400} ${px}px ${cellRtl ? URDU : MONO}`;
@@ -210,74 +210,21 @@ export async function renderReceiptCanvas(
         ctx.restore();
       };
       if (row.cells !== undefined && row.cells.length > 0) {
-        if (row.cells.length > 2) {
-          const widths = columnWidths(options.charsPerLine);
-          const amountPx =
-            (options.dots * widths.amount) / options.charsPerLine;
-          if (rtl) {
-            drawCell(row.cells[2]?.text ?? '', leftPad, 'left', false);
-            drawCell(
-              row.cells[1]?.text ?? '',
-              leftPad + amountPx,
-              'left',
-              lineNeedsRtl(row.cells[1]?.text ?? ''),
-            );
-            drawCell(
-              row.cells[0]?.text ?? '',
-              leftPad + options.dots,
-              'right',
-              lineNeedsRtl(row.cells[0]?.text ?? ''),
-            );
-          } else {
-            drawCell(
-              row.cells[0]?.text ?? '',
-              leftPad,
-              'left',
-              lineNeedsRtl(row.cells[0]?.text ?? ''),
-            );
-            drawCell(
-              row.cells[1]?.text ?? '',
-              leftPad + options.dots - amountPx,
-              'right',
-              lineNeedsRtl(row.cells[1]?.text ?? ''),
-            );
-            drawCell(
-              row.cells[2]?.text ?? '',
-              leftPad + options.dots,
-              'right',
-              false,
-            );
-          }
-        } else {
-          const left = row.cells[0];
-          const right = row.cells[1];
-          if (rtl) {
-            drawCell(
-              left?.text ?? '',
-              leftPad + options.dots,
-              'right',
-              lineNeedsRtl(left?.text ?? ''),
-            );
-            drawCell(
-              right?.text ?? '',
-              leftPad,
-              'left',
-              lineNeedsRtl(right?.text ?? ''),
-            );
-          } else {
-            drawCell(
-              left?.text ?? '',
-              leftPad,
-              'left',
-              lineNeedsRtl(left?.text ?? ''),
-            );
-            drawCell(
-              right?.text ?? '',
-              leftPad + options.dots,
-              'right',
-              lineNeedsRtl(right?.text ?? ''),
-            );
-          }
+        // Same LTR name/qty/amount grid as html.ts and ReceiptPreview; only the
+        // text inside each cell follows its own direction. Weight the cells to
+        // their column widths instead of the full paper width.
+        for (const cell of cellBoxes(
+          row.cells,
+          options.dots,
+          options.charsPerLine,
+        )) {
+          drawCell(
+            cell.text,
+            leftPad + cell.x,
+            cell.align,
+            cell.rtl,
+            cell.maxWidth,
+          );
         }
       } else {
         ctx.save();
@@ -300,8 +247,8 @@ export async function renderReceiptCanvas(
         if (row.size === 'double-height') {
           ctx.translate(0, y);
           ctx.scale(1, 2);
-          ctx.fillText(row.text, x, 0, maxWidth);
-        } else ctx.fillText(row.text, x, y, maxWidth);
+          ctx.fillText(row.text, x, 0, Math.max(1, options.dots));
+        } else ctx.fillText(row.text, x, y, Math.max(1, options.dots));
         ctx.restore();
       }
     }

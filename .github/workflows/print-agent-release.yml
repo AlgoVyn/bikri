@@ -25,6 +25,12 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: apps/print-agent/go.mod
+      - name: Validate release tag
+        shell: pwsh
+        run: |
+          if ($env:GITHUB_REF_NAME -notmatch '^print-agent-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$') {
+            throw "GITHUB_REF_NAME '$env:GITHUB_REF_NAME' is not a print-agent-v<semver> tag"
+          }
       - name: Test
         run: go test ./...
       - name: Build Windows executable
@@ -43,7 +49,7 @@ jobs:
             "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           ) | Where-Object { Test-Path $_ } | Select-Object -First 1
           if (-not $iscc) {
-            choco install innosetup -y --no-progress
+            choco install innosetup --version=6.7.1 -y --no-progress
             $iscc = "${env:ProgramFiles(x86)}\Inno Setup 6\ISCC.exe"
           }
           & $iscc "/DMyAppVersion=$version" "install\windows\bikri-print-agent.iss"
@@ -67,6 +73,12 @@ jobs:
       - uses: actions/setup-go@40f1582b2485089dde7abd97c1529aa768e1baff # v5.6.0
         with:
           go-version-file: apps/print-agent/go.mod
+      - name: Validate release tag
+        run: |
+          if [[ ! "${GITHUB_REF_NAME}" =~ ^print-agent-v(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)\.(0|[1-9][0-9]*)(-[0-9A-Za-z.-]+)?(\+[0-9A-Za-z.-]+)?$ ]]; then
+            echo "::error::GITHUB_REF_NAME '${GITHUB_REF_NAME}' is not a print-agent-v<semver> tag"
+            exit 1
+          fi
       - name: Test
         run: go test -race ./...
       - name: Build packages

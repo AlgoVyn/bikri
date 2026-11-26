@@ -28,7 +28,11 @@ export type RenderLineOptions = {
   size: TextSize;
   /** True when the line contains Arabic-script characters. */
   rtl: boolean;
-  /** Explicit columns for pair/item rows; HTML already draws these. */
+  /**
+   * Explicit columns for pair/item/header rows, always in receipt order
+   * (start → end) regardless of the line direction. Renderers apply bidi per
+   * cell; HTML already draws these.
+   */
   cells?: readonly { text: string; align?: 'start' | 'end' }[];
 };
 
@@ -58,6 +62,11 @@ export type Block =
       size?: TextSize;
       /** Pre-aligned text (column headers); do not apply the non-ASCII 60% wrap. */
       nowrap?: boolean;
+      /**
+       * Structured columns for HTML/raster renderers (column headers, items and
+       * pairs). `text` stays the space-padded ESC/POS source of truth.
+       */
+      cells?: { text: string; align?: 'start' | 'end' }[];
     }
   | {
       t: 'pair';

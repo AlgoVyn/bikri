@@ -234,7 +234,15 @@ export const DEXIE_SCHEMA_V16 = {
     'id, sale_id, refund_id, quotation_id, day_close_id, supplier_return_id, [status+created_at], created_at',
 } as const;
 
-export type DexieTableName = keyof typeof DEXIE_SCHEMA_V16;
+/** V17 adds the quote-sequence compound index and drops two unqueried quote indexes (CORE-L1). */
+export const DEXIE_SCHEMA_V17 = {
+  ...DEXIE_SCHEMA_V16,
+  quotations:
+    'id, &quote_no, business_date, [device_id+quote_seq], [status+valid_until], converted_sale_id, [status+converted_at], [status+cancelled_at]',
+  quotation_lines: 'id, quote_id',
+} as const;
+
+export type DexieTableName = keyof typeof DEXIE_SCHEMA_V17;
 
 export const LOCAL_ONLY_TABLES = [
   'outbox',
@@ -624,6 +632,8 @@ export class BikriDb extends Dexie {
     this.version(15).stores(DEXIE_SCHEMA_V15);
     // V16 adds quotations and the quotation print-job id (D-305).
     this.version(16).stores(DEXIE_SCHEMA_V16);
+    // V17 adds `[device_id+quote_seq]` and drops two unqueried quote indexes (CORE-L1).
+    this.version(17).stores(DEXIE_SCHEMA_V17);
   }
 }
 

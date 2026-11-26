@@ -1,7 +1,7 @@
 /** Device enrolment and "Leave this shop" (screens/02, 05 §2, D-073). */
 import { APP_VERSION } from '@bikri/core';
 import { type BikriDb, clearTenantDb, openTenantDb } from '@bikri/db';
-import { clearSoldCache } from '../state/catalogue.ts';
+import { clearSoldCache, clearWarmCatalogue } from '../state/catalogue.ts';
 import { request } from '../sync/client.ts';
 import { applyStatus, type StatusPayload } from '../sync/status.ts';
 import { closeDb, getDb } from './db.ts';
@@ -109,6 +109,7 @@ export async function enrolDevice(
   closeDb();
   clearSearchCache();
   clearSoldCache();
+  clearWarmCatalogue();
   // A fresh device starts from a fresh database (a revoked device's old data was exported first).
   // Clear instead of delete: indexedDB.deleteDatabase waits forever while another tab holds
   // the database, and a shared tablet must not strand a consumed one-time code.
@@ -291,6 +292,7 @@ export async function leaveShop(db: BikriDb): Promise<void> {
   closeDb();
   clearSearchCache();
   clearSoldCache();
+  clearWarmCatalogue();
   // Broadcast first so other tabs reload away from this shop and close their DB,
   // then clear instead of waiting forever on deleteDatabase.
   if (activeTenantId() === id) setActiveTenantId(null);

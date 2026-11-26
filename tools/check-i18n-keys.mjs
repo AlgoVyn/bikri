@@ -1,6 +1,12 @@
 #!/usr/bin/env node
-/** Check that literal `t('…')` keys used by the till exist in the English catalogs. */
-import { readdirSync, readFileSync, statSync } from 'node:fs';
+/**
+ * Check that literal `t('…')` keys used by the till exist in the English catalogs.
+ * `--unused` also reports catalog keys no source file references; `--unused=strict`
+ * fails on them (after `tools/i18n-unused-allowlist.json`). Dynamic `t(`prefix.${…}`)`
+ * calls mark every key under that prefix used, and exact key strings in other props
+ * (e.g. `i18nKey="…"`) count as usage.
+ */
+import { existsSync, readdirSync, readFileSync, statSync } from 'node:fs';
 import { dirname, join, relative, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
@@ -13,6 +19,20 @@ const CATALOGS = [
   'packages/i18n/public/en.json',
 ];
 const PLURAL = ['_zero', '_one', '_two', '_few', '_many', '_other'];
+
+const args = process.argv.slice(2);
+const unusedArg = args.find(
+  (arg) => arg === '--unused' || arg.startsWith('--unused='),
+);
+const auditUnused = unusedArg !== undefined;
+const strictUnused =
+  unusedArg === '--unused=strict' || args.includes('--strict-unused');
+const allowPath = join(ROOT, 'tools/i18n-unused-allowlist.json');
+const allow = existsSync(allowPath)
+  ? JSON.parse(readFileSync(allowPath, 'utf8'))
+  : {};
+const allowKeys = new Set(Array.isArray(allow.keys) ? allow.keys : []);
+const allowPrefixes = Array.isArray(allow.prefixes) ? allow.prefixes : [];
 
 function flatten(value, prefix = '', out = new Set()) {
   if (value === null || typeof value !== 'object' || Array.isArray(value)) {
@@ -89,10 +109,17 @@ function walk(dir) {
 walk(SOURCE);
 
 const missing = [];
+const used = new Set();
 const literal = /\bt\(\s*(['"`])((?:\\.|(?!\1).)+)\1/gu;
+/** Any quoted string that exactly names a catalog key (i18nKey props, constants). */
+const quoted = /(['"`])([A-Za-z0-9_.-]+)\1/gu;
 for (const file of files) {
   const source = readFileSync(file, 'utf8');
   const keys = allowedKeys(file);
+  const mark = (key) => {
+    used.add(key);
+    for (const suffix of PLURAL) used.add(`${key}${suffix}`);
+  };
   for (const match of source.matchAll(literal)) {
     const key = match[2];
     if (key.includes('${')) {
@@ -107,16 +134,40 @@ for (const file of files) {
         missing.push(
           `${relative(ROOT, file)}: ${key} (no key starts with ${prefix})`,
         );
+      for (const candidate of keys)
+        if (candidate.startsWith(prefix)) used.add(candidate);
       continue;
     }
-    if (keys.has(key) || PLURAL.some((suffix) => keys.has(`${key}${suffix}`)))
+    if (keys.has(key) || PLURAL.some((suffix) => keys.has(`${key}${suffix}`))) {
+      mark(key);
       continue;
+    }
     missing.push(`${relative(ROOT, file)}: ${key}`);
+  }
+  for (const match of source.matchAll(quoted)) {
+    const value = match[2];
+    if (keys.has(value)) mark(value);
   }
 }
 if (missing.length > 0) {
   console.error(`i18n key usage: ${missing.length} missing key(s)`);
   for (const line of missing) console.error(`  ${line}`);
   process.exit(1);
+}
+if (auditUnused) {
+  const catalog = new Set([...base, ...office, ...admin, ...publicKeys]);
+  const unused = [...catalog]
+    .filter((key) => !used.has(key))
+    .filter((key) => !allowKeys.has(key))
+    .filter((key) => !allowPrefixes.some((prefix) => key.startsWith(prefix)))
+    .sort();
+  console.log(`i18n unused keys: ${unused.length} (report mode)`);
+  for (const key of unused) console.log(`  ${key}`);
+  if (strictUnused && unused.length > 0) {
+    console.error(
+      `i18n unused keys: FAIL (${unused.length}); add a real usage, remove the key, or allow-list it in tools/i18n-unused-allowlist.json`,
+    );
+    process.exit(1);
+  }
 }
 console.log('i18n key usage: pass');

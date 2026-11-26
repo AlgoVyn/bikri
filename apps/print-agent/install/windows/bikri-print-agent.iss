@@ -62,7 +62,9 @@ Filename: "{app}\{#AppExe}"; Description: "Start Bikri Print Agent now"; Flags: 
 [UninstallRun]
 ; Only this user's agent: another user on a shared PC may run their own copy on
 ; a different port, and taskkill without the filter fails or needs admin rights.
-Filename: "{cmd}"; Parameters: "/C taskkill /IM {#AppExe} /F /FI ""USERNAME eq %USERNAME%"""; Flags: runhidden waituntilterminated; RunOnceId: "StopAgent"
+; taskkill /F returns before the exe releases its files; wait for this session's
+; process so the uninstaller can delete the directory cleanly.
+Filename: "{sys}\WindowsPowerShell\v1.0\powershell.exe"; Parameters: "-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ""$n='{#AppExe}'; & (Join-Path $env:SystemRoot 'System32\taskkill.exe') /IM $n /F /FI ('USERNAME eq ' + $env:USERNAME) | Out-Null; $sid=(Get-Process -Id $PID).SessionId; Get-Process -Name 'bikri-print-agent' -ErrorAction SilentlyContinue | Where-Object SessionId -eq $sid | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue"""; Flags: runhidden waituntilterminated; RunOnceId: "StopAgent"
 
 [UninstallDelete]
 Type: filesandordirs; Name: "{localappdata}\Bikri\PrintAgent\logs"
@@ -73,12 +75,17 @@ function StopAgent(): Boolean;
 var
   ResultCode: Integer;
 begin
-  // Run through cmd so %USERNAME% expands: taskkill does not resolve it inside a
-  // filter, and stopping every user's agent on a shared PC is both wrong and
-  // denied to a per-user install.
-  Exec(ExpandConstant('{cmd}'),
-    '/C taskkill /IM {#AppExe} /F /FI "USERNAME eq %USERNAME%"', '', SW_HIDE,
-    ewWaitUntilTerminated, ResultCode);
+  // Run through PowerShell so %USERNAME%/$env:USERNAME and the current session
+  // are resolved without a cmd layer. taskkill /F only signals; wait briefly for
+  // this session's agent to exit so an upgrade can replace the locked .exe and
+  // an uninstall can remove the directory. Other users/sessions are untouched.
+  Exec(ExpandConstant('{sys}\WindowsPowerShell\v1.0\powershell.exe'),
+    '-NoProfile -NonInteractive -ExecutionPolicy Bypass -Command ' +
+    '"$n=''{#AppExe}''; & (Join-Path $env:SystemRoot ''System32\taskkill.exe'') /IM $n /F /FI (''USERNAME eq '' + $env:USERNAME) | Out-Null; ' +
+    '$sid=(Get-Process -Id $PID).SessionId; ' +
+    'Get-Process -Name ''bikri-print-agent'' -ErrorAction SilentlyContinue | ' +
+    'Where-Object SessionId -eq $sid | Wait-Process -Timeout 10 -ErrorAction SilentlyContinue"',
+    '', SW_HIDE, ewWaitUntilTerminated, ResultCode);
   Result := True;
 end;
 

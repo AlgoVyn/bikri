@@ -284,6 +284,10 @@ export function quoteOps(
     note?: string;
     staffId?: string;
     status?: 'open' | 'converted' | 'cancelled';
+    /** Override the fixture customer (a unique id exercises cross-tenant FKs). */
+    customerId?: string | null;
+    /** Override the fixture product on the line. */
+    productId?: string | null;
   } = {},
 ) {
   const now = opts.now ?? Date.now();
@@ -297,7 +301,7 @@ export function quoteOps(
     branch_id: shop.branchId,
     device_id: dev.id,
     staff_id: opts.staffId ?? IDS.owner,
-    customer_id: IDS.customer,
+    customer_id: opts.customerId === undefined ? IDS.customer : opts.customerId,
     customer_name: 'Test customer',
     customer_phone: '+923001234567',
     business_date: businessDate(now),
@@ -330,7 +334,7 @@ export function quoteOps(
     id: opts.lineId ?? newId(now),
     quote_id: quoteId,
     line_no: 1,
-    product_id: IDS.product,
+    product_id: opts.productId === undefined ? IDS.product : opts.productId,
     name_snapshot: 'Phone',
     sku_snapshot: 'PHN-0001',
     qty_milli: 1000,

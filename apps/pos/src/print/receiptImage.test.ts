@@ -1,6 +1,17 @@
-import { buildSaleReceipt, saleBasicInput } from '@bikri/printer';
+import {
+  type Block,
+  buildSaleReceipt,
+  saleBasicInput,
+  urduReceiptLabels,
+} from '@bikri/printer';
 import { describe, expect, it } from 'vitest';
-import { jpegToPdf, receiptRows, toImageData } from './receiptImage.ts';
+import { fakeCanvasDocument } from './fakeCanvas.ts';
+import {
+  jpegToPdf,
+  receiptRows,
+  renderReceiptCanvas,
+  toImageData,
+} from './receiptImage.ts';
 
 describe('receipt picture (screens/07 AC 2)', () => {
   it('uses the thermal line layout: title, REPRINT, Powered by line', () => {
@@ -53,6 +64,68 @@ describe('receipt picture (screens/07 AC 2)', () => {
       data: new Uint8Array([0, 0, 0, 0, 255, 0, 0, 128]),
     });
     expect([...out.data]).toEqual([255, 255, 255, 255, 255, 127, 127, 255]);
+  });
+
+  it('draws a mixed Urdu/English item in the same LTR columns as the preview', async () => {
+    const { doc, calls } = fakeCanvasDocument();
+    const blocks: Block[] = [
+      { t: 'item', name: 'کیبل 1m', qty: '2', amount: 'Rs 900' },
+    ];
+    await renderReceiptCanvas(
+      blocks,
+      {
+        dots: 576,
+        charsPerLine: 48,
+        itemLayout: 'columns',
+        logo: null,
+        padding: 0,
+      },
+      doc,
+    );
+    expect(
+      calls.map((call) => [
+        call.text,
+        call.x,
+        call.align,
+        call.direction,
+        call.maxWidth,
+      ]),
+    ).toEqual([
+      ['کیبل 1m', 0, 'left', 'rtl', 336],
+      ['2', 396, 'right', 'ltr', 60],
+      ['Rs 900', 576, 'right', 'ltr', 180],
+    ]);
+  });
+
+  it('draws the Urdu 80 mm header in name/qty/amount columns', async () => {
+    const input = saleBasicInput();
+    input.labels = urduReceiptLabels;
+    const { doc, calls } = fakeCanvasDocument();
+    await renderReceiptCanvas(
+      buildSaleReceipt(input),
+      {
+        dots: 576,
+        charsPerLine: 48,
+        itemLayout: 'columns',
+        logo: null,
+        padding: 0,
+      },
+      doc,
+    );
+    const header = calls
+      .filter((call) => ['چیز', 'تعداد', 'رقم'].includes(call.text))
+      .map((call) => [
+        call.text,
+        call.x,
+        call.align,
+        call.direction,
+        call.maxWidth,
+      ]);
+    expect(header).toEqual([
+      ['چیز', 0, 'left', 'rtl', 336],
+      ['تعداد', 396, 'right', 'rtl', 60],
+      ['رقم', 576, 'right', 'rtl', 180],
+    ]);
   });
 
   it('draws a QR as a scannable row, not as its payload text', () => {

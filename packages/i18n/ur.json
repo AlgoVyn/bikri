@@ -922,7 +922,7 @@
     "quote_quoted": "کوٹ شدہ",
     "quote_now_price": "اب {{amount}}",
     "quote_cancel_title": "کوٹیشن موڈ چھوڑیں؟",
-    "quote_cancel_body": "اس کارٹ کی اشیاء ہٹ جائیں گی۔ کوٹیشن محفوظ نہیں ہوگی۔",
+    "quote_cancel_body": "اس کارٹ کی اشیاء ہٹ جائیں گی۔ کوٹیشن محفوظ نہیں ہوگا۔",
     "quote_cancel_confirm": "کوٹیشن موڈ چھوڑیں"
   },
   "setup": {
@@ -1343,7 +1343,7 @@
     "origin_product": "{{name}}",
     "origin_customer": "{{name}}",
     "origin_delivery": "ڈیلیوری {{invoice}}",
-    "quotation_reference": "کوٹیشن حوالہ",
+    "quotation_reference": "کوٹیشن ریفرنس",
     "open_quotation": "مکمل کوٹیشن کھولیں",
     "origin_quotation": "کوٹیشن {{quote}}"
   }

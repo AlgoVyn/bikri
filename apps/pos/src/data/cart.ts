@@ -92,6 +92,7 @@ export function isEmptyCart(cart: Cart): boolean {
     !cart.bill_discount &&
     !cart.backdate &&
     !cart.reissue &&
+    !cart.quote &&
     cart.note.trim() === '' &&
     (cart.overrides?.length ?? 0) === 0
   );

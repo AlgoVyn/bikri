@@ -267,8 +267,13 @@ const TENANT_TABLES = [
   'suppliers',
   'expense_categories',
   'promises',
-  'sales',
+  // Quotation lines before their headers, and headers before the sales they may
+  // reference; sale lines before sales. wipeTenant deletes with foreign_keys OFF,
+  // but the order also keeps a future FK-on teardown child-first.
+  'quotation_lines',
+  'quotations',
   'sale_lines',
+  'sales',
   'refunds',
   'refund_lines',
   'sale_voids',

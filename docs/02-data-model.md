@@ -2455,6 +2455,8 @@ Pull pages read `change_log` by `(tenant_id, seq)`, the prune uses the daily wat
 
 `products.bundle_since` records when a product became a bundle so the import guard can tell a historical simple-product sale from a synthetic bundle line; `devices.last_report_at` throttles the pending/app-version report separately from the download watermark. `0033` left `bundle_items_lookup` redundant next to the new non-partial `bundle_items_by_component`, so `0035` drops it.
 
+`bundle_since` is **not** on the client wire and not in CSV: pull, snapshot and CSV hide it, and a pushed row that carries it is filtered. JSON backups and the operator/till JSON export **do** keep it (`EXPORT_JSON_SERVER_COLUMNS`), because it is the only proof that a bundle was still a simple product when an older sale line was written. A restore therefore keeps the original conversion time; the insert trigger below is only the fallback when a backup predates the column.
+
 ```sql
 -- 0035_bundle_history.sql
 --
@@ -2546,6 +2548,8 @@ UPDATE meta SET value = '9' WHERE key = 'schema_version';
 Quotations are a **master** document, not a ledger: an open quote can be edited, and a saved quote is kept forever (cancelled/expired are statuses, not deletes). The two tables are synced through the normal push/pull/snapshot path. They never write stock, payments, ledger entries or day closes.
 
 The quote number is independent of the invoice sequence: `QTN-<device_code>-<seq>`, with `quote_seq` from the device's `kv` and `devices.last_quote_seq` for enrolment/restore safety. A quote is not a tax invoice.
+
+> **Current indexes:** the six `CREATE INDEX` statements inside the historical `0036` block are dropped by `0037` (§2.36, D-231). The block is kept verbatim because `tools/check-docs.mjs` compares every migration file with its block; use §2.36 for the live quotation indexes.
 
 ```sql
 ALTER TABLE devices ADD COLUMN last_quote_seq INTEGER NOT NULL DEFAULT 0;
@@ -2654,6 +2658,197 @@ UPDATE meta SET value = '10' WHERE key = 'schema_version';
 - The header totals are a snapshot computed by `computeCart()` from the cart; the Worker re-validates them against the non-deleted lines. `expired` is derived from `status = 'open'` and `valid_until < today` in `shop.timezone`; there is no cron and no stored expired status.
 - The quote tables are ordered **after `sales`** in `SYNC_IMPORT_ORDER` because `converted_sale_id` is a composite FK to `sales`; all other parent tables (products, customers, branches, staff) come before them.
 - Old clients below client schema 10 are gated out of `quotations`/`quotation_lines` in pull and snapshot, like the bundle gate ([03 §4.2](03-sync.md#42-pull--get-apisyncpullsinceseqlimit500)).
+- No server query filters quotations by date, validity, customer or converted sale, or quotation lines by product: pull/prune use the tenant cursor, quote checks read by primary key or the loaded document, and the line-by-quote read is covered by `UNIQUE (tenant_id, quote_id, line_no)`. The six indexes `0036` added were therefore pure write cost and are dropped by `0037` (D-231).
+- Quote creates/edits follow the sale permission rules: `sale.create` for the document, `sale.discount` plus `max_discount_bp` for a bill or line discount, and `catalog.edit` for a below-list price, with the manager `override` audit row written by the till and re-checked by the Worker.
+
+### 2.36 Quotation indexes trimmed (migration `0037_quote_indexes.sql`)
+
+`0036` added six indexes for reads the till does in Dexie, not queries the Worker runs: `quotation_lines_quote` is strictly redundant with the `(tenant_id, quote_id, line_no)` unique index, and `quotation_lines_product`, `quotations_date`, `quotations_validity`, `quotations_customer` and `quotations_sale` had no server caller (`EXPLAIN QUERY PLAN` falls back to the automatic unique/primary-key index). D1 counts every index entry as a row written, so a fresh open 10-line quote with a customer paid 23 unnecessary entries and D-231 was violated. Dropping them is index-only: `SCHEMA_VERSION` stays 10, the wire shape is unchanged and Dexie keeps its local indexes.
+
+```sql
+-- 0037_quote_indexes.sql
+--
+-- CORE-M1 from the 2026-11-27 whole-codebase review: drop six quotation indexes
+-- that no server query uses. `quotation_lines_quote` is strictly redundant with
+-- UNIQUE (tenant_id, quote_id, line_no); the other five are Dexie-only lookups.
+-- Index-only; the wire schema and `SCHEMA_VERSION` stay at 10 (D-231).
+
+DROP INDEX IF EXISTS quotation_lines_quote;
+DROP INDEX IF EXISTS quotation_lines_product;
+DROP INDEX IF EXISTS quotations_date;
+DROP INDEX IF EXISTS quotations_validity;
+DROP INDEX IF EXISTS quotations_customer;
+DROP INDEX IF EXISTS quotations_sale;
+```
+
+### 2.37 Quotation import guards (migration `0038_quote_guards.sql`)
+
+The sync push validates a quotation through `checks/quotes.ts` (header totals, terminal status, bundle group, permissions), but the operator `/import` path writes exported rows straight into D1. These triggers are the database backstop for that path: `round_total_to` is limited to the four supported steps, a quote line cannot mix partial bundle metadata, a `bundle_discount` needs a bundle group and cannot exceed the group price, a bundle cannot be its own component, a bundle product cannot be a standalone quote line, and `bundle_id` must name a bundle product in the same tenant. They mirror `computeCart()`/`assertBundleShape`; the push path already rejects the same rows, so they add no new client rule. Trigger-only: `SCHEMA_VERSION` stays 10 and there is no Dexie change.
+
+```sql
+-- 0038_quote_guards.sql
+--
+-- CORE-M3 from the 2026-11-27 whole-codebase review: DB-level import backstops
+-- for quotations/quotation_lines. The push path already validates these in
+-- checks/quotes.ts; the operator `/import` path writes rows directly, so the
+-- constraints below keep a malformed backup from creating a quote that every
+-- later till edit must reject.
+
+CREATE TRIGGER quotations_round_total_to_insert
+BEFORE INSERT ON quotations
+WHEN NEW.round_total_to NOT IN (1, 100, 500, 1000)
+BEGIN
+  SELECT RAISE(ABORT, 'round_total_to must be 1, 100, 500 or 1000');
+END;
+
+CREATE TRIGGER quotations_round_total_to_update
+BEFORE UPDATE OF round_total_to ON quotations
+WHEN NEW.round_total_to NOT IN (1, 100, 500, 1000)
+BEGIN
+  SELECT RAISE(ABORT, 'round_total_to must be 1, 100, 500 or 1000');
+END;
+
+-- A quote line is either a simple/component line or a complete bundle snapshot.
+-- `bundle_discount` is NOT NULL DEFAULT 0, so it is validated separately.
+CREATE TRIGGER quotation_lines_bundle_metadata_complete_insert
+BEFORE INSERT ON quotation_lines
+WHEN (
+    NEW.bundle_id IS NOT NULL
+    OR NEW.bundle_group IS NOT NULL
+    OR NEW.bundle_name IS NOT NULL
+    OR NEW.bundle_qty IS NOT NULL
+    OR NEW.bundle_price IS NOT NULL
+    OR NEW.bundle_component_qty_milli IS NOT NULL
+  )
+  AND (
+    NEW.bundle_id IS NULL
+    OR NEW.bundle_group IS NULL
+    OR NEW.bundle_name IS NULL
+    OR NEW.bundle_qty IS NULL
+    OR NEW.bundle_price IS NULL
+    OR NEW.bundle_component_qty_milli IS NULL
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'incomplete quotation bundle metadata');
+END;
+
+CREATE TRIGGER quotation_lines_bundle_metadata_complete_update
+BEFORE UPDATE ON quotation_lines
+WHEN (
+    NEW.bundle_id IS NOT NULL
+    OR NEW.bundle_group IS NOT NULL
+    OR NEW.bundle_name IS NOT NULL
+    OR NEW.bundle_qty IS NOT NULL
+    OR NEW.bundle_price IS NOT NULL
+    OR NEW.bundle_component_qty_milli IS NOT NULL
+  )
+  AND (
+    NEW.bundle_id IS NULL
+    OR NEW.bundle_group IS NULL
+    OR NEW.bundle_name IS NULL
+    OR NEW.bundle_qty IS NULL
+    OR NEW.bundle_price IS NULL
+    OR NEW.bundle_component_qty_milli IS NULL
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'incomplete quotation bundle metadata');
+END;
+
+CREATE TRIGGER quotation_lines_bundle_discount_needs_group_insert
+BEFORE INSERT ON quotation_lines
+WHEN NEW.bundle_discount != 0 AND NEW.bundle_group IS NULL
+BEGIN
+  SELECT RAISE(ABORT, 'bundle_discount needs a bundle group');
+END;
+
+CREATE TRIGGER quotation_lines_bundle_discount_needs_group_update
+BEFORE UPDATE ON quotation_lines
+WHEN NEW.bundle_discount != 0 AND NEW.bundle_group IS NULL
+BEGIN
+  SELECT RAISE(ABORT, 'bundle_discount needs a bundle group');
+END;
+
+CREATE TRIGGER quotation_lines_bundle_discount_bound_insert
+BEFORE INSERT ON quotation_lines
+WHEN NEW.bundle_price IS NOT NULL AND NEW.bundle_discount > NEW.bundle_price
+BEGIN
+  SELECT RAISE(ABORT, 'bundle_discount exceeds bundle_price');
+END;
+
+CREATE TRIGGER quotation_lines_bundle_discount_bound_update
+BEFORE UPDATE ON quotation_lines
+WHEN NEW.bundle_price IS NOT NULL AND NEW.bundle_discount > NEW.bundle_price
+BEGIN
+  SELECT RAISE(ABORT, 'bundle_discount exceeds bundle_price');
+END;
+
+CREATE TRIGGER quotation_lines_bundle_not_self_insert
+BEFORE INSERT ON quotation_lines
+WHEN NEW.bundle_id IS NOT NULL AND NEW.bundle_id = NEW.product_id
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot be its own component');
+END;
+
+CREATE TRIGGER quotation_lines_bundle_not_self_update
+BEFORE UPDATE ON quotation_lines
+WHEN NEW.bundle_id IS NOT NULL AND NEW.bundle_id = NEW.product_id
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot be its own component');
+END;
+
+-- A standalone line must not point at a bundle product; bundle components carry
+-- `bundle_id`. This mirrors sale_lines_no_bundle_product on the sale path.
+CREATE TRIGGER quotation_lines_no_bundle_product_insert
+BEFORE INSERT ON quotation_lines
+WHEN EXISTS (
+  SELECT 1 FROM products p
+  WHERE p.tenant_id = NEW.tenant_id
+    AND p.id = NEW.product_id
+    AND p.kind = 'bundle'
+)
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot be a quotation line');
+END;
+
+CREATE TRIGGER quotation_lines_no_bundle_product_update
+BEFORE UPDATE OF product_id ON quotation_lines
+WHEN EXISTS (
+  SELECT 1 FROM products p
+  WHERE p.tenant_id = NEW.tenant_id
+    AND p.id = NEW.product_id
+    AND p.kind = 'bundle'
+)
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot be a quotation line');
+END;
+
+-- `bundle_id` has no composite FK in 0036; require a tenant-scoped bundle product.
+CREATE TRIGGER quotation_lines_bundle_exists_insert
+BEFORE INSERT ON quotation_lines
+WHEN NEW.bundle_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM products p
+    WHERE p.tenant_id = NEW.tenant_id
+      AND p.id = NEW.bundle_id
+      AND p.kind = 'bundle'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'quotation bundle_id is not a bundle product');
+END;
+
+CREATE TRIGGER quotation_lines_bundle_exists_update
+BEFORE UPDATE OF bundle_id ON quotation_lines
+WHEN NEW.bundle_id IS NOT NULL
+  AND NOT EXISTS (
+    SELECT 1 FROM products p
+    WHERE p.tenant_id = NEW.tenant_id
+      AND p.id = NEW.bundle_id
+      AND p.kind = 'bundle'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'quotation bundle_id is not a bundle product');
+END;
+```
 
 ## 3. Dexie schema (till)
 
@@ -2661,7 +2856,7 @@ UPDATE meta SET value = '10' WHERE key = 'schema_version';
 
 ```ts
 // Example only — exact index strings to implement.
-export const DEXIE_SCHEMA_V16 = {
+export const DEXIE_SCHEMA_V17 = {
   // master
   shop: 'id',
   branches: 'id, deleted_at',
@@ -2675,8 +2870,8 @@ export const DEXIE_SCHEMA_V16 = {
   suppliers: 'id',
   expense_categories: 'id, code, sort_order',
   promises: 'id, customer_id, [status+promised_on]',
-  quotations: 'id, quote_no, business_date, customer_id, [status+valid_until], converted_sale_id', // V16
-  quotation_lines: 'id, quote_id, product_id', // V16
+  quotations: 'id, &quote_no, business_date, [device_id+quote_seq], [status+valid_until], converted_sale_id, [status+converted_at], [status+cancelled_at]', // V16; V17 &quote_no + device/seq + terminal-today indexes, drops customer_id
+  quotation_lines: 'id, quote_id', // V16; V17 drops product_id (restore reads all lines by quote)
   sync_conflicts: 'id, resolution',   // pulled read-only; V12 drops row_id/at
   // ledger
   sales: 'id, &invoice_no, business_date, created_at, [device_id+invoice_seq], status',
@@ -2727,13 +2922,15 @@ export const DEXIE_SCHEMA_V16 = {
 
 **Dexie V16 (D-305)** adds the synced `quotations` and `quotation_lines` master tables and the local-only `print_jobs.quotation_id` index/column. No existing data is rewritten; a till that has never pulled a quotation has empty tables. The old-client gate lives on the Worker, not in Dexie.
 
+**Dexie V17 (CORE-L1, 27 Nov review)** makes `quotations.quote_no` unique in Dexie (`&quote_no`, matching D1's `UNIQUE (tenant_id, quote_no)`) and adds `[device_id+quote_seq]` so restore recovery finds its last quote number with one index range instead of scanning every quotation. It adds `[status+converted_at]`/`[status+cancelled_at]` so a cashier's "today" quotation tab can find terminal quotes converted/cancelled today even when their business date is older. It drops `quotations.customer_id` and `quotation_lines.product_id`, which no `.where()` caller used; customer/product filtering already happens in memory. Index-only upgrade; no row changes and no server or wire change (`SCHEMA_VERSION` stays 10).
+
 ### 3.1 Local-only tables
 
 | Table | Shape | Purpose |
 |---|---|---|
 | `outbox` | `{ seq, op_id, tx_id, tbl, kind, row_id, row, base_rev?, changed_fields?, created_at, status: 'pending'|'sending'|'failed', attempts, last_error? }` | Ops waiting to be pushed; acknowledged entries are deleted ([03-sync §3](03-sync.md#3-outbox)) |
-| `kv` | `{ key, value }` | `tenant` (id, display_name; from enrolment and `/api/me`), `device` (id, name, code, branch_id, is_admin), `device_token`, `invoice_seq` (last issued number, never decreases, 03 §5), `pull_cursor`, `restore_epoch`, `last_push_at`, `last_pull_at`, `printer` (shape in [06 §8](06-printing.md#8-printer-setup-and-test-print-per-device)), `logo_bitmap`, `ui.prefs` (device display: theme, text size, sounds, auto-lock and `privacyMode`), `language`, `locked_staff_id`, `pin_failures` (05 §4), `stock_count_draft` (screens/09), `setup_draft` (screens/01), `label` (label size and options, [screens/20](screens/20-barcode-labels.md)), `snapshot_state` (resumable snapshot progress, 03 §4.3), `initial_sync_pending` (first enrolment has downloaded its snapshot), `pull_errors` (per-table pull failures shown on Sync), `last_full_sync_at`, `poll_after_ms` (from the server, 13 §6), `tenant_status` (`{ status, since, learned_at }` from `/api/me`, pull and push responses; `read_only` puts the till in read-only mode, 13 §7.2), `support` (`{ until, reason }` while operator support access is active, 13 §7.5) |
-| `carts` | `{ id: 'c1'|'c2'|'c3', customer_id?, lines: CartLine[], bill_discount?: {type, value}, note, updated_at }` | Open carts, survive reload |
+| `kv` | `{ key, value }` | `tenant` (id, display_name; from enrolment and `/api/me`), `device` (id, name, code, branch_id, is_admin), `device_token`, `invoice_seq` (last issued number, never decreases, 03 §5), `quote_seq` (last issued quotation sequence for this device, never decreases), `pull_cursor`, `restore_epoch`, `last_push_at`, `last_pull_at`, `printer` (shape in [06 §8](06-printing.md#8-printer-setup-and-test-print-per-device)), `logo_bitmap`, `ui.prefs` (device display: theme, text size, sounds, auto-lock and `privacyMode`), `language`, `locked_staff_id`, `pin_failures` (05 §4), `stock_count_draft` (screens/09), `setup_draft` (screens/01), `label` (label size and options, [screens/20](screens/20-barcode-labels.md)), `snapshot_state` (resumable snapshot progress, 03 §4.3), `initial_sync_pending` (first enrolment has downloaded its snapshot), `pull_errors` (per-table pull failures shown on Sync), `last_full_sync_at`, `poll_after_ms` (from the server, 13 §6), `tenant_status` (`{ status, since, learned_at }` from `/api/me`, pull and push responses; `read_only` puts the till in read-only mode, 13 §7.2), `support` (`{ until, reason }` while operator support access is active, 13 §7.5) |
+| `carts` | `{ id: 'c1'|'c2'|'c3', customer_id?, lines: CartLine[], bill_discount?: {type, value}, note, updated_at, overrides?, reissue?, backdate?, quote?: { quote_id, quote_no, valid_until, terms, mode: 'new'|'edit'|'convert' } \| null }` | Open carts, survive reload. `quote` keeps the Sell cart in quotation mode (D-305); `edit` updates that open quote on save, `convert` marks the quote converted in the sale transaction, and `new` (including a duplicate) creates a fresh quote number |
 | `held_bills` | same as cart + `{ held_at, held_by, label }` | Parked bills |
 | `file_queue` | `{ id, kind: 'product_image'|'logo', target_id, blob, sha256, status, created_at? }` | Images waiting for upload; failed entries older than 30 days are trimmed |
 | `print_jobs` | `{ id, sale_id?, refund_id?, quotation_id?, day_close_id?, supplier_return_id?, kind: 'sale'|'refund'|'void'|'test'|'day_close'|'statement'|'supplier'|'quotation', status: 'queued'|'printing'|'done'|'failed', started_at?, error?, reprint?, created_at }` | Print history and retry; `done` jobs older than 90 days are trimmed |
@@ -2772,7 +2969,7 @@ All rows of one action are written in **one Dexie transaction** together with th
 | Bundle product create/edit | 1 `products` on create or when the bundle price/name changes (`kind='bundle'`, `track_stock=0`); 1..20 `bundle_items` upserts/soft deletes on a recipe edit; 1 `audit_log` `bundle_change` with the before/after recipe; a price edit also writes `price_change`. No stock movement |
 | Sale | 1 `sales`; n `sale_lines` (with `warranty_until` when the product has `warranty_days > 0`); a bundle sale writes one line per component, never a line for the bundle product itself, with the seven `bundle_*` fields; `sales.line_count` and `sales.items_qty_milli` count those component lines/units, not bundles (a 4-component bundle × 2 is 4 lines and 8 units; the bundle header is a UI grouping only); 0..3 `payments` (direction in, purpose sale, one per method used); 1 `ledger_entries` (+udhaar) if udhaar part > 0; n `stock_movements` (reason `sale`, −qty) for lines with `track_stock = 1`; `audit_log` if any discount exceeded the cashier limit (manager override) |
 | Backdated sale | Same rows as Sale, plus 1 `audit_log` `sale_backdated` (`after_json`: attributed staff, business date, reason, recorded_at). The sale is written on the owner's device with `business_date` = the chosen date and `created_at` = the entry time; the attributed `staff_id` is the cashier who made it ([D-173](decisions.md#decisions-log)) |
-| Save quote | 1 `quotations` upsert (create with `base_rev: 0`, or update with `rev`); 1..60 `quotation_lines` upserts and soft deletes for removed lines. No `payments`, `ledger_entries`, `stock_movements`, `party_balances` or day-close row. 1 `audit_log` `quote_create`/`quote_change` |
+| Save quote | 1 `quotations` upsert (create with `base_rev: 0`, or update with `rev`); 1..60 `quotation_lines` upserts and soft deletes for removed lines. No `payments`, `ledger_entries`, `stock_movements`, `party_balances` or day-close row. 1 `audit_log` `quote_create`/`quote_change`; a manager-approved quote discount or price override also writes the normal `override` audit row(s), because the Worker applies `sale.discount`/`max_discount_bp`/`catalog.edit` to quote writes exactly as it does to a sale |
 | Edit quote | Same as Save quote on the existing `quotations` row; only while `status = 'open'`. Converted/cancelled quotes are immutable |
 | Cancel quote | 1 `quotations` upsert setting `status = 'cancelled'`, `cancelled_reason`, `cancelled_at`; 1 `audit_log` `quote_cancel`. No stock/money reversal because a quote never moved either |
 | Convert quote | 1 `quotations` upsert setting `status = 'converted'`, `converted_sale_id`, `converted_at`; the normal Sale recipe (stock movements, payments, ledger and audit as applicable); 1 `audit_log` `quote_convert`. The sale is a normal sale; the quote adds no money/stock rows itself |

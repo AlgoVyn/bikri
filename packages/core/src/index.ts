@@ -3,6 +3,7 @@ export { businessDate, DEFAULT_TIME_ZONE, isTimeZone } from './dates.ts';
 export { normaliseDigits, normaliseNumericText } from './digits.ts';
 export {
   EXPORT_HIDDEN_COLUMNS,
+  EXPORT_JSON_SERVER_COLUMNS,
   MONEY_FIELDS,
   TIME_FIELDS,
 } from './exportFields.ts';

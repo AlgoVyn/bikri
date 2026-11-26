@@ -7,6 +7,15 @@ import {
   openReadyShop,
   setLanguage,
 } from './helpers.ts';
+import {
+  API,
+  createShop,
+  enrol,
+  newTill,
+  ORIGIN,
+  syncNow,
+  unlock,
+} from './syncHelpers.ts';
 
 // v1.2 quotations (D-305, screens/21). Every scenario runs in English and Urdu;
 // Playwright repeats it at 1280×800 and 390×844.
@@ -328,4 +337,174 @@ test.describe('Quotations (v1.2)', () => {
       expect(await idbAll(page, 'quotations')).toHaveLength(2);
     }
   });
+});
+
+async function serverRows(
+  request: import('@playwright/test').APIRequestContext,
+  tenantId: string,
+  tbl: string,
+): Promise<number> {
+  let after = '';
+  let rows = 0;
+  for (;;) {
+    const query = new URLSearchParams({
+      tbl,
+      before: String(Date.now() + 1),
+      after,
+    });
+    const res = await request.get(
+      `${API}/admin/tenants/${tenantId}/export?${query.toString()}`,
+      { headers: { origin: ORIGIN } },
+    );
+    expect(res.status(), await res.text()).toBe(200);
+    const body = (await res.json()) as {
+      rows: unknown[];
+      next_after: string;
+      has_more: boolean;
+    };
+    rows += body.rows.length;
+    if (!body.has_more) return rows;
+    after = body.next_after;
+  }
+}
+
+test('journey 28: an offline quotation create/edit/reload/convert syncs after reconnect', async ({
+  browser,
+  request,
+}, testInfo) => {
+  test.skip(
+    testInfo.project.name !== 'desktop',
+    'sync is viewport-independent',
+  );
+  test.setTimeout(150_000);
+  const shop = await createShop(request, `quote-${Date.now()}@e2e.test`);
+  const till = await newTill(browser);
+  await enrol(till.page, shop.owner_code.code, 'Counter 1');
+  await till.page.waitForFunction(() => window.__bikriTest !== undefined);
+  await till.page.evaluate(() => window.__bikriTest?.finishSetupHere());
+  await till.page.evaluate(() => window.__bikriTest?.navigate('/'));
+  await unlock(till.page);
+
+  // One simple product and a two-component bundle, created online and synced.
+  await till.page.evaluate(
+    (list) => window.__bikriTest?.seedProducts(list),
+    [
+      {
+        name: 'Quote phone',
+        price: PRICE,
+        cost: 3_800_000,
+        stock: 10,
+        sku: 'QTN-PHONE',
+      },
+      {
+        name: 'Quote cable',
+        price: 100_000,
+        cost: 60_000,
+        stock: 10,
+        sku: 'QTN-CABLE',
+      },
+      {
+        name: 'Quote case',
+        price: 90_000,
+        cost: 50_000,
+        stock: 10,
+        sku: 'QTN-CASE',
+      },
+    ],
+  );
+  await till.page.evaluate(() => window.__bikriTest?.navigate('/products/new'));
+  await till.page.locator('input[id$="-name_en"]').fill('Quote pack');
+  await till.page.locator('input[id$="-kind"]').check();
+  await till.page.locator('input[id$="-price"]').fill('5000');
+  for (const sku of ['QTN-CABLE', 'QTN-CASE']) {
+    await till.page.locator('#bundle-add-search').fill(sku);
+    await till.page
+      .locator('#bundle-add-search + ul button')
+      .filter({ hasText: sku })
+      .click();
+  }
+  await till.page.locator('form button[type=submit]').click();
+  await expect(
+    till.page.getByRole('heading', { name: 'Quote pack' }),
+  ).toBeVisible();
+  await syncNow(till.page);
+  await expect(till.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+    { timeout: 30_000 },
+  );
+
+  // Warm the lazy routes, reload under the service worker, unlock, then go offline.
+  await till.page.evaluate(() => window.__bikriTest?.navigate('/quotations'));
+  await till.page.evaluate(() => window.__bikriTest?.navigate('/sales'));
+  await till.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
+  await till.page.evaluate(
+    async () => (await navigator.serviceWorker.ready).active?.state,
+  );
+  await till.page.reload();
+  await unlock(till.page);
+  await till.ctx.setOffline(true);
+
+  await till.page.evaluate(() => window.__bikriTest?.navigate('/sell'));
+  await tile(till.page, 'Quote phone').click();
+  await tile(till.page, 'Quote pack').click();
+  await till.page.getByTestId('save-quote').click();
+  const dialog = till.page.getByRole('dialog');
+  await dialog.locator('textarea').fill('Offline terms');
+  await till.page.getByTestId('save-quote-dialog').click();
+  await expect(till.page.getByTestId('quote-detail')).toBeVisible();
+  const quote = (await idbAll<Row>(till.page, 'quotations'))[0];
+  const quoteId = String(quote?.id);
+  expect(quote?.status).toBe('open');
+  const lines = await idbAll<Row>(till.page, 'quotation_lines');
+  expect(lines).toHaveLength(3);
+  const bundleLines = lines.filter((line) => line.bundle_id !== null);
+  expect(bundleLines).toHaveLength(2);
+  expect(new Set(bundleLines.map((line) => line.bundle_group)).size).toBe(1);
+
+  // Edit offline through the real Sell cart, then reload while still offline.
+  await till.page.keyboard.press('e');
+  await expect(till.page).toHaveURL(/\/sell/u);
+  await till.page.getByTestId('save-quote').click();
+  await till.page
+    .getByRole('dialog')
+    .locator('textarea')
+    .fill('Edited offline');
+  await till.page.getByTestId('save-quote-dialog').click();
+  await expect(till.page.getByTestId('quote-detail')).toContainText(
+    'Edited offline',
+  );
+  await till.page.reload();
+  await unlock(till.page);
+  await expect(till.page.getByTestId('quote-detail')).toContainText(
+    'Edited offline',
+  );
+
+  // Convert offline: the sale and the quote transition stay in the outbox.
+  await till.page.getByTestId('convert-quote').click();
+  await expect(till.page).toHaveURL(/\/sell/u);
+  await till.page.keyboard.press('F8');
+  const pay = till.page.getByRole('dialog');
+  await pay.getByTestId('pay-done').click();
+  const done = till.page.getByRole('dialog');
+  await done.getByTestId('sale-saved').waitFor({ state: 'visible' });
+  await till.page.keyboard.press('Escape');
+  const converted = (await idbAll<Row>(till.page, 'quotations')).find(
+    (row) => row.id === quoteId,
+  );
+  expect(converted?.status).toBe('converted');
+  expect(await idbAll(till.page, 'sales')).toHaveLength(1);
+
+  await till.ctx.setOffline(false);
+  await syncNow(till.page);
+  await expect(till.page.getByTestId('staff-menu')).toHaveAttribute(
+    'data-sync-state',
+    'synced',
+    { timeout: 30_000 },
+  );
+  expect(await serverRows(request, shop.tenant.id, 'quotations')).toBe(1);
+  expect(await serverRows(request, shop.tenant.id, 'quotation_lines')).toBe(3);
+  expect(await serverRows(request, shop.tenant.id, 'sales')).toBe(1);
+  expect(await serverRows(request, shop.tenant.id, 'payments')).toBe(1);
+  await till.ctx.close();
 });

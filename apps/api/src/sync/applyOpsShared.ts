@@ -6,7 +6,12 @@
  * Push algorithm (03 §4.1). Every statement is tenant-scoped through `tenantDb`. Ops are grouped
  * by `tx_id` (one user action); a group is applied or rejected as a whole (D-104).
  */
-import { can, type Permission, type Role } from '@bikri/core';
+import {
+  can,
+  type Permission,
+  type Role,
+  SERVER_MANAGED_COLUMNS,
+} from '@bikri/core';
 import type { D1Table } from '@bikri/db/tables';
 import type { SqlValue, TenantDb } from '../db/tenantDb.ts';
 import type { DeviceRow, TenantRow } from '../types.ts';
@@ -97,15 +102,13 @@ export const CLIENT_AUDIT_ACTIONS = new Set([
   'track_stock_change',
   'void',
 ]);
-export const SERVER_MANAGED: Partial<Record<string, ReadonlySet<string>>> = {
-  products: new Set([
-    'avg_cost',
-    'on_hand_milli',
-    'cost_changed_at',
-    'bundle_since',
-  ]),
-  sales: new Set(['status']),
-};
+/** Derived from the client-safe list so the two cannot drift (CORE-L2). */
+export const SERVER_MANAGED: Partial<Record<string, ReadonlySet<string>>> =
+  Object.fromEntries(
+    Object.entries(SERVER_MANAGED_COLUMNS)
+      .filter(([tbl]) => tbl !== '*')
+      .map(([tbl, columns]) => [tbl, new Set(columns)]),
+  );
 export const DAY_MS = 86_400_000;
 /** The row and its outbox envelope are written in the same action; a large skew means a forged or broken clock. */
 export const MAX_ROW_OP_SKEW_MS = 10 * 60_000;
@@ -327,6 +330,8 @@ export type Lookups = {
   quotes: Map<string, QuoteInfo>;
   /** Every stored line (including soft-deleted) of the quotes touched by this push. */
   quoteLinesByQuote: Map<string, QuoteLineInfo[]>;
+  /** Stored quotation lines by id, including lines the op re-parents from another quote. */
+  quoteLineById: Map<string, QuoteLineInfo>;
   /** The latest stored close of each device, for period chaining. */
   lastClose: Map<
     string,

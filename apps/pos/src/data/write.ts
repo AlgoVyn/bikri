@@ -91,7 +91,12 @@ export interface Writer {
   /** New master row (base_rev 0, changed_fields []). */
   create(tbl: MasterTable, row: NewMasterRow): Promise<MasterRow>;
   /** Edit a master row; only fields that really change are sent as changed_fields. */
-  update(tbl: MasterTable, id: string, patch: OpRow): Promise<MasterRow>;
+  update(
+    tbl: MasterTable,
+    id: string,
+    patch: OpRow,
+    options?: { force?: boolean; changedFields?: readonly string[] },
+  ): Promise<MasterRow>;
   /** Soft delete (deleted_at) of a master row. */
   remove(tbl: MasterTable, id: string): Promise<void>;
 }
@@ -281,13 +286,24 @@ export async function writeAction<T>(
         });
         return row;
       },
-      async update(tbl, id, patch) {
+      async update(
+        tbl,
+        id,
+        patch,
+        options?: { force?: boolean; changedFields?: readonly string[] },
+      ) {
         const existing = await master(tbl).get(id);
         if (!existing) throw new RowNotFoundError(tbl, id);
         const changed = Object.keys(patch).filter(
           (k) => !SYSTEM_FIELDS.has(k) && !sameValue(existing[k], patch[k]),
         );
-        if (changed.length === 0) return existing;
+        // Some fields must travel even when the local row already has the value: a
+        // conversion racing an offline cancel has to clear the server's cancelled_*
+        // columns explicitly (API-H3).
+        for (const field of options?.changedFields ?? []) {
+          if (field in patch && !changed.includes(field)) changed.push(field);
+        }
+        if (changed.length === 0 && options?.force !== true) return existing;
         const pending = await pendingUpsert(tbl, id);
         if (!pending) await rememberBeforeEdit(tbl, existing);
         const row: MasterRow = {
