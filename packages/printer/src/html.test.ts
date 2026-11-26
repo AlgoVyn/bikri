@@ -1,6 +1,11 @@
 import { describe, expect, it } from 'vitest';
 import { fitPageCss, renderReceiptHtml } from './html.ts';
-import { buildSaleReceipt, resolvePaper, saleBasicInput } from './index.ts';
+import {
+  buildSaleReceipt,
+  resolvePaper,
+  saleBasicInput,
+  urduReceiptLabels,
+} from './index.ts';
 
 describe('renderReceiptHtml (06 §5.3)', () => {
   for (const mm of [58, 80] as const) {
@@ -97,6 +102,35 @@ describe('renderReceiptHtml (06 §5.3)', () => {
     expect(html).toContain('<span>USB-C cable 1m</span>');
     expect(html).toContain('<span class="v">2</span>');
     expect(html).toContain('<span class="v">Rs 900</span>');
+  });
+
+  it('renders the 80 mm column header as the same grid, not space-padded text', () => {
+    const html = renderReceiptHtml(buildSaleReceipt(saleBasicInput()), {
+      widthMm: 80,
+      charsPerLine: 48,
+      itemLayout: 'columns',
+    });
+    expect(html).toContain(
+      '<div class="row" style="grid-template-columns:minmax(0,1fr) 5ch 15ch"><span>ITEM</span><span class="v">QTY</span><span class="v">AMOUNT</span></div>',
+    );
+    expect(html).not.toMatch(/<div class="l">ITEM {10,}/);
+  });
+
+  it('keeps an Urdu column header in its own grid cells', () => {
+    const input = saleBasicInput();
+    input.labels = urduReceiptLabels;
+    const html = renderReceiptHtml(buildSaleReceipt(input), {
+      widthMm: 80,
+      charsPerLine: 48,
+      itemLayout: 'columns',
+    });
+    expect(html).toContain('<span class="rtl" dir="rtl" lang="ur">چیز</span>');
+    expect(html).toContain(
+      '<span class="v rtl" dir="rtl" lang="ur">تعداد</span>',
+    );
+    expect(html).toContain(
+      '<span class="v rtl" dir="rtl" lang="ur">رقم</span>',
+    );
   });
 
   it('keeps an Urdu item name inside its own grid cell', () => {

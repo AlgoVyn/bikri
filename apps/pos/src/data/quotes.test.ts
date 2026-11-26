@@ -137,6 +137,68 @@ describe('quotes (D-305)', () => {
     );
   });
 
+  it('keeps a quote identity on a cross-till edit, queues the header and stamps the acting device', async () => {
+    const fx = await quoteFixture('quote-cross-till');
+    const { quote } = await saveQuote(fx.db, {
+      cartId: 'c1',
+      cart: fx.cart,
+      money: fx.money,
+      validUntil: VALID,
+      terms: '',
+      staffId: 'st-1',
+      now: NOW,
+    });
+    await fx.db.kv.put({
+      key: 'device',
+      value: {
+        id: 'dev-2',
+        name: 'Counter 2',
+        code: 'B',
+        branch_id: 'br-1',
+        is_admin: false,
+      },
+    });
+    const edit = await startQuoteCart(fx.db, {
+      quoteId: quote.id,
+      cartId: 'c2',
+      mode: 'edit',
+      now: NOW + 1000,
+    });
+    const firstLine = edit.lines[0];
+    if (!firstLine) throw new Error('quote has no line');
+    firstLine.note = 'IMEI 123';
+    await fx.db.carts.put({ ...edit, updated_at: NOW + 1000 });
+    const saved = await saveQuote(fx.db, {
+      cartId: 'c2',
+      cart: edit,
+      money: fx.money,
+      validUntil: VALID,
+      terms: '',
+      staffId: 'st-1',
+      now: NOW + 2000,
+    });
+    expect(saved.quote).toMatchObject({
+      device_id: 'dev-1',
+      branch_id: 'br-1',
+    });
+    const header = (await fx.db.outbox.toArray())
+      .filter((entry) => entry.tbl === 'quotations')
+      .at(-1);
+    expect(header).toBeDefined();
+    expect(header?.changed_fields).not.toContain('device_id');
+    expect(header?.changed_fields).not.toContain('branch_id');
+    await cancelQuote(fx.db, {
+      quoteId: quote.id,
+      reason: 'Cross till',
+      staffId: 'st-1',
+      now: NOW + 3000,
+    });
+    const audit = (await fx.db.audit_log.toArray()).find(
+      (row) => row.action === 'quote_cancel',
+    );
+    expect(audit?.device_id).toBe('dev-2');
+  });
+
   it('cancels an open quote without touching stock or money', async () => {
     const fx = await quoteFixture('quote-cancel');
     const { quote } = await saveQuote(fx.db, {
@@ -165,6 +227,33 @@ describe('quotes (D-305)', () => {
         staffId: 'st-1',
       }),
     ).rejects.toMatchObject({ code: 'terminal' });
+  });
+
+  it('duplicates a cancelled quote instead of rejecting it', async () => {
+    const fx = await quoteFixture('quote-duplicate-cancelled');
+    const { quote } = await saveQuote(fx.db, {
+      cartId: 'c1',
+      cart: fx.cart,
+      money: fx.money,
+      validUntil: VALID,
+      terms: '',
+      staffId: 'st-1',
+      now: NOW,
+    });
+    await cancelQuote(fx.db, {
+      quoteId: quote.id,
+      reason: 'No',
+      staffId: 'st-1',
+      now: NOW + 1000,
+    });
+    const duplicate = await startQuoteCart(fx.db, {
+      quoteId: quote.id,
+      cartId: 'c2',
+      mode: 'duplicate',
+      now: NOW + 2000,
+    });
+    expect(duplicate.quote).toMatchObject({ mode: 'new', quote_id: null });
+    expect(duplicate.lines.length).toBeGreaterThan(0);
   });
 
   it('converts a quote into a normal sale and marks it converted', async () => {
@@ -558,6 +647,118 @@ describe('quotes (D-305)', () => {
     expect(quotesCsv([{}], new Map(), new Map())).toContain('quote_no');
   });
 
+  it('clears a deleted customer and blocks a changed bundle on conversion', async () => {
+    const fx = await quoteFixture('quote-convert-guards');
+    const customer = await createCustomer(
+      fx.db,
+      { name: 'Old Customer', phone: '+923004445556' },
+      'st-1',
+      NOW,
+    );
+    const bundle = await saveNewProduct(
+      fx.db,
+      {
+        name_en: 'Convert Pack',
+        sku: 'Q-CONV',
+        unit: 'set',
+        price: 700000,
+        kind: 'bundle',
+        track_stock: false,
+        bundle_items: [
+          { component_product_id: fx.phone.id, qty_milli: 1000 },
+          { component_product_id: fx.buds.id, qty_milli: 1000 },
+        ],
+      },
+      fx.ctx,
+      { now: NOW },
+    );
+    const cart = {
+      ...addBundle(
+        emptyCart('c1', NOW),
+        bundle,
+        [
+          { product: fx.phone, qty_milli: 1000 },
+          { product: fx.buds, qty_milli: 1000 },
+        ],
+        1,
+        'avg',
+      ),
+      customer_id: customer.id,
+      quote: {
+        quote_id: null,
+        quote_no: null,
+        valid_until: VALID,
+        terms: '',
+        mode: 'new' as const,
+      },
+    };
+    await fx.db.carts.put(cart);
+    const { quote } = await saveQuote(fx.db, {
+      cartId: 'c1',
+      cart,
+      money: fx.money,
+      validUntil: VALID,
+      terms: '',
+      staffId: 'st-1',
+      now: NOW,
+    });
+    await fx.db.customers.update(customer.id, { deleted_at: NOW + 500 });
+    const converted = await startQuoteCart(fx.db, {
+      quoteId: quote.id,
+      cartId: 'c2',
+      mode: 'convert',
+      now: NOW + 1000,
+    });
+    expect(converted.customer_id).toBeNull();
+    const recipe = await fx.db.bundle_items
+      .where('bundle_id')
+      .equals(bundle.id)
+      .toArray();
+    const first = recipe[0];
+    if (!first) throw new Error('bundle recipe missing');
+    await fx.db.bundle_items.update(first.id, { deleted_at: NOW + 1500 });
+    await expect(
+      startQuoteCart(fx.db, {
+        quoteId: quote.id,
+        cartId: 'c3',
+        mode: 'convert',
+        now: NOW + 2000,
+      }),
+    ).rejects.toMatchObject({ code: 'bundle_changed' });
+  });
+
+  it('writes quotation override approvals as audit rows', async () => {
+    const fx = await quoteFixture('quote-override-audit');
+    const cart = {
+      ...fx.cart,
+      overrides: [
+        {
+          permission: 'sale.discount' as const,
+          approved_by: 'st-1',
+          approved_at: NOW,
+        },
+      ],
+    };
+    await fx.db.carts.put(cart);
+    const { quote } = await saveQuote(fx.db, {
+      cartId: 'c1',
+      cart,
+      money: fx.money,
+      validUntil: VALID,
+      terms: '',
+      staffId: 'st-1',
+      now: NOW,
+    });
+    const approval = (await fx.db.audit_log.toArray()).find(
+      (row) => row.action === 'override' && row.entity_id === quote.id,
+    );
+    expect(approval).toBeDefined();
+    expect(JSON.parse(String(approval?.after_json))).toMatchObject({
+      permission: 'sale.discount',
+      approved_by: 'st-1',
+    });
+  });
+
   it('round-trips a bundle quote snapshot', async () => {
     const fx = await quoteFixture('quote-bundle');
     const bundle = await saveNewProduct(
@@ -623,6 +824,10 @@ describe('quotes (D-305)', () => {
       true,
     );
     expect(loaded.lines[0]?.bundle_price).toBe(700000);
+    const share = quoteShareText(quote, lines, 'Bilal Mobile');
+    expect(share).toContain('Starter Pack');
+    expect(share).toContain('Galaxy A15');
+    expect(share).toContain('Total');
 
     // An expired conversion at today's prices follows the current bundle shelf price.
     await fx.db.products.update(bundle.id, { price: 750000, updated_at: NOW });

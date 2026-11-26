@@ -919,10 +919,10 @@
     "bundle_price": "Bundle price",
     "bundle_list_price": "List {{amount}}",
     "bundle_empty": "Is bundle mein koi cheez nahi. Sell se pehle Products mein items shamil karein.",
-    "quote_quoted": "Quoted",
+    "quote_quoted": "Qeemat lag gayi",
     "quote_now_price": "Ab {{amount}}",
     "quote_cancel_title": "Quotation mode chhor dein?",
-    "quote_cancel_body": "Is cart ki cheezein hata di jayengi. Quotation save nahin hogi.",
+    "quote_cancel_body": "Is cart ki cheezein hata di jayengi. Quotation save nahin hoga.",
     "quote_cancel_confirm": "Quotation mode chhor dein"
   },
   "setup": {

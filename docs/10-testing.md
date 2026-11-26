@@ -101,7 +101,7 @@ Journeys that need a second shop or a bundle create their rows through the real 
 
 Visual snapshots: the deterministic English screenshots in `e2e/tests/visual.spec.ts-snapshots` (desktop and phone, light) use a fixed pixel budget; other language/theme captures are attached with `VISUAL=1` for review.
 
-Journeys 26–27 live in `e2e/tests/bundles.spec.ts`; journey 28 lives in `e2e/tests/quotations.spec.ts`; journey 20 (stale `410 SNAPSHOT_REQUIRED`, forced snapshot and `restore_epoch` recovery) and the I17 operator-auth check live in `e2e/tests/sync.spec.ts`.
+Journeys 26–27 live in `e2e/tests/bundles.spec.ts`; journey 28 lives in `e2e/tests/quotes.spec.ts`; journey 20 (stale `410 SNAPSHOT_REQUIRED`, forced snapshot and `restore_epoch` recovery) and the I17 operator-auth check live in `e2e/tests/sync.spec.ts`.
 
 ## 6. Manual hardware checklist (before each release)
 

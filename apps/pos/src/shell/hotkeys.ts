@@ -12,6 +12,16 @@ export function ignoresHotkey(target: EventTarget | null): boolean {
   return target instanceof HTMLElement && target.isContentEditable;
 }
 
+/** A button/link/menu item must receive Enter/Space itself, not a page shortcut. */
+export function interactiveTarget(target: EventTarget | null): boolean {
+  if (!(target instanceof Element)) return false;
+  return (
+    target.closest(
+      'button, a, input, textarea, select, [role="button"], [role="menuitem"], [role="option"], [contenteditable="true"]',
+    ) !== null
+  );
+}
+
 /** Urdu/IME composition: Enter/Escape belong to the input, not to a shortcut. */
 export function composing(event: {
   isComposing?: boolean;

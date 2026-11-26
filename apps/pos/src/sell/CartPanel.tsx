@@ -127,7 +127,12 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
             {t('sell.quote_converting', { quote: p.quote.quote_no ?? '' })}
           </p>
           <p>
-            {t('sell.quote_valid_until', { date: p.quote.valid_until ?? '' })}
+            {t('sell.quote_valid_until', {
+              date: formatBusinessDate(
+                String(p.quote.valid_until ?? ''),
+                i18n.language,
+              ),
+            })}
           </p>
         </div>
       ) : null}
@@ -145,7 +150,10 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
               </p>
               <p className="truncate">
                 {t('sell.quote_valid_until', {
-                  date: p.quote.valid_until ?? '',
+                  date: formatBusinessDate(
+                    String(p.quote.valid_until ?? ''),
+                    i18n.language,
+                  ),
                 })}
               </p>
             </div>

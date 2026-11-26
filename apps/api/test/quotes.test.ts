@@ -1,7 +1,13 @@
 import { env } from 'cloudflare:workers';
 import { newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
-import { addBundleFixture, api, json, seedShop } from './helpers/fixtures.ts';
+import {
+  addBundleFixture,
+  api,
+  IDS,
+  json,
+  seedShop,
+} from './helpers/fixtures.ts';
 import { op, pullAll, pushOk, quoteOps, saleOps } from './helpers/ops.ts';
 
 const count = async (sql: string, ...params: unknown[]) =>
@@ -503,5 +509,338 @@ describe('quotations (D-305)', () => {
         .bind(shop.tenantId, shop.till.id)
         .first<{ last_quote_seq: number }>(),
     ).toEqual({ last_quote_seq: 0 });
+  });
+
+  it('API-H1: empty changed_fields cannot reopen a cancelled quote', async () => {
+    const shop = await seedShop('Quote reopen');
+    const quote = quoteOps(shop, shop.till, 1);
+    await pushOk(shop.till, quote.ops);
+    const now = Date.now();
+    await pushOk(shop.till, [
+      op(
+        'quotations',
+        'upsert',
+        {
+          ...quote.row,
+          status: 'cancelled',
+          cancelled_reason: 'No',
+          cancelled_at: now,
+        },
+        {
+          tx_id: newId(now),
+          base_rev: 1,
+          changed_fields: ['status', 'cancelled_reason', 'cancelled_at'],
+        },
+      ),
+    ]);
+    const phantom = op(
+      'quotations',
+      'upsert',
+      {
+        ...quote.row,
+        status: 'open',
+        cancelled_at: null,
+        cancelled_reason: '',
+        note: 'phantom open',
+      },
+      { tx_id: newId(now), base_rev: 2, changed_fields: [] },
+    );
+    const applied = await pushOk(shop.till, [phantom]);
+    expect(applied.results[0]?.result).toBe('applied');
+    const stored = await env.DB.prepare(
+      'SELECT status, note FROM quotations WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, quote.quoteId)
+      .first<{ status: string; note: string }>();
+    expect(stored).toEqual({ status: 'cancelled', note: '' });
+    const reopen = op(
+      'quotations',
+      'upsert',
+      {
+        ...quote.row,
+        status: 'open',
+        cancelled_at: null,
+        cancelled_reason: '',
+        note: 'reopened',
+      },
+      {
+        tx_id: newId(now),
+        base_rev: 3,
+        changed_fields: ['status', 'cancelled_at', 'cancelled_reason', 'note'],
+      },
+    );
+    const rejected = await pushOk(shop.till, [reopen]);
+    expect(rejected.results[0]).toMatchObject({
+      result: 'rejected',
+      error_code: 'CONSTRAINT_FAILED',
+    });
+  });
+
+  it('API-H2: a line from a cancelled quote cannot be re-parented into an open quote', async () => {
+    const shop = await seedShop('Quote line theft');
+    const first = quoteOps(shop, shop.till, 1);
+    const second = quoteOps(shop, shop.till, 2);
+    await pushOk(shop.till, [...first.ops, ...second.ops]);
+    const now = Date.now();
+    await pushOk(shop.till, [
+      op(
+        'quotations',
+        'upsert',
+        {
+          ...first.row,
+          status: 'cancelled',
+          cancelled_reason: 'No',
+          cancelled_at: now,
+        },
+        {
+          tx_id: newId(now),
+          base_rev: 1,
+          changed_fields: ['status', 'cancelled_reason', 'cancelled_at'],
+        },
+      ),
+    ]);
+    const tx = newId(now);
+    const line = {
+      ...first.line,
+      quote_id: second.quoteId,
+      line_no: 2,
+      name_snapshot: 'Stolen',
+    };
+    const header = {
+      ...second.row,
+      line_count: 2,
+      items_qty_milli: 2000,
+      gross_total: 300000,
+      subtotal: 300000,
+      total: 300000,
+    };
+    const res = await pushOk(shop.till, [
+      op('quotation_lines', 'upsert', line, {
+        tx_id: tx,
+        base_rev: 1,
+        changed_fields: Object.keys(line).filter((key) => key !== 'id'),
+      }),
+      op('quotations', 'upsert', header, {
+        tx_id: tx,
+        base_rev: 1,
+        changed_fields: [
+          'line_count',
+          'items_qty_milli',
+          'gross_total',
+          'subtotal',
+          'total',
+        ],
+      }),
+    ]);
+    expect(res.results.every((row) => row.result === 'rejected')).toBe(true);
+    expect(
+      await env.DB.prepare(
+        'SELECT quote_id, name_snapshot FROM quotation_lines WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(shop.tenantId, first.line.id)
+        .first<{ quote_id: string; name_snapshot: string }>(),
+    ).toEqual({ quote_id: first.quoteId, name_snapshot: 'Phone' });
+  });
+
+  it('API-H3: a conversion racing an offline cancel still commits the sale', async () => {
+    const shop = await seedShop('Quote cancel convert');
+    const quote = quoteOps(shop, shop.till, 1);
+    await pushOk(shop.till, quote.ops);
+    const now = Date.now();
+    await pushOk(shop.till, [
+      op(
+        'quotations',
+        'upsert',
+        {
+          ...quote.row,
+          status: 'cancelled',
+          cancelled_reason: 'No',
+          cancelled_at: now,
+        },
+        {
+          tx_id: newId(now),
+          base_rev: 1,
+          changed_fields: ['status', 'cancelled_reason', 'cancelled_at'],
+        },
+      ),
+    ]);
+    const sale = saleOps(shop, shop.till, 1);
+    const saleId = String(sale[0]?.row?.id ?? '');
+    const tx = String(sale[0]?.tx_id ?? '');
+    const convert = op(
+      'quotations',
+      'upsert',
+      {
+        ...quote.row,
+        status: 'converted',
+        converted_sale_id: saleId,
+        converted_at: now,
+        cancelled_at: null,
+        cancelled_reason: '',
+      },
+      {
+        tx_id: tx,
+        base_rev: 2,
+        changed_fields: [
+          'status',
+          'converted_sale_id',
+          'converted_at',
+          'cancelled_at',
+          'cancelled_reason',
+        ],
+      },
+    );
+    const res = await pushOk(shop.till, [...sale, convert]);
+    expect(res.results.at(-1)).toMatchObject({ result: 'applied' });
+    const stored = await env.DB.prepare(
+      'SELECT status, converted_sale_id FROM quotations WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, quote.quoteId)
+      .first<{ status: string; converted_sale_id: string }>();
+    expect(stored).toEqual({
+      status: 'converted',
+      converted_sale_id: saleId,
+    });
+    const replay = op(
+      'quotations',
+      'upsert',
+      {
+        ...quote.row,
+        status: 'converted',
+        converted_sale_id: saleId,
+        converted_at: now,
+        cancelled_at: null,
+        cancelled_reason: '',
+      },
+      {
+        tx_id: newId(now),
+        base_rev: 3,
+        changed_fields: [
+          'status',
+          'converted_sale_id',
+          'converted_at',
+          'cancelled_at',
+          'cancelled_reason',
+        ],
+      },
+    );
+    expect((await pushOk(shop.till, [replay])).results[0]?.result).toBe(
+      'applied',
+    );
+  });
+
+  it('API-M1: a cross-till quote edit does not advance the editor device sequence', async () => {
+    const shop = await seedShop('Quote cross till seq');
+    const quote = quoteOps(shop, shop.till, 1);
+    await pushOk(shop.till, quote.ops);
+    const edit = op(
+      'quotations',
+      'upsert',
+      { ...quote.row, note: 'Admin edit' },
+      { base_rev: 1, changed_fields: ['note'] },
+    );
+    expect((await pushOk(shop.admin, [edit])).results[0]?.result).toBe(
+      'applied',
+    );
+    expect(
+      await env.DB.prepare(
+        'SELECT last_quote_seq FROM devices WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(shop.tenantId, shop.admin.id)
+        .first<{ last_quote_seq: number }>(),
+    ).toEqual({ last_quote_seq: 0 });
+  });
+
+  it('API-M2: a cashier cannot create an over-limit quote discount', async () => {
+    const shop = await seedShop('Quote discount policy');
+    const quote = quoteOps(shop, shop.till, 1, { staffId: IDS.cashier });
+    const discounted = {
+      ...quote.row,
+      bill_discount_type: 'rs',
+      bill_discount_value: 50000,
+      bill_discount: 50000,
+      subtotal: 150000,
+      total: 100000,
+    };
+    const tx = newId();
+    const res = await pushOk(shop.till, [
+      op('quotations', 'upsert', discounted, {
+        tx_id: tx,
+        base_rev: 0,
+        changed_fields: Object.keys(discounted).filter((key) => key !== 'id'),
+      }),
+      op('quotation_lines', 'upsert', quote.line, {
+        tx_id: tx,
+        base_rev: 0,
+        changed_fields: Object.keys(quote.line).filter((key) => key !== 'id'),
+      }),
+    ]);
+    expect(res.results.every((row) => row.result === 'rejected')).toBe(true);
+    expect(res.results[0]?.error_code).toBe('FORBIDDEN');
+  });
+
+  it('cancels a quote after the catalogue price moved or the product became a bundle', async () => {
+    const shop = await seedShop('Quote cancel policy');
+    const quote = quoteOps(shop, shop.till, 1);
+    const priced = {
+      ...quote.row,
+      gross_total: 100000,
+      subtotal: 100000,
+      total: 100000,
+    };
+    const line = {
+      ...quote.line,
+      unit_price: 100000,
+      gross: 100000,
+      net: 100000,
+    };
+    const tx = newId();
+    const created = await pushOk(shop.till, [
+      op('quotations', 'upsert', priced, {
+        tx_id: tx,
+        base_rev: 0,
+        changed_fields: Object.keys(priced).filter((key) => key !== 'id'),
+      }),
+      op('quotation_lines', 'upsert', line, {
+        tx_id: tx,
+        base_rev: 0,
+        changed_fields: Object.keys(line).filter((key) => key !== 'id'),
+      }),
+    ]);
+    expect(created.results.every((row) => row.result === 'applied')).toBe(true);
+    // The owner converted the simple product to a bundle after the quote was saved.
+    await env.DB.prepare(
+      "UPDATE products SET kind = 'bundle', track_stock = 0 WHERE tenant_id = ?1 AND id = ?2",
+    )
+      .bind(shop.tenantId, IDS.product)
+      .run();
+    const now = Date.now();
+    const cancelled = await pushOk(shop.till, [
+      op(
+        'quotations',
+        'upsert',
+        {
+          ...priced,
+          status: 'cancelled',
+          cancelled_reason: 'No',
+          cancelled_at: now,
+          updated_by: IDS.cashier,
+        },
+        {
+          base_rev: 1,
+          changed_fields: ['status', 'cancelled_reason', 'cancelled_at'],
+        },
+      ),
+    ]);
+    expect(cancelled.results[0]).toMatchObject({ result: 'applied' });
+  });
+
+  it('API-M2: a standalone line cannot point at a bundle product', async () => {
+    const shop = await seedShop('Quote bundle product line');
+    await addBundleFixture(shop);
+    const quote = quoteOps(shop, shop.till, 1);
+    (quote.line as { product_id: string }).product_id = IDS.bundle;
+    const res = await pushOk(shop.till, quote.ops);
+    expect(res.results.every((row) => row.result === 'rejected')).toBe(true);
   });
 });

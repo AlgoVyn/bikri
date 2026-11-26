@@ -216,6 +216,51 @@ export async function completeSale(
   const { cart, money } = input;
   if (cart.lines.length === 0) throw new SaleInvalidError('empty cart');
   let totals: CartResult = cartTotals(cart, money);
+  const productIds = [
+    ...new Set(
+      cart.lines
+        .map((l) => l.product_id)
+        .filter((id): id is string => id !== null),
+    ),
+  ];
+  const products = new Map<string, MasterRow>();
+  for (const p of await db.products.bulkGet(productIds))
+    if (p) products.set(p.id, p);
+  // Costs may have changed since the line was added (e.g. a delivery synced from another
+  // till). Re-price the cart now (bundles included) so the below-cost decision, the
+  // component split and the payment settle against the same totals the server checks.
+  let pricedCart = cart;
+  for (const group of new Set(
+    cart.lines
+      .map((line) => line.bundle_group)
+      .filter((value): value is string => typeof value === 'string'),
+  )) {
+    const qty = Number(
+      pricedCart.lines.find((line) => line.bundle_group === group)
+        ?.bundle_qty ?? 0,
+    );
+    pricedCart = updateBundleQty(
+      pricedCart,
+      group,
+      qty,
+      products,
+      money.cost_method,
+    );
+  }
+  totals = cartTotals(
+    {
+      ...pricedCart,
+      lines: pricedCart.lines.map((line) => {
+        const product = line.product_id
+          ? products.get(line.product_id)
+          : undefined;
+        return product
+          ? { ...line, unit_cost: unitCostOf(product, money.cost_method) }
+          : line;
+      }),
+    },
+    money,
+  );
   const rows = mergeRows(input.rows);
   const s = settle(totals.total, rows);
   if (!s.valid) throw new SaleInvalidError('payments do not cover the total');
@@ -277,51 +322,6 @@ export async function completeSale(
     business_date: date,
     created_at: now,
   };
-  const productIds = [
-    ...new Set(
-      cart.lines
-        .map((l) => l.product_id)
-        .filter((id): id is string => id !== null),
-    ),
-  ];
-  const products = new Map<string, MasterRow>();
-  for (const p of await db.products.bulkGet(productIds))
-    if (p) products.set(p.id, p);
-  // Costs may have changed since the line was added (e.g. a delivery synced from another
-  // till). Re-price the cart now (bundles included) so the below-cost decision and the
-  // component split match the cost snapshot the server will verify.
-  let pricedCart = cart;
-  for (const group of new Set(
-    cart.lines
-      .map((line) => line.bundle_group)
-      .filter((value): value is string => typeof value === 'string'),
-  )) {
-    const qty = Number(
-      pricedCart.lines.find((line) => line.bundle_group === group)
-        ?.bundle_qty ?? 0,
-    );
-    pricedCart = updateBundleQty(
-      pricedCart,
-      group,
-      qty,
-      products,
-      money.cost_method,
-    );
-  }
-  totals = cartTotals(
-    {
-      ...pricedCart,
-      lines: pricedCart.lines.map((line) => {
-        const product = line.product_id
-          ? products.get(line.product_id)
-          : undefined;
-        return product
-          ? { ...line, unit_cost: unitCostOf(product, money.cost_method) }
-          : line;
-      }),
-    },
-    money,
-  );
   const manualDiscount = manualDiscountBp(pricedCart, totals);
 
   const seller = await db.staff.get(sellerId);
@@ -836,11 +836,18 @@ export async function completeSale(
         if (!quote) throw new SaleInvalidError('quote');
         if (String(quote.status) === 'cancelled')
           throw new SaleInvalidError('quote cancelled');
-        await w.update('quotations', input.quoteId, {
-          status: 'converted',
-          converted_sale_id: input.saleId,
-          converted_at: now,
-        });
+        await w.update(
+          'quotations',
+          input.quoteId,
+          {
+            status: 'converted',
+            converted_sale_id: input.saleId,
+            converted_at: now,
+            cancelled_at: null,
+            cancelled_reason: '',
+          },
+          { changedFields: ['cancelled_at', 'cancelled_reason'] },
+        );
         auditRows.push({
           id: newId(now),
           action: 'quote_convert',

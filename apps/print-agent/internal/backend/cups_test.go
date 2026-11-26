@@ -138,12 +138,67 @@ func TestSpoolIDPatternRejectsOptions(t *testing.T) {
 	}
 }
 
+func TestSpoolIDPatternRejectsControlCharacters(t *testing.T) {
+	codes := make([]byte, 0, 0x21)
+	for code := 0x00; code <= 0x1f; code++ {
+		codes = append(codes, byte(code))
+	}
+	codes = append(codes, 0x7f)
+	for _, code := range codes {
+		control := string(code)
+		for _, id := range []string{
+			control + "Bixolon-42",
+			"Bix" + control + "olon-42",
+			"Bixolon" + control + "-42",
+		} {
+			if spoolIDPattern.MatchString(id) {
+				t.Fatalf("control character %#x accepted in %q", code, id)
+			}
+		}
+	}
+}
+
 func TestClonePrintersKeepsEmptyNonNil(t *testing.T) {
 	if list := clonePrinters(nil); list == nil || len(list) != 0 {
 		t.Fatalf("nil source = %#v, want non-nil empty", list)
 	}
 	if list := clonePrinters([]Printer{}); list == nil || len(list) != 0 {
 		t.Fatalf("empty source = %#v, want non-nil empty", list)
+	}
+}
+
+// A zero-printer cache expired and the leader's refresh failed while a waiter
+// was blocked. The waiter must serve the cached [] (like the leader) instead of
+// treating it as "no cache" and returning 502.
+func TestListPrintersWaiterKeepsEmptyCacheOnFailedRefresh(t *testing.T) {
+	b := &cupsBackend{
+		printers:    []Printer{},
+		printersAt:  time.Now().Add(-2 * cupsPrinterTTL),
+		refreshing:  true,
+		refreshDone: make(chan struct{}),
+		refreshErr:  &Error{Code: "CUPS_UNAVAILABLE", Message: "lpstat failed"},
+	}
+	type result struct {
+		list []Printer
+		err  error
+	}
+	got := make(chan result, 1)
+	go func() {
+		list, err := b.ListPrinters(context.Background())
+		got <- result{list: list, err: err}
+	}()
+	// Let the waiter observe the in-flight refresh, then publish the failure.
+	time.Sleep(10 * time.Millisecond)
+	close(b.refreshDone)
+	res := <-got
+	if res.err != nil {
+		t.Fatalf("waiter returned an error: %v", res.err)
+	}
+	if res.list == nil {
+		t.Fatal("waiter received a nil list")
+	}
+	if len(res.list) != 0 {
+		t.Fatalf("waiter list = %#v", res.list)
 	}
 }
 

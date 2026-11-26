@@ -135,6 +135,7 @@ const WARM_TABLES = new Set([
   'bundle_items',
   'categories',
   'stock_movements',
+  'shop',
 ]);
 const SEARCH_INVOICE_TABLES = new Set(['sales', 'refunds', 'sale_voids']);
 const FIRST_DAY_TABLES = new Set([
@@ -529,12 +530,10 @@ export async function fixQuoteSeq(db: BikriDb): Promise<void> {
   const device = await deviceInfo(db);
   if (!device) return;
   const own = await db.quotations
-    .filter((quote) => String(quote.device_id) === device.id)
-    .toArray();
-  const local = own.reduce(
-    (max, quote) => Math.max(max, Number(quote.quote_seq ?? 0)),
-    0,
-  );
+    .where('[device_id+quote_seq]')
+    .between([device.id, 0], [device.id, Number.MAX_SAFE_INTEGER])
+    .last();
+  const local = Number(own?.quote_seq ?? 0);
   const server = Number((await db.devices.get(device.id))?.last_quote_seq ?? 0);
   const current = await getKv<number>(db, 'quote_seq', 0);
   const next = Math.max(current, local, server);
@@ -572,6 +571,16 @@ export async function reconcileRecoveredMasterFields(
 ): Promise<void> {
   await db.transaction('rw', db.tables, async () => {
     const entries = await db.outbox.toArray();
+    // A recovered quotation line must stay in a transaction with its header; the
+    // Worker's line check requires the parent op (POS-C1). Keep a no-op header op
+    // even when its own fields already match the restored row.
+    const quoteLineTxs = new Set(
+      entries
+        .filter(
+          (entry) => entry.recovery === true && entry.tbl === 'quotation_lines',
+        )
+        .map((entry) => entry.tx_id),
+    );
     for (const entry of entries) {
       if (
         entry.recovery !== true ||
@@ -608,6 +617,23 @@ export async function reconcileRecoveredMasterFields(
                 !sameValue(entry.row?.[key], local[key]),
             );
       if (changed.length === 0) {
+        if (entry.tbl === 'quotations' && quoteLineTxs.has(entry.tx_id)) {
+          if (entry.seq !== undefined)
+            await db.outbox.update(entry.seq, {
+              changed_fields: [],
+              row: {
+                id: entry.row.id,
+                ...(local.updated_at !== undefined
+                  ? { updated_at: local.updated_at }
+                  : {}),
+                ...(local.updated_by !== undefined
+                  ? { updated_by: local.updated_by }
+                  : {}),
+              },
+              base_rev: Number(local.rev ?? 0),
+            });
+          continue;
+        }
         // The restored row already matches this till's copy; keeping a no-op op with
         // its stale base_rev caused a spurious merge or a permanent rejection (POS-H5).
         if (entry.seq !== undefined) await db.outbox.delete(entry.seq);
@@ -1135,7 +1161,13 @@ async function restoreRecoveryUnlocked(
       }
       const usedRecipe = new Set<string>();
       for (const item of masterRows) {
-        if (item.tbl === 'staff' || item.tbl === 'bundle_items') continue;
+        if (
+          item.tbl === 'staff' ||
+          item.tbl === 'bundle_items' ||
+          item.tbl === 'quotations' ||
+          item.tbl === 'quotation_lines'
+        )
+          continue;
         if (openingKeys.has(`${item.tbl}:${item.row.id}`)) continue;
         const drafts = [masterDraft(item, now)];
         const rows: SyncedRow[] = [item.row];
@@ -1156,6 +1188,98 @@ async function restoreRecoveryUnlocked(
         addUnit([masterDraft(item, now)], [item.row]);
       }
 
+      // Quotations are one document, like a sale: the header and every line must travel
+      // in the same transaction. A new quote may need to be created open first, then
+      // transitioned after its converted sale; a terminal quote whose conversion predates
+      // the restore point is already on the server and needs no recovery (POS-C1).
+      const quoteItems = masterRows.filter((item) => item.tbl === 'quotations');
+      const quoteLineItems = masterRows.filter(
+        (item) => item.tbl === 'quotation_lines',
+      );
+      const quoteTransitions: RecoveredMaster[] = [];
+      const addQuoteDocument = async (
+        quote: SyncedRow,
+        transition: RecoveredMaster | null,
+      ) => {
+        const quoteId = String(quote.id);
+        const status = String(quote.status ?? 'open');
+        const terminalAt =
+          status === 'converted'
+            ? Number(quote.converted_at ?? 0)
+            : status === 'cancelled'
+              ? Number(quote.cancelled_at ?? 0)
+              : 0;
+        if (status !== 'open' && terminalAt > 0 && terminalAt <= restorePointAt)
+          return;
+        const created = Number(quote.created_at ?? 0);
+        const isNew = created >= restorePointAt;
+        // A quote created on another till is that till's document to recover; this till
+        // cannot satisfy the server's creator-device rule for a new quote.
+        if (isNew && String(quote.device_id ?? '') !== device?.id) return;
+        const activeLines = (
+          await db.quotation_lines.where('quote_id').equals(quoteId).toArray()
+        ).filter(
+          (line) => line.deleted_at === null || line.deleted_at === undefined,
+        );
+        const deletedLines = quoteLineItems.filter(
+          (line) => String(line.row.quote_id ?? '') === quoteId && line.deleted,
+        );
+        const openRow: SyncedRow =
+          status === 'open'
+            ? quote
+            : {
+                ...quote,
+                status: 'open',
+                converted_sale_id: null,
+                converted_at: null,
+                cancelled_reason: '',
+                cancelled_at: null,
+              };
+        const drafts = [
+          masterDraft({ tbl: 'quotations', row: openRow, deleted: false }, now),
+          ...activeLines.map((line) =>
+            masterDraft(
+              { tbl: 'quotation_lines', row: line, deleted: false },
+              now,
+            ),
+          ),
+          ...deletedLines.map((line) => masterDraft(line, now)),
+        ];
+        addUnit(drafts, [
+          openRow,
+          ...activeLines,
+          ...deletedLines.map((line) => line.row),
+        ]);
+        if (status !== 'open' && transition) quoteTransitions.push(transition);
+      };
+      for (const item of quoteItems) await addQuoteDocument(item.row, item);
+      // A line can be newer than its parent quote (a line-only edit from an older
+      // client). Recover it with the local header instead of dropping the line.
+      const recoveredQuotes = new Set(
+        quoteItems.map((item) => String(item.row.id)),
+      );
+      const orphanQuotes = new Set(
+        quoteLineItems
+          .map((item) => String(item.row.quote_id ?? ''))
+          .filter((id) => id !== '' && !recoveredQuotes.has(id)),
+      );
+      for (const quoteId of orphanQuotes) {
+        if (
+          queued.has(`quotations:${quoteId}`) ||
+          failedKeys.has(`quotations:${quoteId}`)
+        )
+          continue;
+        const header = (await db.quotations.get(quoteId)) as
+          | SyncedRow
+          | undefined;
+        if (!header) continue;
+        await addQuoteDocument(header, {
+          tbl: 'quotations',
+          row: header,
+          deleted: false,
+        });
+      }
+
       const otherLedger = recoveredRows.filter(
         ({ row }) => row.source_type !== 'opening',
       );
@@ -1165,6 +1289,10 @@ async function restoreRecoveryUnlocked(
           group.map(({ row }) => row),
         );
       }
+      // A converted quote's transition must see its sale in D1; cancelled quotes only
+      // need the open document above. Both run after the ledger units.
+      for (const item of quoteTransitions)
+        addUnit([masterDraft(item, now)], [item.row]);
 
       // A new staff member with no rows of their own still has to be restored.
       for (const item of newStaff.values()) {

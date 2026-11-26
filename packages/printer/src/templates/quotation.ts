@@ -7,7 +7,11 @@ import {
   formatReceiptNumber,
   formatTaxRate,
 } from '../format.ts';
-import { formatColumnHeader, resolvePaper } from '../layout.ts';
+import {
+  columnHeaderCells,
+  formatColumnHeader,
+  resolvePaper,
+} from '../layout.ts';
 import type { Block } from '../types.ts';
 import {
   labelsFrom,
@@ -60,6 +64,7 @@ function pushQuoteItems(
       t: 'text',
       text: formatColumnHeader(labels, charsPerLine),
       nowrap: true,
+      cells: columnHeaderCells(labels),
     });
   }
   const money = (paisa: number): string =>
@@ -174,8 +179,6 @@ export function buildQuotationReceipt(
     ),
     money(quote.subtotal),
   );
-  if (quote.itemDiscountTotal > 0)
-    pushPair(blocks, labels.discount, `-${money(quote.itemDiscountTotal)}`);
   if (quote.billDiscount > 0)
     pushPair(blocks, labels.discount, `-${money(quote.billDiscount)}`);
   if (quote.tax > 0 && !quote.taxInclusive)

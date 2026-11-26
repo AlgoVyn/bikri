@@ -27,8 +27,9 @@ describe('tenant extraction', () => {
         name_en: 'Phone',
         on_hand_milli: 5000,
         cost_changed_at: 123,
+        bundle_since: 456,
       }),
-    ).toEqual({ id: 'p1', name_en: 'Phone' });
+    ).toEqual({ id: 'p1', name_en: 'Phone', bundle_since: 456 });
     expect(EXPORT_TABLES).toEqual([...SNAPSHOT_TABLES]);
     for (const operational of [
       'tenant_usage',

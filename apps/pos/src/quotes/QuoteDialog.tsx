@@ -5,7 +5,9 @@ import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { DialogFooter } from '../components/DialogFooter.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { useAreaStrings } from '../i18n/areas.tsx';
 import { Modal } from '../sell/Modal.tsx';
+import { useHotkey } from '../shell/hotkeys.ts';
 
 export function QuoteDialog({
   open,
@@ -16,6 +18,7 @@ export function QuoteDialog({
   customerName,
   defaultValidUntil,
   minDate,
+  maxDate,
   defaultTerms,
   editing,
   saving,
@@ -30,6 +33,7 @@ export function QuoteDialog({
   customerName: string;
   defaultValidUntil: string;
   minDate: string;
+  maxDate: string;
   defaultTerms: string;
   editing: boolean;
   saving?: boolean;
@@ -37,6 +41,7 @@ export function QuoteDialog({
   onCustomer: () => void;
 }) {
   const { t } = useTranslation();
+  const officeReady = useAreaStrings('office');
   const [validUntil, setValidUntil] = useState(defaultValidUntil);
   const [terms, setTerms] = useState(defaultTerms);
 
@@ -45,6 +50,19 @@ export function QuoteDialog({
     setValidUntil(defaultValidUntil);
     setTerms(defaultTerms);
   }, [open, defaultValidUntil, defaultTerms]);
+
+  useHotkey(
+    (event) =>
+      (event.ctrlKey || event.metaKey) &&
+      !event.altKey &&
+      event.key.toLowerCase() === 's',
+    () => {
+      if (validUntil) onSave({ validUntil, terms });
+    },
+    { enabled: open, inFields: true, inDialog: true },
+  );
+
+  if (!officeReady) return null;
 
   return (
     <Modal
@@ -88,6 +106,7 @@ export function QuoteDialog({
           label={t('office.quotations.valid_until')}
           value={validUntil}
           min={minDate}
+          max={maxDate}
           onChange={setValidUntil}
         />
         <p className="-mt-2 text-caption text-text-muted">

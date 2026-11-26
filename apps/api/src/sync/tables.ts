@@ -1,5 +1,6 @@
 /** Synced-table metadata for the Worker (02 §1.1, 03 §4.3), from packages/db/src/tables.ts. */
 import {
+  EXPORT_JSON_SERVER_COLUMNS,
   LEDGER_TABLES,
   MASTER_TABLES,
   SYNC_EXPORT_ORDER,
@@ -39,6 +40,22 @@ export function columnsOf(tbl: D1Table): readonly string[] {
   return TABLE_COLUMNS[tbl];
 }
 
+/**
+ * Columns an operator/owner JSON backup carries. It is the client row plus the
+ * server-only fields a restore needs (`products.bundle_since`, CORE-M2). CSV and
+ * `/sync/snapshot` keep using `clientColumns`.
+ */
+export function backupColumns(tbl: D1Table): readonly string[] {
+  const extra = EXPORT_JSON_SERVER_COLUMNS[tbl] ?? [];
+  if (extra.length === 0) return clientColumns(tbl);
+  return [...clientColumns(tbl), ...extra];
+}
+
+/** Columns an operator `/import` accepts (client row plus JSON restore fields). */
+export function importColumns(tbl: D1Table): readonly string[] {
+  return backupColumns(tbl);
+}
+
 export function isSyncedTable(tbl: string): tbl is SyncedTable {
   return (
     (MASTER_TABLES as readonly string[]).includes(tbl) ||
@@ -73,13 +90,14 @@ export function rowJsonExpr(tbl: D1Table, alias = ''): string {
   return expr;
 }
 
-/** A SELECT list of the client columns. */
-const SELECT_LISTS = new Map<D1Table, string>();
-export function selectList(tbl: D1Table): string {
-  const cached = SELECT_LISTS.get(tbl);
+/** A SELECT list of the client (or JSON-backup) columns. */
+const SELECT_LISTS = new Map<string, string>();
+export function selectList(tbl: D1Table, backup = false): string {
+  const key = `${tbl}:${backup ? 1 : 0}`;
+  const cached = SELECT_LISTS.get(key);
   if (cached !== undefined) return cached;
-  const list = clientColumns(tbl).join(', ');
-  SELECT_LISTS.set(tbl, list);
+  const list = (backup ? backupColumns(tbl) : clientColumns(tbl)).join(', ');
+  SELECT_LISTS.set(key, list);
   return list;
 }
 

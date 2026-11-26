@@ -314,6 +314,23 @@ export function formatColumnHeader(
   );
 }
 
+/**
+ * The same column header as {@link formatColumnHeader}, as cells for the HTML
+ * and raster renderers. The ESC/POS path keeps the padded text; the structured
+ * row keeps the header aligned when a label is Urdu.
+ */
+export function columnHeaderCells(labels: {
+  item: string;
+  qty: string;
+  amount: string;
+}): LaidCell[] {
+  return [
+    { text: sanitizeInline(labels.item) },
+    { text: sanitizeInline(labels.qty), align: 'end' },
+    { text: sanitizeInline(labels.amount), align: 'end' },
+  ];
+}
+
 export type ItemFields = {
   name: string;
   qty: string;
@@ -466,6 +483,7 @@ function pushText(
   size: TextSize,
   charsPerLine: number,
   nowrap = false,
+  cells?: { text: string; align?: 'start' | 'end' }[],
 ): void {
   const paragraphs = text.split('\n');
   const columns = columnsFor(size, charsPerLine);
@@ -482,8 +500,21 @@ function pushText(
       !nowrap && hasNonAscii(paragraph)
         ? Math.max(1, Math.floor(width * 0.6))
         : width;
-    for (const line of wrapText(paragraph, wrapWidth)) {
-      out.push({ kind: 'text', text: line, align, bold, size });
+    const lines = wrapText(paragraph, wrapWidth);
+    for (const [index, line] of lines.entries()) {
+      out.push({
+        kind: 'text',
+        text: line,
+        align,
+        bold,
+        size,
+        // A one-line structured row (the column header) keeps its cells; a
+        // wrapped line cannot map them to the printed text any more.
+        cells:
+          cells !== undefined && index === 0 && lines.length === 1
+            ? [...cells]
+            : undefined,
+      });
     }
   }
 }
@@ -506,6 +537,7 @@ function pushBlock(
         block.size ?? 'normal',
         options.charsPerLine,
         block.nowrap ?? false,
+        block.cells,
       );
       return;
     case 'pair': {

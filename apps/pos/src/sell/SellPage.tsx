@@ -63,6 +63,7 @@ import { deviceInfo } from '../data/localTenant.ts';
 import { saveQuote } from '../data/quotes.ts';
 import { belowCataloguePrices } from '../data/sale.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { formatBusinessDate } from '../lib/date.ts';
 import { QuoteDialog } from '../quotes/QuoteDialog.tsx';
 import { loadDevicePrefs } from '../shell/devicePrefs.ts';
 import { composing, flushFocusedField, useHotkey } from '../shell/hotkeys.ts';
@@ -173,6 +174,13 @@ export function SellPage() {
   }, [cart.lines]);
   const today = businessDate(Date.now(), timeZone);
   const quoteDefaultDate = addDays(today, 7);
+  const quoteBusinessDate =
+    useLiveQuery(async () => {
+      const id = cart.quote?.mode === 'edit' ? cart.quote.quote_id : null;
+      if (!id) return '';
+      return String((await getDb().quotations.get(id))?.business_date ?? '');
+    }, [cart.quote?.mode, cart.quote?.quote_id]) ?? '';
+  const quoteMaxDate = addDays(quoteBusinessDate || today, 365);
   const prefix = parseQtyPrefix(query);
   const term = prefix ? prefix.rest : query;
   // The barcode/scanner Enter path reads the input value synchronously; only the
@@ -385,6 +393,12 @@ export function SellPage() {
     await cartsSettled();
     const current = (await getDb().carts.get(active)) ?? cart;
     if (current.lines.length === 0) return;
+    // A quote-mode cart (new/edit) is not a sale. F8, an empty search Enter and the
+    // visible button all route to the quote dialog; only a convert cart may pay.
+    if (current.quote && current.quote.mode !== 'convert') {
+      openQuoteDialog();
+      return;
+    }
     const now = cartTotals(current, money);
     // A backdated cart is attributed to the cashier who made the sale; their limits and
     // permissions decide whether an owner/manager override is needed (D-173).
@@ -677,11 +691,93 @@ export function SellPage() {
       : '';
 
   const openQuoteDialog = () => {
-    if (cart.lines.length === 0) {
-      toast.push(t('sell.quote_empty'), 'error');
-      return;
-    }
-    setQuoteOpen(true);
+    void (async () => {
+      if (cart.lines.length === 0) {
+        toast.push(t('sell.quote_empty'), 'error');
+        return;
+      }
+      await cartsSettled();
+      const db = getDb();
+      const current = (await db.carts.get(active)) ?? cart;
+      if (current.lines.length === 0) {
+        toast.push(t('sell.quote_empty'), 'error');
+        return;
+      }
+      const sellerCan = (permission: Permission) =>
+        Boolean(
+          staff &&
+            canDo(
+              staff.role as Role,
+              String(staff.permissions_json ?? '{}'),
+              permission,
+            ),
+        );
+      const currentTotals = cartTotals(current, money);
+      const sellerLimit = Number(staff?.max_discount_bp ?? 0);
+      const manualDiscount = manualDiscountBp(current, currentTotals);
+      if (manualDiscount > 0 && !sellerCan('sale.discount')) {
+        toast.push(t('sell.discount_forbidden'), 'error');
+        return;
+      }
+      if (
+        manualDiscount > sellerLimit &&
+        !overrideMatches(current, 'sale.discount')
+      ) {
+        setOverride({
+          permission: 'sale.discount',
+          onApproved: (by) => {
+            void mutate((c) =>
+              addOverride(c, {
+                permission: 'sale.discount',
+                approved_by: by,
+                approved_at: Date.now(),
+              }),
+            ).then(() => openQuoteDialog());
+          },
+        });
+        return;
+      }
+      if (!sellerCan('catalog.edit')) {
+        const productIds = [
+          ...new Set(
+            current.lines.flatMap((line) =>
+              [line.product_id, line.bundle_id].filter(
+                (id): id is string => typeof id === 'string' && id !== null,
+              ),
+            ),
+          ),
+        ];
+        const catalogue = new Map<string, MasterRow>();
+        for (const product of await db.products.bulkGet(productIds))
+          if (product) catalogue.set(product.id, product);
+        const overrun = belowCataloguePrices(current, catalogue).find(
+          (entry) =>
+            !overrideMatches(current, 'catalog.edit', {
+              line: entry.key,
+              price: entry.price,
+            }),
+        );
+        if (overrun) {
+          const approved = overrun;
+          setOverride({
+            permission: 'catalog.edit',
+            onApproved: (by) => {
+              void mutate((c) =>
+                addOverride(c, {
+                  permission: 'catalog.edit',
+                  approved_by: by,
+                  approved_at: Date.now(),
+                  bound_line: approved.key,
+                  bound_price: approved.price,
+                }),
+              ).then(() => openQuoteDialog());
+            },
+          });
+          return;
+        }
+      }
+      setQuoteOpen(true);
+    })();
   };
 
   const onSaveQuote = async (input: { validUntil: string; terms: string }) => {
@@ -1001,6 +1097,35 @@ export function SellPage() {
         className="flex min-w-0 flex-1 flex-col gap-2 p-3 lg:basis-3/5"
       >
         <h1 className="sr-only">{t('nav.sell')}</h1>
+        {cart.quote && cart.lines.length === 0 ? (
+          <div
+            className="flex items-start gap-2 rounded-control border border-primary bg-primary-subtle p-2 text-small text-primary-subtle-ink lg:hidden"
+            data-testid="quote-mode-banner"
+          >
+            <div className="min-w-0 flex-1">
+              <p className="font-medium">
+                {cart.quote.mode === 'edit' && cart.quote.quote_no
+                  ? t('sell.quote_editing', { quote: cart.quote.quote_no })
+                  : t('sell.quote_new')}
+              </p>
+              <p className="truncate">
+                {t('sell.quote_valid_until', {
+                  date: formatBusinessDate(
+                    String(cart.quote.valid_until ?? ''),
+                    i18n.language,
+                  ),
+                })}
+              </p>
+            </div>
+            <button
+              type="button"
+              className="min-h-11 shrink-0 px-2 underline underline-offset-2"
+              onClick={cancelQuoteMode}
+            >
+              {t('sell.quote_cancel_edit')}
+            </button>
+          </div>
+        ) : null}
         <search>
           <label htmlFor="sell-search" className="sr-only">
             {t('sell.search_label')}
@@ -1245,12 +1370,12 @@ export function SellPage() {
         customerName={customerName ?? ''}
         defaultValidUntil={cart.quote?.valid_until ?? quoteDefaultDate}
         minDate={today}
+        maxDate={quoteMaxDate}
         defaultTerms={cart.quote?.terms ?? ''}
         editing={cart.quote?.mode === 'edit'}
         saving={quoteSaving}
         onSave={(input) => void onSaveQuote(input)}
         onCustomer={() => {
-          setQuoteOpen(false);
           setDialog('customer');
         }}
       />

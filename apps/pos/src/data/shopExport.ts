@@ -2,6 +2,7 @@ import {
   APP_VERSION,
   DEFAULT_TIME_ZONE,
   EXPORT_HIDDEN_COLUMNS,
+  EXPORT_JSON_SERVER_COLUMNS,
   isTimeZone,
   LOCAL_ONLY_COLUMNS,
   MONEY_FIELDS,
@@ -309,6 +310,10 @@ export async function buildShopExport(
       // would make the operator restore reject every row of that table.
       ...(LOCAL_ONLY_COLUMNS[name] ?? []),
     ]);
+    const keepJson = new Set(EXPORT_JSON_SERVER_COLUMNS[name] ?? []);
+    const hiddenJson = new Set(
+      [...hidden].filter((field) => !keepJson.has(field)),
+    );
     const json = new JsonStream();
     const csv = new ExportStream();
     let columns: string[] | null = null;
@@ -331,7 +336,7 @@ export async function buildShopExport(
           continue;
         const copy = { ...row };
         delete copy.tenant_id;
-        for (const field of hidden) delete copy[field];
+        for (const field of hiddenJson) delete copy[field];
         clean.push(copy);
       }
       if (clean.length > 0) {

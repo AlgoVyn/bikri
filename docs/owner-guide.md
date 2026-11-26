@@ -43,7 +43,17 @@ The three cart tabs keep separate sales; **Hold** parks a bill and **Resume** br
 
 If a sale was not entered, open **Sales → Record past sale**. Pick the sale date (any past date; the calendar goes back as far as you need), the cashier who made it, and why it was missed. The sale is recorded on the current device with the chosen date and the cashier's name; you are recorded as the person who entered it in Activity. **The cash must be with you, not in the till.** The original till's day close is never changed: if that till is still open and the cash is there, record the cash handover as a pay-out or take the cash before closing. Cancel writes nothing. The sale shows a **Late** badge and prints `RECORDED LATE`; reports put it on the chosen day.
 
-## 5. Udhaar (khata)
+## 5. Quotations
+
+- A quotation is a price offer, not a bill: **Save quote** in the Sell cart stores the customer, lines, discount and terms without taking payment or moving stock. Quote numbers start with `QTN-` and never use an invoice number.
+- **Bills | Quotations** under Sales lists quotes with their status and valid-until date. Open one to edit, duplicate, cancel, print, share on WhatsApp, download a PDF or **Convert to sale**.
+- **Convert to sale** opens a normal Sell cart with the quoted lines. The payment is an ordinary sale; the quote then shows **Converted** and links to that bill.
+- A quote is valid until the date you choose (7 days by default). After that date it is shown as expired: conversion uses today's prices unless an owner/manager approves **Use quoted prices**, which is recorded in Activity.
+- Quote edits, conversions and cancellations need the same permission as creating a sale. Discount and price-override limits still apply, so a cashier may need a manager PIN.
+- Quotes sync between tills and are included in the backup/export. They work offline like a sale; a quote saved or converted offline syncs when the connection returns.
+- A quotation is **not a tax invoice** and has no payment rows. Print or share it as an offer only.
+
+## 6. Udhaar (khata)
 
 - **Udhaar** lists every customer, total owed, age and promise date. Search by name or phone.
 - Open a customer to see the statement: every sale, payment, refund and adjustment with a running balance.
@@ -52,7 +62,7 @@ If a sale was not entered, open **Sales → Record past sale**. Pick the sale da
 - Send a reminder on WhatsApp from the customer's page. A customer with no phone has the button disabled.
 - CSVs and the statement PDF/PNG can be exported from the customer page.
 
-## 6. Products, stock and suppliers
+## 7. Products, stock and suppliers
 
 - **Products**: add name (English and Urdu), price, cost, SKU, barcode, unit, low-stock alert and whether stock is tracked. `Print label` creates a Code 128 barcode label.
 - **Bundles** (v1.1): create a product and tick **This is a bundle**, then add 1–20 component products with a quantity each and one bundle price. Selling the bundle deducts each tracked component; a component gets no stock of its own. Edit the recipe or price in the product; a component used by a bundle cannot be deleted until you remove it from the recipe. A return is always for whole bundle units.
@@ -60,37 +70,37 @@ If a sale was not entered, open **Sales → Record past sale**. Pick the sale da
 - **Suppliers**: record deliveries (purchase invoice, lines, freight, paid now) and pay the supplier. A delivery raises stock at the landed cost.
 - **Return to supplier**: open a supplier → **Return to supplier**, link the original delivery lines, choose the credit and whether the supplier refunded you now.
 
-## 7. Expenses and day close
+## 8. Expenses and day close
 
 - **Expenses**: record cash/card/bank expenses. A cashier can record a small cash expense; larger or non-cash expenses need a manager. A wrong expense is reversed, not deleted.
 - **Cash in/out** records money put into or taken out of the drawer.
 - **Day close** counts the drawer (notes or a total), shows expected cash, difference and a note. Close once per device at the end of the day; the Z-report can be printed or saved. The next day starts from the counted cash.
 
-## 8. Reports and exports
+## 9. Reports and exports
 
 - **Reports**: today/7 days/30 days/month/custom range, device filter, summary, products, stock, udhaar, staff, day closes and expenses. Profit and cost appear only for owners/managers (or staff with cost permission).
 - Every list has a CSV export. Reports also have a summary PDF and a shareable PNG.
 - **Settings → Backup** (owner only) downloads a full copy of the shop as a zip (JSON + CSV). **Download from server** needs an admin device and the owner email sign-in. It contains data already synced from every till, including a lost one; unsynced changes on a lost till cannot be recovered.
 
-## 9. Printer and labels
+## 10. Printer and labels
 
 - **Settings → Printer** (owner/manager): choose 58 mm or 80 mm, connect a USB or Serial printer, print a test page and set auto-print/copies/drawer options.
 - **Bikri Print Agent** (optional, Windows/macOS/Linux): install it on the till PC to print through the system printer driver (raw ESC/POS or a driver-rendered image). Pair it from Settings → Printer with the 6-digit code the agent shows on `http://127.0.0.1:17890`. It listens on the local machine only; uninstall or unpair it from the same page. See [14-print-agent](14-print-agent.md).
 - If the printer is not connected, the receipt stays queued; **Retry** from Sale complete or Settings → Printer.
 - **Labels**: from a product (`L`), the product list's Select mode, or after saving a delivery. Choose 50×25, 38×25, 40×30 mm or A4, generate a barcode if needed, and print through the browser dialog. Settings → Labels prints a test label.
 
-## 10. Offline, sync and multiple tills
+## 11. Offline, sync and multiple tills
 
 - A till keeps a full local copy and works with no network. The top bar shows waiting changes, and a banner appears when offline.
 - Changes sync automatically. A conflict (the same product/price edited on two tills) is shown in Settings → Sync and resolved by the owner.
 - Each till has its own invoice counter and day close. Add tills from **Settings → Devices** (owner on an admin device) and give each its own name.
 - One browser profile holds one shop. To run two shops on one PC, use two browser profiles.
 
-## 11. Email sign-in and admin devices
+## 12. Email sign-in and admin devices
 
 Some actions need the owner email as well as the PIN: server export, device management and owner settings. Ask Algovyn to add your address, then click the verification link Cloudflare emails you once. After that, enter the 6-digit code sent to your email. The session lasts 12 hours and ends when you lock or switch user. Mark at least one device as **admin** in Settings → Devices.
 
-## 12. Read-only, support access and your data
+## 13. Read-only, support access and your data
 
 - If the shop is made **read-only** (for example an unpaid bill), you can still sign in, see reports and history and export your data, but cannot make sales or changes. A banner stays on every screen. Sales made before the till learned the status are kept.
 - **Algovyn support** access is explicit, time-limited (1–24 hours) and shown in a banner on every till; the support device is view-only. An owner on an admin device can end it with **End now**.
@@ -99,7 +109,7 @@ Some actions need the owner email as well as the PIN: server export, device mana
 - **Full copy:** Settings → Backup → Export. Do this before leaving Bikri or before a deletion request.
 - **Delete a shop:** ask Algovyn; an export is offered first. Its live rows and files are removed, the tenant row stays as a tombstone, and encrypted backup copies expire on the schedule above.
 
-## 13. Quick fixes
+## 14. Quick fixes
 
 | Problem | Try |
 |---|---|

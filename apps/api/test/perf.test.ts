@@ -103,6 +103,12 @@ const HOT_QUERIES: Array<{
     index: 'sqlite_autoindex_supplier_return_lines_1',
   },
   {
+    name: 'quotation lines by quote',
+    sql: 'SELECT id FROM quotation_lines WHERE tenant_id = ? AND quote_id IN (?)',
+    args: ['t', 'q'],
+    index: 'sqlite_autoindex_quotation_lines_1',
+  },
+  {
     name: 'ledger by party',
     sql: 'SELECT amount FROM ledger_entries WHERE tenant_id = ? AND party_type = ? AND party_id = ?',
     args: ['t', 'customer', 'c'],

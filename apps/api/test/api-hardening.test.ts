@@ -2534,6 +2534,52 @@ describe('API-M2: soft-deleted rows are not resurrected across a push', () => {
     expect(res.results[0]?.error_code ?? null).toBeNull();
     expect(res.results[1]?.error_code).toBe('CONSTRAINT_FAILED');
   });
+  it('refuses to re-parent the last recipe row and leave the source bundle empty', async () => {
+    const shop = await seedShop('M3 reparent');
+    const now = Date.now();
+    const source = newId(now);
+    const target = newId(now);
+    const itemId = newId(now);
+    const component = newId(now);
+    await env.DB.batch([
+      env.DB.prepare(
+        `INSERT INTO products (tenant_id, id, name_en, sku, price, kind, track_stock, created_at, updated_at, rev)
+         VALUES (?1, ?2, 'Source', 'SRC-M3', 1000, 'bundle', 0, ?3, ?3, 1)`,
+      ).bind(shop.tenantId, source, now),
+      env.DB.prepare(
+        `INSERT INTO products (tenant_id, id, name_en, sku, price, kind, track_stock, created_at, updated_at, rev)
+         VALUES (?1, ?2, 'Target', 'TGT-M3', 1000, 'bundle', 0, ?3, ?3, 1)`,
+      ).bind(shop.tenantId, target, now),
+      env.DB.prepare(
+        `INSERT INTO products (tenant_id, id, name_en, sku, price, created_at, updated_at, rev)
+         VALUES (?1, ?2, 'Target component', 'TC-M3', 500, ?3, ?3, 1)`,
+      ).bind(shop.tenantId, component, now),
+      env.DB.prepare(
+        `INSERT INTO bundle_items (tenant_id, id, bundle_id, component_product_id, qty_milli, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, 1000, 0, ?5, ?5)`,
+      ).bind(shop.tenantId, itemId, source, IDS.product, now),
+      env.DB.prepare(
+        `INSERT INTO bundle_items (tenant_id, id, bundle_id, component_product_id, qty_milli, sort_order, created_at, updated_at)
+         VALUES (?1, ?2, ?3, ?4, 1000, 0, ?5, ?5)`,
+      ).bind(shop.tenantId, newId(now), target, component, now),
+    ]);
+    const res = await pushOk(shop.till, [
+      op(
+        'bundle_items',
+        'upsert',
+        { id: itemId, bundle_id: target, updated_by: IDS.owner },
+        { base_rev: 1, changed_fields: ['bundle_id'] },
+      ),
+    ]);
+    expect(res.results[0]?.error_code).toBe('CONSTRAINT_FAILED');
+    expect(
+      await count(
+        'SELECT COUNT(*) AS n FROM bundle_items WHERE tenant_id = ?1 AND bundle_id = ?2 AND deleted_at IS NULL',
+        shop.tenantId,
+        source,
+      ),
+    ).toBe(1);
+  });
 });
 
 describe('API-M4: one rev bump per costed delivery', () => {

@@ -17,6 +17,7 @@ import {
 } from '../../packages/core/src/dates.ts';
 import {
   EXPORT_HIDDEN_COLUMNS,
+  EXPORT_JSON_SERVER_COLUMNS,
   MONEY_FIELDS,
   TIME_FIELDS,
 } from '../../packages/core/src/exportFields.ts';
@@ -47,7 +48,10 @@ export function backupExportedAt(date) {
 export function stripRow(table, row) {
   const copy = { ...row };
   delete copy.tenant_id;
-  for (const field of EXPORT_HIDDEN_COLUMNS[table] ?? []) delete copy[field];
+  const keep = new Set(EXPORT_JSON_SERVER_COLUMNS[table] ?? []);
+  for (const field of EXPORT_HIDDEN_COLUMNS[table] ?? []) {
+    if (!keep.has(field)) delete copy[field];
+  }
   return copy;
 }
 

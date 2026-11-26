@@ -69,7 +69,7 @@ import { useSellStore } from '../sell/sellStore.ts';
 import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { cashierTodayOnly } from '../state/reportScope.ts';
+import { cashierTodayOnly, quoteVisible } from '../state/reportScope.ts';
 import { BackdateDialog } from './BackdateDialog.tsx';
 import {
   dayHeading,
@@ -246,12 +246,61 @@ function SalesListContent({
     }, [range.from, range.to, rangeError]) ?? 0;
   const quotationCount =
     useLiveQuery(async () => {
-      if (rangeError) return 0;
-      return getDb()
-        .quotations.where('business_date')
+      if (rangeError || !can('sale.create')) return 0;
+      const db = getDb();
+      const visible = (quote: Record<string, unknown>) =>
+        quoteVisible({
+          role,
+          support,
+          canViewReports: can('report.view'),
+          canQuote: true,
+          status: String(quote.status),
+          businessDate: String(quote.business_date),
+          branchId,
+          quoteBranchId: String(quote.branch_id ?? ''),
+          today,
+          timeZone,
+          convertedAt: Number(quote.converted_at ?? 0) || null,
+          cancelledAt: Number(quote.cancelled_at ?? 0) || null,
+        });
+      if (limited) {
+        const todayRange = rangeFor('today', Date.now(), timeZone);
+        const dayMs = 86_400_000;
+        const from = Date.parse(`${todayRange.from}T00:00:00Z`) - 2 * dayMs;
+        const to = Date.parse(`${todayRange.to}T00:00:00Z`) + 2 * dayMs;
+        const open = await db.quotations
+          .where('[status+valid_until]')
+          .between(['open', ''], ['open', '\uffff'], true, true)
+          .filter(visible)
+          .count();
+        const converted = await db.quotations
+          .where('[status+converted_at]')
+          .between(['converted', from], ['converted', to], true, true)
+          .filter(visible)
+          .count();
+        const cancelled = await db.quotations
+          .where('[status+cancelled_at]')
+          .between(['cancelled', from], ['cancelled', to], true, true)
+          .filter(visible)
+          .count();
+        return open + converted + cancelled;
+      }
+      return db.quotations
+        .where('business_date')
         .between(range.from, range.to, true, true)
+        .filter(visible)
         .count();
-    }, [range.from, range.to, rangeError]) ?? 0;
+    }, [
+      range.from,
+      range.to,
+      rangeError,
+      limited,
+      role,
+      support,
+      branchId,
+      today,
+      timeZone,
+    ]) ?? 0;
   const [pageData, setPageData] = useState<{
     summary: SalesSummary;
     days: SalesDay[];
@@ -509,6 +558,7 @@ function SalesListContent({
         active="bills"
         billCount={pageData?.rowCount}
         quotationCount={quotationCount}
+        showQuotations={can('sale.create')}
       />
 
       {limited ? (

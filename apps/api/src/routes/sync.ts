@@ -375,6 +375,7 @@ export async function snapshotPayload(
   maxLimit = 1000,
   clientSchema = BUNDLE_SCHEMA,
   chargeReads = true,
+  backup = false,
 ): Promise<Record<string, unknown>> {
   const tables = SNAPSHOT_TABLES.filter(
     (tbl) =>
@@ -427,7 +428,7 @@ export async function snapshotPayload(
   const hideBundles = clientSchema < BUNDLE_SCHEMA && q.tbl === 'products';
   const result = await db
     .prepare(
-      `SELECT ${selectList(q.tbl)} FROM ${q.tbl} WHERE tenant_id = ?1 AND id > ?2${column ? ` AND ${column} <= ?3` : ''}${hideBundles ? " AND kind <> 'bundle'" : ''} ORDER BY id LIMIT ?${column ? 4 : 3}`,
+      `SELECT ${selectList(q.tbl, backup)} FROM ${q.tbl} WHERE tenant_id = ?1 AND id > ?2${column ? ` AND ${column} <= ?3` : ''}${hideBundles ? " AND kind <> 'bundle'" : ''} ORDER BY id LIMIT ?${column ? 4 : 3}`,
       ...(column
         ? [q.after, q.before as number, limit + 1]
         : [q.after, limit + 1]),
@@ -435,6 +436,18 @@ export async function snapshotPayload(
     .all<Record<string, unknown>>();
   const rows = result.results;
   const page = rows.slice(0, limit);
+  // A quote converted after the export cut-off can point at a sale that is not in the
+  // archive. Mask the conversion so restore does not fail the composite FK (API-L3).
+  if (q.tbl === 'quotations' && q.before !== undefined) {
+    for (const row of page) {
+      const convertedAt = Number(row.converted_at ?? 0);
+      if (convertedAt > q.before) {
+        row.status = 'open';
+        row.converted_sale_id = null;
+        row.converted_at = null;
+      }
+    }
+  }
   // The operator export is Access-only and deliberately outside the shop's read
   // budget; till snapshots and owner exports still charge their pages. Use D1's
   // real rows-read count rather than the page size (API-L6).

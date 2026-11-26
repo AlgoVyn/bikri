@@ -2356,6 +2356,217 @@ describe('pull (03 §4.2)', () => {
     expect(entries.find((entry) => entry.row_id === 'bi-old')).toBeDefined();
   });
 
+  it('recovers quotations as documents and sequences a terminal transition', async () => {
+    const db = await enrolled('recover-quotes');
+    const quote = (
+      id: string,
+      status: 'open' | 'converted' | 'cancelled',
+      convertedAt: number | null = null,
+      cancelledAt: number | null = null,
+    ) => ({
+      id,
+      quote_no: `QTN-A-${id.slice(-1)}`,
+      quote_seq: Number(id.slice(-1)),
+      branch_id: 'br-1',
+      device_id: 'dev-1',
+      staff_id: 'st-1',
+      customer_id: null,
+      customer_name: '',
+      customer_phone: '',
+      business_date: '2026-10-27',
+      valid_until: '2026-11-03',
+      status,
+      line_count: 1,
+      items_qty_milli: 1000,
+      gross_total: 1000,
+      item_discount_total: 0,
+      subtotal: 1000,
+      bill_discount_type: null,
+      bill_discount_value: 0,
+      bill_discount: 0,
+      tax_rate_bp: 0,
+      tax: 0,
+      tax_inclusive: 0,
+      round_total_to: 1,
+      rounding: 0,
+      total: 1000,
+      note: '',
+      converted_sale_id: status === 'converted' ? 'sale-1' : null,
+      converted_at: convertedAt,
+      cancelled_reason: status === 'cancelled' ? 'No' : '',
+      cancelled_at: cancelledAt,
+      created_at: NOW + 1,
+      updated_at: NOW + 1,
+      deleted_at: null,
+      rev: 1,
+      updated_by: 'st-1',
+    });
+    const line = (id: string, quoteId: string) => ({
+      id,
+      quote_id: quoteId,
+      line_no: 1,
+      product_id: 'p1',
+      name_snapshot: 'Phone',
+      sku_snapshot: 'S',
+      qty_milli: 1000,
+      unit_price: 1000,
+      gross: 1000,
+      discount_type: null,
+      discount_value: 0,
+      discount: 0,
+      net: 1000,
+      note: '',
+      unit_cost_snapshot: 0,
+      bundle_id: null,
+      bundle_group: null,
+      bundle_name: null,
+      bundle_qty: null,
+      bundle_price: null,
+      bundle_component_qty_milli: null,
+      bundle_discount: 0,
+      created_at: NOW + 1,
+      updated_at: NOW + 1,
+      deleted_at: null,
+      rev: 1,
+      updated_by: 'st-1',
+    });
+    await db.quotations.bulkAdd([
+      quote('q1', 'open'),
+      quote('q2', 'converted', NOW + 2),
+      {
+        ...quote('q3', 'cancelled', null, NOW - 50),
+        created_at: NOW - 100,
+        updated_at: NOW + 1,
+        rev: 2,
+      },
+      {
+        ...quote('q4', 'open'),
+        created_at: NOW - 100,
+        updated_at: NOW - 100,
+      },
+    ] as never);
+    await db.quotation_lines.bulkAdd([
+      line('ql1', 'q1'),
+      line('ql2', 'q2'),
+      line('ql3', 'q3'),
+      { ...line('ql4', 'q4'), updated_at: NOW + 1 },
+    ] as never);
+    server.tables = {};
+    await restoreRecovery(db, NOW + 1, 'epoch-quotes');
+    const entries = await db.outbox.toArray();
+    const openHeader = entries.find(
+      (entry) => entry.tbl === 'quotations' && entry.row_id === 'q1',
+    );
+    const openLine = entries.find(
+      (entry) => entry.tbl === 'quotation_lines' && entry.row_id === 'ql1',
+    );
+    expect(openHeader?.tx_id).toBe(openLine?.tx_id);
+    expect(openHeader?.row).toMatchObject({ status: 'open' });
+    const convertedOpen = entries.find(
+      (entry) =>
+        entry.tbl === 'quotations' &&
+        entry.row_id === 'q2' &&
+        entry.row?.status === 'open',
+    );
+    const convertedLine = entries.find(
+      (entry) => entry.tbl === 'quotation_lines' && entry.row_id === 'ql2',
+    );
+    expect(convertedOpen?.tx_id).toBe(convertedLine?.tx_id);
+    const transition = entries.find(
+      (entry) =>
+        entry.tbl === 'quotations' &&
+        entry.row_id === 'q2' &&
+        entry.row?.status === 'converted',
+    );
+    expect(transition).toBeDefined();
+    expect(transition?.tx_id).not.toBe(convertedOpen?.tx_id);
+    // A terminal quote whose conversion predates the restore point is already in the
+    // restored copy; it must not be re-sent.
+    expect(
+      entries.some(
+        (entry) => entry.tbl === 'quotations' && entry.row_id === 'q3',
+      ),
+    ).toBe(false);
+    // A line newer than its parent header is still recovered with the local header.
+    const orphanHeader = entries.find(
+      (entry) => entry.tbl === 'quotations' && entry.row_id === 'q4',
+    );
+    const orphanLine = entries.find(
+      (entry) => entry.tbl === 'quotation_lines' && entry.row_id === 'ql4',
+    );
+    expect(orphanHeader).toBeDefined();
+    expect(orphanHeader?.tx_id).toBe(orphanLine?.tx_id);
+  });
+
+  it('keeps a no-op quotation header beside a recovered line edit', async () => {
+    const db = await readyDb('reconcile-quote-header');
+    await db.quotations.add({
+      id: 'q1',
+      quote_no: 'QTN-A-1',
+      quote_seq: 1,
+      status: 'open',
+      branch_id: 'br-1',
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+      updated_by: 'st-1',
+    } as never);
+    await db.quotation_lines.add({
+      id: 'ql1',
+      quote_id: 'q1',
+      line_no: 1,
+      note: 'old',
+      created_at: NOW,
+      updated_at: NOW,
+      deleted_at: null,
+      rev: 1,
+      updated_by: 'st-1',
+    } as never);
+    const tx = newId();
+    await db.outbox.bulkAdd([
+      {
+        op_id: newId(),
+        tx_id: tx,
+        tbl: 'quotations',
+        kind: 'upsert',
+        row_id: 'q1',
+        row: { id: 'q1', updated_at: NOW, updated_by: 'st-1' },
+        base_rev: 1,
+        changed_fields: [],
+        created_at: NOW,
+        status: 'pending',
+        attempts: 0,
+        recovery: true,
+      },
+      {
+        op_id: newId(),
+        tx_id: tx,
+        tbl: 'quotation_lines',
+        kind: 'upsert',
+        row_id: 'ql1',
+        row: {
+          id: 'ql1',
+          note: 'new',
+          updated_at: NOW + 1,
+          updated_by: 'st-1',
+        },
+        base_rev: 1,
+        changed_fields: ['note'],
+        created_at: NOW,
+        status: 'pending',
+        attempts: 0,
+        recovery: true,
+      },
+    ]);
+    await reconcileRecoveredMasterFields(db);
+    const entries = await db.outbox.toArray();
+    const header = entries.find((entry) => entry.row_id === 'q1');
+    const line = entries.find((entry) => entry.row_id === 'ql1');
+    expect(header).toMatchObject({ tx_id: tx, changed_fields: [] });
+    expect(line).toMatchObject({ tx_id: tx, changed_fields: ['note'] });
+  });
+
   it('narrows recovered master edits to the fields that differ from the restored row', async () => {
     const db = await readyDb('recover-master');
     await db.customers.put({

@@ -3,7 +3,11 @@ import {
   formatReceiptDate,
   formatReceiptMoney,
 } from '../format.ts';
-import { formatColumnHeader, resolvePaper } from '../layout.ts';
+import {
+  columnHeaderCells,
+  formatColumnHeader,
+  resolvePaper,
+} from '../layout.ts';
 import type { Block } from '../types.ts';
 import {
   labelsFrom,
@@ -80,6 +84,7 @@ export function buildRefundReceipt(
       t: 'text',
       text: formatColumnHeader(labels, paper.charsPerLine),
       nowrap: true,
+      cells: columnHeaderCells(labels),
     });
   }
   for (const line of input.lines) {

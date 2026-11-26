@@ -808,40 +808,67 @@ function applyQuoteChanges(look: Lookups, ops: PushOp[]): void {
       const changed = new Set(op.changed_fields ?? []);
       const next: Record<string, unknown> = current ? { ...current } : {};
       for (const [field, value] of Object.entries(row)) {
-        if (changed.size === 0 || changed.has(field)) next[field] = value;
+        // Mirror planOp: an existing master row writes only changed_fields plus
+        // updated_at/updated_by (API-H1).
+        if (
+          !current ||
+          changed.has(field) ||
+          field === 'updated_at' ||
+          field === 'updated_by'
+        )
+          next[field] = value;
       }
       look.quotes.set(id, next as unknown as QuoteInfo);
       continue;
     }
     if (op.tbl !== 'quotation_lines') continue;
     if (op.kind === 'delete') {
+      const id = op.row_id;
+      if (!id) continue;
+      look.quoteLineById.delete(id);
       for (const [quoteId, lines] of look.quoteLinesByQuote)
         look.quoteLinesByQuote.set(
           quoteId,
-          lines.filter((line) => line.id !== op.row_id),
+          lines.filter((line) => line.id !== id),
         );
       continue;
     }
     const row = op.row ?? {};
-    const quoteId = String(row.quote_id ?? '');
     const id = String(row.id ?? '');
-    if (!quoteId || !id) continue;
+    if (!id) continue;
+    const stored =
+      look.quoteLineById.get(id) ??
+      [...look.quoteLinesByQuote.values()]
+        .flat()
+        .find((line) => line.id === id);
+    const quoteId = stored?.quote_id ?? String(row.quote_id ?? '');
+    if (!quoteId) continue;
     const lines = look.quoteLinesByQuote.get(quoteId) ?? [];
     const index = lines.findIndex((line) => line.id === id);
-    const current = index >= 0 ? lines[index] : undefined;
+    const current = stored ?? (index >= 0 ? lines[index] : undefined);
     const changed = new Set(op.changed_fields ?? []);
     const next: Record<string, unknown> = current ? { ...current } : {};
     for (const [field, value] of Object.entries(row)) {
-      if (changed.size === 0 || changed.has(field)) next[field] = value;
+      if (
+        !current ||
+        changed.has(field) ||
+        field === 'updated_at' ||
+        field === 'updated_by'
+      )
+        next[field] = value;
     }
-    if (next.deleted_at !== null && next.deleted_at !== undefined) {
+    // Never clear a stored soft delete in memory when planOp will not clear it in D1.
+    if (current?.deleted_at !== null && current?.deleted_at !== undefined)
+      next.deleted_at = current.deleted_at;
+    const updated = next as unknown as QuoteLineInfo;
+    look.quoteLineById.set(id, updated);
+    if (updated.deleted_at !== null && updated.deleted_at !== undefined) {
       look.quoteLinesByQuote.set(
         quoteId,
         lines.filter((line) => line.id !== id),
       );
       continue;
     }
-    const updated = next as unknown as QuoteLineInfo;
     if (index >= 0) lines[index] = updated;
     else lines.push(updated);
     look.quoteLinesByQuote.set(quoteId, lines);
@@ -860,6 +887,8 @@ export async function applyOps(
   const final = new Map<string, OpResult>();
   /** Sale ops that wrote a fresh row, so only those may advance `last_invoice_seq`. */
   const freshSaleOps = new Set<string>();
+  /** Quote inserts that wrote a fresh row on this device (API-M1). */
+  const freshQuoteOps = new Set<string>();
   let rowsWritten = 0;
   let rowsRead = 0;
 
@@ -1036,6 +1065,15 @@ export async function applyOps(
               !p.existingInsert
             )
               freshSaleOps.add(p.op.op_id);
+            if (
+              !lostGroup &&
+              p.op.tbl === 'quotations' &&
+              p.op.kind === 'upsert' &&
+              !p.existingInsert &&
+              p.result.server_rev === 1 &&
+              p.op.row?.device_id === ctx.device.id
+            )
+              freshQuoteOps.add(p.op.op_id);
           }
           // A lost guard rolls back the whole transaction (`guardAssert`): replay every
           // op of the group, not only the guarded ones, so companions reach round 2 with
@@ -1141,6 +1179,7 @@ export async function applyOps(
       op.tbl !== 'quotations' ||
       op.kind !== 'upsert' ||
       !op.row ||
+      !freshQuoteOps.has(op.op_id) ||
       final.get(op.op_id)?.result !== 'applied'
     )
       continue;

@@ -52,7 +52,7 @@ import {
   revokeSupportDeviceStatements,
   supportPayload,
 } from '../sync/status.ts';
-import { APPLY_ORDER, clientColumns, SNAPSHOT_TABLES } from '../sync/tables.ts';
+import { APPLY_ORDER, importColumns, SNAPSHOT_TABLES } from '../sync/tables.ts';
 import type { DeviceRow, TenantRow, TenantStatus } from '../types.ts';
 import { snapshotPayload } from './sync.ts';
 
@@ -799,6 +799,7 @@ admin.get('/tenants/:id/export', async (c) => {
     1000,
     CLIENT_SCHEMA_VERSION,
     false,
+    true,
   );
   if (!c.req.query('tbl')) {
     await db.batch(
@@ -990,7 +991,7 @@ admin.post('/tenants/:id/import', async (c) => {
     })
     .parse(await readJsonBody(c, 4_000_000));
   const tbl = body.tbl as (typeof IMPORT_TABLES)[number];
-  const allowed = new Set(clientColumns(tbl));
+  const allowed = new Set(importColumns(tbl));
   const now = Date.now();
   const stmts: D1PreparedStatement[] = [];
   for (const raw of body.rows) {

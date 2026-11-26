@@ -1057,6 +1057,21 @@ export function checkOp(
       !productDeletedInGroup(look, group, bundleId)
     )
       throw new Reject('CONSTRAINT_FAILED');
+    // Re-parenting an existing recipe row must not leave its old bundle with 0
+    // components (API-M3). Deleting the old bundle itself is allowed.
+    const storedItem = look.bundleItemById.get(String(row.id));
+    if (storedItem && storedItem.bundle_id !== bundleId) {
+      const remaining = activeBundleComponents(
+        look,
+        group,
+        storedItem.bundle_id,
+      );
+      if (
+        remaining.size < 1 &&
+        !productDeletedInGroup(look, group, storedItem.bundle_id)
+      )
+        throw new Reject('CONSTRAINT_FAILED');
+    }
   }
   if (op.tbl === 'products') {
     // D-229 invariants are enforced on the state the op actually leaves: `planOp` writes
@@ -1171,5 +1186,5 @@ export function checkOp(
     }
   }
   if (op.tbl === 'quotations') checkQuoteHeader(ctx, look, group, op, row);
-  if (op.tbl === 'quotation_lines') checkQuoteLine(look, group, op, row);
+  if (op.tbl === 'quotation_lines') checkQuoteLine(ctx, look, group, op, row);
 }

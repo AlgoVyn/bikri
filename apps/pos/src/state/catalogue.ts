@@ -186,6 +186,7 @@ const WARM_TABLES = new Set([
   'bundle_items',
   'categories',
   'stock_levels',
+  'shop',
 ]);
 
 // A sale or refund invalidates the snapshot for the next screen that opens; the Sell

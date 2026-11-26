@@ -1,4 +1,5 @@
 import { env } from 'cloudflare:workers';
+import { newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { TENANT_TABLES } from '../../src/db/tenantDb.ts';
 import { passFinished, pruneAll } from '../../src/platform/prune.ts';
@@ -11,7 +12,7 @@ import {
   seedShop,
   setStatus,
 } from '../helpers/fixtures.ts';
-import { pullAll, pushOk, saleOps } from '../helpers/ops.ts';
+import { op, pullAll, pushOk, quoteOps, saleOps } from '../helpers/ops.ts';
 
 const DAY = 86_400_000;
 const n = async (sql: string, ...p: unknown[]) =>
@@ -162,7 +163,30 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
     const a = await seedShop('Del A');
     const d = await seedShop('Del D');
     await addBundleFixture(d, 'D');
-    await pushOk(d.till, saleOps(d, d.till, 1));
+    const sale = saleOps(d, d.till, 1);
+    const saleId = String(sale[0]?.row?.id);
+    await pushOk(d.till, sale);
+    // A converted quotation is the hardest purge case: its header points at a sale
+    // (composite FK), so the purge must delete the quote children before parents.
+    const quote = quoteOps(d, d.till, 1);
+    await pushOk(d.till, quote.ops);
+    await pushOk(d.till, [
+      op(
+        'quotations',
+        'upsert',
+        {
+          ...quote.row,
+          status: 'converted',
+          converted_sale_id: saleId,
+          converted_at: Date.now(),
+        },
+        {
+          tx_id: newId(),
+          base_rev: 1,
+          changed_fields: ['status', 'converted_sale_id', 'converted_at'],
+        },
+      ),
+    ]);
     await pushOk(a.till, saleOps(a, a.till, 1));
     const now = Date.now();
     await env.DB.prepare(

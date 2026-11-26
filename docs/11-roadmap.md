@@ -14,6 +14,7 @@ Ordered tasks for an implementing agent. Do them **in order**; each task is one 
 | M3 Back office | 8–9 | Refunds (incl. udhaar split), cancel/reissue, udhaar, suppliers, returns to supplier, barcode labels, expenses, day close, reports, exports, owner's server export |
 | M4 Hardening | 10–11 | Backups, per-tenant export/restore/deletion, performance, a11y, Urdu polish, hardware checklist, v1.0.0 release |
 | v1.1 Bundles | after v1.0.0 | Fixed-recipe product bundles: one bundle price, component sale lines, whole-bundle returns only |
+| v1.2 Quotations | after v1.1 | Synced, non-financial sales documents: save/edit/convert a quote offline, separate `QTN-` numbering, print/share, and the same bundle/pricing rules as a sale |
 | v2 | later | Branches, IMEI/serials, batches & expiry, Bluetooth printing, FBR, direct label-printer commands, product variants |
 
 ## M0 — Foundations

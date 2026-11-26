@@ -708,6 +708,8 @@ async function startOwnerExport(c: Context<AppEnv>) {
       tenant,
       500,
       CLIENT_SCHEMA_VERSION,
+      true,
+      true,
     );
     const token = await signToken(ownerSessionKey(c.env), {
       kind: 'export',
@@ -763,6 +765,8 @@ shop.get('/export', async (c) => {
       tenant,
       500,
       CLIENT_SCHEMA_VERSION,
+      true,
+      true,
     ),
   );
 });

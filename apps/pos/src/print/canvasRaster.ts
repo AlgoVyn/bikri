@@ -1,11 +1,10 @@
 /** Browser text rasteriser for Urdu / non-ASCII receipt lines (06 §6). */
-import {
-  columnWidths,
-  lineNeedsRtl,
-  type RasterRenderer,
-  type RasterSource,
-  type RenderLineOptions,
+import type {
+  RasterRenderer,
+  RasterSource,
+  RenderLineOptions,
 } from '@bikri/printer';
+import { cellBoxes } from './cellLayout.ts';
 
 const PX: Record<RenderLineOptions['size'], number> = {
   small: 17,
@@ -77,6 +76,7 @@ export function createCanvasRasterRenderer(
         cellX: number,
         cellAlign: CanvasTextAlign,
         cellRtl: boolean,
+        maxWidth: number,
       ): void => {
         ctx.save();
         ctx.scale(1, tall);
@@ -87,56 +87,15 @@ export function createCanvasRasterRenderer(
         }`;
         ctx.direction = cellRtl ? 'rtl' : 'ltr';
         ctx.textAlign = cellAlign;
-        ctx.fillText(value, cellX, height / tall / 2, Math.max(1, o.dots));
+        ctx.fillText(value, cellX, height / tall / 2, maxWidth);
         ctx.restore();
       };
       if (o.cells !== undefined && o.cells.length > 0) {
-        const cells = o.cells;
-        if (cells.length > 2) {
-          const chars = o.charsPerLine ?? 48;
-          const widths = columnWidths(chars);
-          const amountPx = (o.dots * widths.amount) / chars;
-          if (o.rtl) {
-            drawCell(cells[2]?.text ?? '', 0, 'left', false);
-            drawCell(
-              cells[1]?.text ?? '',
-              amountPx,
-              'left',
-              lineNeedsRtl(cells[1]?.text ?? ''),
-            );
-            drawCell(
-              cells[0]?.text ?? '',
-              o.dots,
-              'right',
-              lineNeedsRtl(cells[0]?.text ?? ''),
-            );
-          } else {
-            drawCell(
-              cells[0]?.text ?? '',
-              0,
-              'left',
-              lineNeedsRtl(cells[0]?.text ?? ''),
-            );
-            drawCell(
-              cells[1]?.text ?? '',
-              o.dots - amountPx,
-              'right',
-              lineNeedsRtl(cells[1]?.text ?? ''),
-            );
-            drawCell(cells[2]?.text ?? '', o.dots, 'right', false);
-          }
-        } else {
-          const left = cells[0];
-          const right = cells[1];
-          const leftRtl = lineNeedsRtl(left?.text ?? '');
-          const rightRtl = lineNeedsRtl(right?.text ?? '');
-          if (o.rtl) {
-            drawCell(left?.text ?? '', o.dots, 'right', leftRtl);
-            drawCell(right?.text ?? '', 0, 'left', rightRtl);
-          } else {
-            drawCell(left?.text ?? '', 0, 'left', leftRtl);
-            drawCell(right?.text ?? '', o.dots, 'right', rightRtl);
-          }
+        // One receipt-level column order (name/qty/amount), matching html.ts and
+        // ReceiptPreview; bidi is per cell, so a mixed row never zig-zags. Each
+        // cell is capped to its own column so Urdu cannot spill into the next one.
+        for (const cell of cellBoxes(o.cells, o.dots, o.charsPerLine ?? 48)) {
+          drawCell(cell.text, cell.x, cell.align, cell.rtl, cell.maxWidth);
         }
       } else {
         ctx.font = `${o.bold ? 700 : 400} ${px}px ${

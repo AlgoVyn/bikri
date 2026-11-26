@@ -8,7 +8,11 @@ import {
   formatReceiptNumber,
   formatTaxRate,
 } from '../format.ts';
-import { formatColumnHeader, resolvePaper } from '../layout.ts';
+import {
+  columnHeaderCells,
+  formatColumnHeader,
+  resolvePaper,
+} from '../layout.ts';
 import type { Block } from '../types.ts';
 import {
   labelsFrom,
@@ -81,6 +85,7 @@ function pushItems(
       t: 'text',
       text: formatColumnHeader(labels, charsPerLine),
       nowrap: true,
+      cells: columnHeaderCells(labels),
     });
   }
   const money = (paisa: number): string =>

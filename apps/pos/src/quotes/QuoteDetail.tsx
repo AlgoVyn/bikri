@@ -1,3 +1,4 @@
+import { formatQtyFromMilli } from '@bikri/core';
 import type { SyncedRow } from '@bikri/db';
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
@@ -17,11 +18,14 @@ import {
   type PageActionItem,
   PageActions,
 } from '../components/PageActions.tsx';
+import { PageLoading } from '../components/PageLoading.tsx';
 import { useToast } from '../components/Toast.tsx';
+import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { saleApprovers } from '../data/cart.ts';
 import { getDb } from '../data/db.ts';
 import {
   cancelQuote,
+  QuoteError,
   queueQuotePrint,
   quoteShareText,
   quoteStatus,
@@ -30,6 +34,7 @@ import {
 import { waLink } from '../data/receipt.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { ReadOnlyError } from '../data/write.ts';
 import { formatBusinessDate } from '../lib/date.ts';
 import { useRecordBack } from '../peek/recordBack.ts';
 import { useOpenPeek } from '../peek/usePeekNavigation.ts';
@@ -44,6 +49,7 @@ import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useIsDesktop } from '../shell/useIsDesktop.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
+import { quoteVisible } from '../state/reportScope.ts';
 
 type Loaded = {
   quote: SyncedRow;
@@ -53,10 +59,14 @@ type Loaded = {
   shopName: string;
   branchName: string;
   convertedInvoice: string | null;
+  numberGrouping: 'intl' | 'lakh';
 };
 
 export function QuoteDetail({ quoteId }: { quoteId: string }) {
   const { t } = useTranslation();
+  const { role, support, can, branchId } = useCurrentStaff();
+  const timeZone = useShopTimeZone();
+  const { today } = useBusinessDates(timeZone);
   const data = useLiveQuery(async (): Promise<Loaded | null> => {
     const db = getDb();
     const quote = await db.quotations.get(quoteId);
@@ -91,12 +101,33 @@ export function QuoteDetail({ quoteId }: { quoteId: string }) {
       shopName: shop ? String(shop.name) : '',
       branchName: branch ? String(branch.name) : '',
       convertedInvoice: sale ? String(sale.invoice_no) : null,
+      numberGrouping: shop?.number_grouping === 'lakh' ? 'lakh' : 'intl',
     };
   }, [quoteId]);
 
-  if (!data)
+  if (data === undefined) return <PageLoading compact />;
+  if (data === null)
     return (
       <p className="p-4 text-text-muted">{t('office.quotations.not_found')}</p>
+    );
+  if (
+    !quoteVisible({
+      role,
+      support,
+      canViewReports: can('report.view'),
+      canQuote: can('sale.create'),
+      status: String(data.quote.status),
+      businessDate: String(data.quote.business_date),
+      branchId,
+      quoteBranchId: String(data.quote.branch_id ?? ''),
+      today,
+      timeZone,
+      convertedAt: Number(data.quote.converted_at ?? 0) || null,
+      cancelledAt: Number(data.quote.cancelled_at ?? 0) || null,
+    })
+  )
+    return (
+      <p className="p-4 text-text-muted">{t('office.quotations.forbidden')}</p>
     );
   return <QuoteDetailBody quoteId={quoteId} data={data} />;
 }
@@ -121,6 +152,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
   const [overrideOpen, setOverrideOpen] = useState(false);
   const [reason, setReason] = useState('');
   const [busy, setBusy] = useState(false);
+  const submitGuard = useSubmitGuard();
 
   const { quote, lines } = data;
   const display = quoteStatus(quote, today);
@@ -165,8 +197,13 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
       });
       setActive(cart.id);
       void navigate({ to: '/sell' });
-    } catch {
-      toast.push(t('errors.generic'), 'error');
+    } catch (err) {
+      toast.push(
+        err instanceof QuoteError && err.code === 'bundle_changed'
+          ? t('office.quotations.bundle_changed')
+          : t('errors.generic'),
+        'error',
+      );
     } finally {
       setBusy(false);
     }
@@ -174,6 +211,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
 
   const doCancel = async () => {
     if (reason.trim().length === 0) return;
+    if (!submitGuard.lock()) return;
     try {
       setBusy(true);
       await cancelQuote(getDb(), {
@@ -183,9 +221,15 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
       });
       setCancelOpen(false);
       toast.push(t('office.quotations.cancelled_toast'));
-    } catch {
-      toast.push(t('errors.generic'), 'error');
+    } catch (err) {
+      toast.push(
+        err instanceof ReadOnlyError
+          ? t('tenant.readOnly.blocked')
+          : t('errors.generic'),
+        'error',
+      );
     } finally {
+      submitGuard.unlock();
       setBusy(false);
     }
   };
@@ -211,7 +255,12 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
         return;
       }
       const png = await receiptPng(receipt);
-      const text = quoteShareText(quote, lines, data.shopName);
+      const text = quoteShareText(
+        quote,
+        lines,
+        data.shopName,
+        data.numberGrouping,
+      );
       const phone = quote.customer_phone ? String(quote.customer_phone) : null;
       const link = phone ? waLink(phone, text) : null;
       const file = new File([png], `${String(quote.quote_no)}.png`, {
@@ -235,8 +284,9 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
           toast.push(t('done.image_saved'));
         }
       }
-    } catch {
+    } catch (err) {
       closeShareWindow(shareWindow);
+      if (err instanceof DOMException && err.name === 'AbortError') return;
       toast.push(t('office.quotations.share_failed'), 'error');
     }
   };
@@ -286,8 +336,13 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
       });
       setActive(cart.id);
       void navigate({ to: '/sell' });
-    } catch {
-      toast.push(t('errors.generic'), 'error');
+    } catch (err) {
+      toast.push(
+        err instanceof QuoteError && err.code === 'bundle_changed'
+          ? t('office.quotations.bundle_changed')
+          : t('errors.generic'),
+        'error',
+      );
     } finally {
       setBusy(false);
     }
@@ -350,7 +405,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
       disabled: busy,
       onSelect: () => void openCart('edit'),
     });
-  if (canQuote)
+  if (canQuote && !readOnly)
     moreActions.push({
       label: t('office.quotations.duplicate'),
       disabled: busy,
@@ -462,7 +517,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
         primaryLast={!wide}
       />
 
-      {quote.converted_sale_id ? (
+      {quote.converted_sale_id && data.convertedInvoice ? (
         <div
           data-testid="quote-converted-banner"
           className="rounded-control bg-success-subtle px-3 py-2 text-small text-success-subtle-ink"
@@ -522,9 +577,18 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
         <Meta
           label={t('office.quotations.customer')}
           value={
-            quote.customer_name
-              ? String(quote.customer_name)
-              : t('sell.walk_in')
+            quote.customer_name ? (
+              <span className="flex flex-col">
+                <span>{String(quote.customer_name)}</span>
+                {quote.customer_phone ? (
+                  <bdi dir="ltr" className="text-caption text-text-muted">
+                    {String(quote.customer_phone)}
+                  </bdi>
+                ) : null}
+              </span>
+            ) : (
+              t('sell.walk_in')
+            )
           }
         />
         <Meta
@@ -588,7 +652,10 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
                           <span className="ms-auto text-small text-text-muted">
                             {Number(first.bundle_qty ?? 0)} ×{' '}
                             <MoneyText
-                              paisa={Number(first.bundle_price ?? 0)}
+                              paisa={
+                                Number(first.bundle_price ?? 0) -
+                                Number(first.bundle_discount ?? 0)
+                              }
                             />
                           </span>
                         </span>
@@ -603,29 +670,9 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
                           {String(component.name_snapshot)}
                         </td>
                         <td className="p-2 tabular-nums">
-                          {Number(component.qty_milli) / 1000}
+                          {formatQtyFromMilli(Number(component.qty_milli), '')}
                         </td>
-                        <td
-                          className={
-                            wide
-                              ? 'hidden'
-                              : 'hidden p-2 text-start sm:table-cell'
-                          }
-                        >
-                          <MoneyText paisa={Number(component.unit_price)} />
-                        </td>
-                        <td
-                          className={
-                            wide
-                              ? 'hidden'
-                              : 'hidden p-2 text-start sm:table-cell'
-                          }
-                        >
-                          <MoneyText paisa={Number(component.discount ?? 0)} />
-                        </td>
-                        <td className="p-2 text-start">
-                          <MoneyText paisa={Number(component.net ?? 0)} />
-                        </td>
+                        <td colSpan={3} />
                       </tr>
                     ))}
                   </Fragment>
@@ -849,11 +896,11 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
   );
 }
 
-function Meta({ label, value }: { label: string; value: string }) {
+function Meta({ label, value }: { label: string; value: ReactNode }) {
   return (
     <div className="min-w-0">
       <dt className="text-text-muted">{label}</dt>
-      <dd className="truncate">{value}</dd>
+      <dd className="break-words">{value}</dd>
     </div>
   );
 }

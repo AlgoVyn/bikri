@@ -1,5 +1,13 @@
 /** Quotations (D-305, screens/21): a non-financial sales document. */
-import { businessDate, type CartResult, newId, priceBundle } from '@bikri/core';
+import {
+  businessDate,
+  type CartResult,
+  formatMoney,
+  formatQtyFromMilli,
+  type NumberGrouping,
+  newId,
+  priceBundle,
+} from '@bikri/core';
 import type { BikriDb, Cart, CartLine, MasterRow, SyncedRow } from '@bikri/db';
 import { csvCell, qtyCsv, rupeesCsv } from '../lib/csv.ts';
 import { addDays, isBusinessDate } from './backdate.ts';
@@ -24,6 +32,7 @@ export type QuoteErrorCode =
   | 'note'
   | 'missing'
   | 'terminal'
+  | 'bundle_changed'
   | 'read_only'
   | 'changed';
 
@@ -129,20 +138,23 @@ export async function saveQuote(
   const shop = await db.shop.get('shop');
   const timeZone = String(shop?.timezone ?? '').trim() || 'Asia/Karachi';
   const today = businessDate(now, timeZone);
-  if (input.validUntil < today) throw new QuoteError('validity');
-  if (input.validUntil > addDays(today, 365)) throw new QuoteError('validity');
-
-  const totals = cartTotals(cart, money);
   const existingId = cart.quote?.mode === 'edit' ? cart.quote.quote_id : null;
   const existing = existingId ? await db.quotations.get(existingId) : null;
   if (existingId && !existing) throw new QuoteError('missing');
   if (existing && String(existing.status) !== 'open')
     throw new QuoteError('terminal');
+  const businessDateValue = existing ? String(existing.business_date) : today;
+  // An edit keeps the document's original business date, so the +365-day horizon
+  // must be measured from that date (POS-M2), not from today.
+  if (input.validUntil < businessDateValue) throw new QuoteError('validity');
+  if (input.validUntil > addDays(businessDateValue, 365))
+    throw new QuoteError('validity');
+
+  const totals = cartTotals(cart, money);
   const customer = cart.customer_id
     ? await db.customers.get(cart.customer_id)
     : undefined;
   const quoteId = existingId ?? newId(now);
-  const businessDateValue = existing ? String(existing.business_date) : today;
 
   let created = false;
   const quote = await writeAction(
@@ -155,6 +167,13 @@ export async function saveQuote(
         JSON.stringify(live) !== JSON.stringify(cart)
       )
         throw new QuoteError('changed');
+      if (existingId) {
+        const current = await w
+          .table<SyncedRow, string>('quotations')
+          .get(existingId);
+        if (!current || String(current.status) !== 'open')
+          throw new QuoteError('terminal');
+      }
       const kv = w.table<{ key: string; value: unknown }>('kv');
       const allExistingLines = existing
         ? await w
@@ -179,10 +198,12 @@ export async function saveQuote(
         ) + 1;
       const kept = new Set<string>();
       const lineRows: SyncedRow[] = [];
+      const lineIdByKey = new Map<string, string>();
       for (const { line, result } of ordered) {
         const existingLine = existingById.get(line.key);
         if (existingLine) {
           kept.add(String(existingLine.id));
+          lineIdByKey.set(line.key, String(existingLine.id));
           const row = quoteLineRow(
             quoteId,
             line,
@@ -198,6 +219,7 @@ export async function saveQuote(
         }
         const row = quoteLineRow(quoteId, line, result, nextLineNo, now);
         nextLineNo += 1;
+        lineIdByKey.set(line.key, row.id);
         await w.create('quotation_lines', row);
         lineRows.push(row);
       }
@@ -221,8 +243,8 @@ export async function saveQuote(
         id: quoteId,
         quote_no: quoteNo,
         quote_seq: seq,
-        branch_id: device.branch_id,
-        device_id: device.id,
+        branch_id: existing ? String(existing.branch_id) : device.branch_id,
+        device_id: existing ? String(existing.device_id) : device.id,
         staff_id: existing ? String(existing.staff_id) : input.staffId,
         customer_id: cart.customer_id ?? null,
         customer_name: customer ? String(customer.name) : '',
@@ -266,7 +288,7 @@ export async function saveQuote(
         const patch = { ...row };
         delete (patch as { created_at?: number }).created_at;
         delete (patch as { rev?: number }).rev;
-        await w.update('quotations', quoteId, patch);
+        await w.update('quotations', quoteId, patch, { force: true });
       } else {
         created = true;
         await w.create('quotations', row);
@@ -292,6 +314,30 @@ export async function saveQuote(
         staff_id: input.staffId,
         created_at: now,
       });
+      // Approvals live on the quote document, not on a sale that does not exist yet.
+      // The Worker validates these `override` audit rows with the same rules as a sale.
+      for (const override of cart.overrides ?? []) {
+        if (override.permission === 'sale.void') continue;
+        const { bound_cart: _boundCart, ...approval } = override;
+        const boundLine =
+          typeof approval.bound_line === 'string'
+            ? lineIdByKey.get(approval.bound_line)
+            : undefined;
+        await w.insert('audit_log', {
+          id: newId(now),
+          action: 'override',
+          entity: 'quotations',
+          entity_id: quoteId,
+          before_json: null,
+          after_json: JSON.stringify({
+            ...approval,
+            ...(boundLine === undefined ? {} : { bound_line: boundLine }),
+          }),
+          device_id: device.id,
+          staff_id: input.staffId,
+          created_at: now,
+        });
+      }
       await w.table<Cart, string>('carts').put(emptyCart(input.cartId, now));
       return row;
     },
@@ -322,6 +368,8 @@ export async function cancelQuote(
   const quote = await db.quotations.get(input.quoteId);
   if (!quote) throw new QuoteError('missing');
   if (String(quote.status) !== 'open') throw new QuoteError('terminal');
+  const device = await deviceInfo(db);
+  if (!device) throw new QuoteError('missing');
   return writeAction(
     db,
     async (w) => {
@@ -344,7 +392,7 @@ export async function cancelQuote(
         entity_id: input.quoteId,
         before_json: JSON.stringify({ status: current.status }),
         after_json: JSON.stringify({ status: 'cancelled', reason }),
-        device_id: String(current.device_id),
+        device_id: device.id,
         staff_id: input.staffId,
         created_at: now,
       });
@@ -382,8 +430,11 @@ export async function startQuoteCart(
   const now = input.now ?? Date.now();
   const quote = await db.quotations.get(input.quoteId);
   if (!quote) throw new QuoteError('missing');
+  const device = await deviceInfo(db);
+  if (!device) throw new QuoteError('missing');
   const status = String(quote.status);
-  if (status === 'cancelled') throw new QuoteError('terminal');
+  if (status === 'cancelled' && input.mode !== 'duplicate')
+    throw new QuoteError('terminal');
   if (input.mode === 'edit' && status !== 'open')
     throw new QuoteError('terminal');
   if (input.mode === 'convert' && status === 'converted')
@@ -425,11 +476,58 @@ export async function startQuoteCart(
   const live = lines.filter(
     (line) => line.deleted_at === null || line.deleted_at === undefined,
   );
+  let customerId = quote.customer_id ? String(quote.customer_id) : null;
+  if (input.mode === 'convert') {
+    if (customerId) {
+      const customer = await db.customers.get(customerId);
+      if (!customer || customer.deleted_at) customerId = null;
+    }
+    // A bundle recipe that changed or disappeared after the quote was saved cannot be
+    // converted with the old component snapshot: the Worker would reject the paid sale
+    // (POS-M1). Block the conversion with a clear error instead of committing locally.
+    const groups = new Map<string, SyncedRow[]>();
+    for (const line of live) {
+      if (!line.bundle_group) continue;
+      const group = String(line.bundle_group);
+      groups.set(group, [...(groups.get(group) ?? []), line]);
+    }
+    for (const groupLines of groups.values()) {
+      const first = groupLines[0];
+      const bundleId = first?.bundle_id ? String(first.bundle_id) : '';
+      if (!bundleId) throw new QuoteError('bundle_changed');
+      const bundle = await db.products.get(bundleId);
+      if (!bundle || bundle.deleted_at) throw new QuoteError('bundle_changed');
+      const recipe = (
+        await db.bundle_items.where('bundle_id').equals(bundleId).toArray()
+      ).filter(
+        (item) => item.deleted_at === null || item.deleted_at === undefined,
+      );
+      const expected = new Map(
+        recipe.map((item) => [
+          String(item.component_product_id),
+          Number(item.qty_milli ?? 0),
+        ]),
+      );
+      const actual = new Map(
+        groupLines.map((line) => [
+          String(line.product_id ?? ''),
+          Number(line.bundle_component_qty_milli ?? 0),
+        ]),
+      );
+      if (
+        expected.size !== actual.size ||
+        [...expected].some(([productId, qty]) => actual.get(productId) !== qty)
+      )
+        throw new QuoteError('bundle_changed');
+    }
+  }
   // Today's-price conversion re-prices every simple line and every bundle group from
   // the current catalogue. Bundles keep their group discount but follow the current
   // shelf price and recipe, exactly like a fresh Sell cart (D-305).
   const todayPrices =
-    input.pricing === 'today' ? await repriceLines(db, live) : null;
+    input.pricing === 'today'
+      ? await repriceLines(db, live, money.cost_method)
+      : null;
   const cartLines: CartLine[] = live
     .map((line) => {
       const product = line.product_id
@@ -447,12 +545,19 @@ export async function startQuoteCart(
         sku: String(line.sku_snapshot ?? ''),
         qty_milli: Number(line.qty_milli),
         unit_price: priced?.unitPrice ?? Number(line.unit_price),
-        ...(line.discount_type === 'pct'
-          ? { discount_type: 'percent' as const }
-          : line.discount_type === 'rs'
+        ...(priced && line.bundle_id
+          ? priced.discount > 0
             ? { discount_type: 'amount' as const }
-            : {}),
-        discount_value: Number(line.discount_value ?? 0),
+            : {}
+          : line.discount_type === 'pct'
+            ? { discount_type: 'percent' as const }
+            : line.discount_type === 'rs'
+              ? { discount_type: 'amount' as const }
+              : {}),
+        discount_value:
+          priced && line.bundle_id
+            ? priced.discount
+            : Number(line.discount_value ?? 0),
         unit_cost: product
           ? unitCostOf(product, money.cost_method)
           : Number(line.unit_cost_snapshot ?? 0),
@@ -483,7 +588,7 @@ export async function startQuoteCart(
     .reverse();
   const cart: Cart = {
     ...emptyCart(input.cartId, now),
-    customer_id: quote.customer_id ? String(quote.customer_id) : null,
+    customer_id: customerId,
     lines: cartLines,
     bill_discount:
       quote.bill_discount_type === 'pct' &&
@@ -545,7 +650,7 @@ export async function startQuoteCart(
             quote_no: String(quote.quote_no),
             approved_by: input.approvedBy,
           }),
-          device_id: String(quote.device_id ?? ''),
+          device_id: device.id,
           staff_id: input.staffId,
           created_at: now,
         });
@@ -566,6 +671,7 @@ export async function startQuoteCart(
 
 type RepricedLine = {
   unitPrice: number;
+  discount: number;
   bundleBase: number;
   bundleNet: number;
 };
@@ -574,6 +680,7 @@ type RepricedLine = {
 async function repriceLines(
   db: BikriDb,
   lines: readonly SyncedRow[],
+  costMethod: 'avg' | 'last',
 ): Promise<{ lines: Map<string, RepricedLine> }> {
   const productIds = [
     ...new Set(
@@ -596,6 +703,7 @@ async function repriceLines(
     if (!product) continue;
     result.set(String(line.id), {
       unitPrice: Number(product.price),
+      discount: 0,
       bundleBase: 0,
       bundleNet: 0,
     });
@@ -611,10 +719,14 @@ async function repriceLines(
     if (!first?.bundle_id) continue;
     const bundle = await db.products.get(String(first.bundle_id));
     if (!bundle || bundle.deleted_at) continue;
-    const recipe = await db.bundle_items
-      .where('bundle_id')
-      .equals(String(first.bundle_id))
-      .toArray();
+    const recipe = (
+      await db.bundle_items
+        .where('bundle_id')
+        .equals(String(first.bundle_id))
+        .toArray()
+    ).filter(
+      (item) => item.deleted_at === null || item.deleted_at === undefined,
+    );
     const recipeProducts = new Map(
       (
         await db.products.bulkGet(
@@ -634,7 +746,7 @@ async function repriceLines(
       return {
         qty_milli: qty,
         unit_cost: product
-          ? Number(product.last_cost ?? 0)
+          ? unitCostOf(product, costMethod)
           : Number(line.unit_cost_snapshot ?? 0),
         unit_price: product ? Number(product.price) : Number(line.unit_price),
       };
@@ -650,6 +762,7 @@ async function repriceLines(
         if (!pricedLine) return;
         result.set(String(line.id), {
           unitPrice: pricedLine.unit_price,
+          discount: pricedLine.discount,
           bundleBase: base,
           bundleNet: net,
         });
@@ -668,7 +781,8 @@ export async function startNewQuote(
   now = Date.now(),
 ): Promise<Cart> {
   const existing = await db.carts.get(cartId);
-  if (existing && existing.lines.length > 0) throw new QuoteError('changed');
+  if (existing && (existing.lines.length > 0 || existing.quote))
+    throw new QuoteError('changed');
   const shop = await db.shop.get('shop');
   const timeZone = String(shop?.timezone ?? '').trim() || 'Asia/Karachi';
   const today = businessDate(now, timeZone);
@@ -712,12 +826,44 @@ export function quoteShareText(
   quote: SyncedRow,
   lines: readonly SyncedRow[],
   shopName: string,
+  numberGrouping: NumberGrouping = 'intl',
 ): string {
-  const format = (paisa: number): string =>
-    `Rs ${(paisa / 100).toLocaleString('en-PK', {
-      minimumFractionDigits: paisa % 100 === 0 ? 0 : 2,
-      maximumFractionDigits: 2,
-    })}`;
+  const format = (paisa: number): string => formatMoney(paisa, numberGrouping);
+  const qty = (milli: number): string => formatQtyFromMilli(milli, '');
+  const blocks: string[] = [];
+  const seenGroups = new Set<string>();
+  for (const line of lines) {
+    if (line.deleted_at !== null && line.deleted_at !== undefined) continue;
+    const group = line.bundle_group == null ? null : String(line.bundle_group);
+    if (group === null) {
+      blocks.push(
+        `${String(line.name_snapshot)} × ${qty(Number(line.qty_milli))}  ${format(Number(line.net))}`,
+      );
+      continue;
+    }
+    if (seenGroups.has(group)) continue;
+    seenGroups.add(group);
+    const groupLines = lines.filter(
+      (candidate) =>
+        (candidate.deleted_at === null || candidate.deleted_at === undefined) &&
+        candidate.bundle_group != null &&
+        String(candidate.bundle_group) === group,
+    );
+    const first = groupLines[0] ?? line;
+    const total = groupLines.reduce(
+      (sum, component) => sum + Number(component.net),
+      0,
+    );
+    blocks.push(
+      `${String(first.bundle_name ?? first.name_snapshot)} × ${qty(
+        Number(first.bundle_qty ?? 0) * 1000,
+      )}  ${format(total)}`,
+    );
+    for (const component of groupLines)
+      blocks.push(
+        `  ${String(component.name_snapshot)} × ${qty(Number(component.qty_milli))}`,
+      );
+  }
   const rows = [
     shopName,
     `QUOTATION ${String(quote.quote_no)}`,
@@ -725,14 +871,7 @@ export function quoteShareText(
     ...(quote.customer_name
       ? [`Customer: ${String(quote.customer_name)}`]
       : []),
-    ...lines
-      .filter(
-        (line) => line.deleted_at === null || line.deleted_at === undefined,
-      )
-      .map(
-        (line) =>
-          `${String(line.name_snapshot)} × ${Number(line.qty_milli) / 1000}  ${format(Number(line.net))}`,
-      ),
+    ...blocks,
     `Total ${format(Number(quote.total))}`,
     ...(String(quote.note ?? '').trim()
       ? [`Terms: ${String(quote.note).trim()}`]

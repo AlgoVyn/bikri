@@ -1,3 +1,4 @@
+import { formatQtyFromMilli } from '@bikri/core';
 import type { ReactNode } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -306,8 +307,69 @@ export function QuotationPeekBody({ data }: { data: QuotationPeekData }) {
         : display === 'expired'
           ? 'bg-warning-subtle text-warning-subtle-ink'
           : 'bg-danger-subtle text-danger-subtle-ink';
-  const lines = data.lines.slice(0, 3);
-  const remaining = data.lines.length - lines.length;
+  const blocks: {
+    key: string;
+    label: ReactNode;
+    value: number;
+  }[] = [];
+  const seenGroups = new Set<string>();
+  for (const line of data.lines) {
+    const group = line.bundle_group == null ? null : String(line.bundle_group);
+    if (group === null) {
+      blocks.push({
+        key: String(line.id),
+        label: (
+          <>
+            <span
+              className={`data-name ${
+                isLatinName(String(line.name_snapshot)) ? 'ltr-name' : ''
+              }`}
+            >
+              {String(line.name_snapshot)}
+            </span>
+            <span className="block text-caption text-text-muted">
+              {formatQtyFromMilli(Number(line.qty_milli), '')}
+            </span>
+          </>
+        ),
+        value: Number(line.net),
+      });
+      continue;
+    }
+    if (seenGroups.has(group)) continue;
+    seenGroups.add(group);
+    const groupLines = data.lines.filter(
+      (candidate) =>
+        candidate.bundle_group != null &&
+        String(candidate.bundle_group) === group,
+    );
+    const first = groupLines[0];
+    blocks.push({
+      key: group,
+      label: (
+        <>
+          <span className="block font-medium">
+            {String(first?.bundle_name ?? '')}
+          </span>
+          {groupLines.map((component) => (
+            <span
+              key={String(component.id)}
+              className="block text-caption text-text-muted"
+            >
+              {String(component.name_snapshot)} ·{' '}
+              {formatQtyFromMilli(Number(component.qty_milli), '')}
+            </span>
+          ))}
+        </>
+      ),
+      value: groupLines.reduce(
+        (sum, component) => sum + Number(component.net),
+        0,
+      ),
+    });
+  }
+  const lines = blocks.slice(0, 3);
+  const remaining = blocks.length - lines.length;
   return (
     <>
       <div className="flex flex-wrap items-center gap-2">
@@ -327,7 +389,7 @@ export function QuotationPeekBody({ data }: { data: QuotationPeekData }) {
           <MoneyText paisa={Number(data.quote.total)} />
         </PeekFigure>
         <PeekFigure label={t('peek.items')}>
-          {Number(data.quote.items_qty_milli) / 1000}
+          {formatQtyFromMilli(Number(data.quote.items_qty_milli), '')}
         </PeekFigure>
         <PeekFigure label={t('peek.lines')}>
           {Number(data.quote.line_count)}
@@ -360,19 +422,9 @@ export function QuotationPeekBody({ data }: { data: QuotationPeekData }) {
           <>
             {lines.map((line) => (
               <PeekRow
-                key={String(line.id)}
-                label={
-                  <>
-                    <span className="block font-medium">
-                      {String(line.name_snapshot)}
-                    </span>
-                    <span className="block text-caption text-text-muted">
-                      {Number(line.qty_milli) / 1000} ·{' '}
-                      <MoneyText paisa={Number(line.unit_price)} />
-                    </span>
-                  </>
-                }
-                value={<MoneyText paisa={Number(line.net)} />}
+                key={line.key}
+                label={line.label}
+                value={<MoneyText paisa={line.value} />}
               />
             ))}
             {remaining > 0 ? (
