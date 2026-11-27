@@ -123,7 +123,7 @@ test.describe('Quotations (v1.2)', () => {
           },
         });
       });
-      await page.getByTestId('share-quote').click();
+      await detailAction(page, 'share-quote', /Share|شیئر/u);
       await expect
         .poll(() =>
           page.evaluate(
@@ -216,9 +216,17 @@ test.describe('Quotations (v1.2)', () => {
       await page.keyboard.press('Escape');
       await expect(page.getByRole('dialog')).toHaveCount(0);
       await page.evaluate(() => window.__bikriTest?.navigate('/quotations'));
+      const exportQuotes = page.getByTestId('export-quotes');
       const [listCsv] = await Promise.all([
         page.waitForEvent('download'),
-        page.getByTestId('export-quotes').click(),
+        exportQuotes.isVisible().then(async (visible) => {
+          if (visible) {
+            await exportQuotes.click();
+            return;
+          }
+          await page.getByTestId('page-actions-more').click();
+          await page.getByRole('button', { name: /CSV/ }).click();
+        }),
       ]);
       const csv = await readFile((await listCsv.path()) ?? '', 'utf8');
       expect(csv).toContain('quote_no,date,valid_until,customer,phone');

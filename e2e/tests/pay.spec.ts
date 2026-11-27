@@ -61,7 +61,7 @@ test.describe('Pay (T-017)', () => {
     expect(await idbAll(page, 'sales')).toEqual([]);
 
     await page.keyboard.press('F8');
-    await expect(pay(page).getByLabel('Received')).toHaveValue('43000');
+    await expect(pay(page).getByLabel('Received')).toHaveValue('43,000');
     await expect(
       pay(page).getByRole('button', { name: 'Rs 45,000' }),
     ).toBeVisible();
@@ -107,7 +107,7 @@ test.describe('Pay (T-017)', () => {
       .click();
     await pay(page).getByRole('button', { name: 'JazzCash' }).click();
     await pay(page).getByLabel('Reference (optional)').fill('TX123');
-    await expect(pay(page).getByLabel('Amount')).toHaveValue('13000');
+    await expect(pay(page).getByLabel('Amount')).toHaveValue('13,000');
     await expect(pay(page).getByTestId('pay-row')).toHaveCount(2);
     await expect(pay(page).getByTestId('pay-running')).toHaveText(
       'Paid Rs 43,000 · Remaining Rs 0',

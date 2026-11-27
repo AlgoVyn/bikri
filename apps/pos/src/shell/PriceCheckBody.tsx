@@ -213,7 +213,7 @@ export function PriceCheckBody({ onClose }: { onClose: () => void }) {
             <li key={p.id}>
               <button
                 type="button"
-                className="flex min-h-11 w-full items-center justify-between gap-2 rounded-control border border-border px-3 text-start"
+                className="flex min-h-11 w-full items-center justify-between gap-2 rounded-control border border-divider px-3 text-start"
                 onClick={() => void pick(p)}
               >
                 <span
@@ -233,7 +233,7 @@ export function PriceCheckBody({ onClose }: { onClose: () => void }) {
         <section
           aria-label={String(product.name_en)}
           data-testid="price-card"
-          className="flex gap-4 rounded-card border border-border p-4"
+          className="flex gap-4 rounded-card border border-divider p-4"
         >
           <ProductThumb
             name={String(product.name_en)}

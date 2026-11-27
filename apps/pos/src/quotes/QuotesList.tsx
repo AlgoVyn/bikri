@@ -21,6 +21,7 @@ import { ListPager } from '../components/ListPager.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageActions } from '../components/PageActions.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading.tsx';
 import { SalesTabs } from '../components/SalesTabs.tsx';
@@ -127,7 +128,7 @@ const QuoteListItem = memo(function QuoteListItem({
 }) {
   const { t, i18n } = useTranslation();
   return (
-    <li className="relative border-b border-border last:border-b-0">
+    <li className="relative border-b border-divider last:border-b-0">
       <Link
         to="/quotations/$id"
         params={{ id: quote.id }}
@@ -144,7 +145,7 @@ const QuoteListItem = memo(function QuoteListItem({
       >
         <span className="min-w-0">
           <span className="flex min-w-0 items-center gap-1.5">
-            <span className="truncate font-mono text-small font-semibold">
+            <span className="truncate font-sans tabular-nums text-small font-semibold">
               {quote.quote_no}
             </span>
             <span
@@ -544,29 +545,45 @@ function QuotesListContent({
         headingLevel={detailOpen ? 'h2' : 'h1'}
         hideTitleOnPhone
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {!readOnly && canQuote ? (
-              <button
-                type="button"
-                className={buttonPrimary}
-                data-testid="new-quote"
-                onClick={() => void newQuote()}
-              >
-                {t('office.quotations.new')}
-              </button>
-            ) : null}
-            {can('export.data') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                data-testid="export-quotes"
-                disabled={rows.length === 0}
-                onClick={exportCsv}
-              >
-                {t('office.quotations.export_csv')}
-              </button>
-            ) : null}
-          </div>
+          <PageActions
+            primary={
+              !readOnly && canQuote ? (
+                <button
+                  type="button"
+                  className={buttonPrimary}
+                  data-testid="new-quote"
+                  onClick={() => void newQuote()}
+                >
+                  {t('office.quotations.new')}
+                </button>
+              ) : undefined
+            }
+            secondary={
+              can('export.data') ? (
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  data-testid="export-quotes"
+                  disabled={rows.length === 0}
+                  onClick={exportCsv}
+                >
+                  {t('office.quotations.export_csv')}
+                </button>
+              ) : null
+            }
+            more={
+              can('export.data')
+                ? [
+                    {
+                      label: t('office.quotations.export_csv'),
+                      mobileOnly: true,
+                      disabled: rows.length === 0,
+                      onSelect: exportCsv,
+                    },
+                  ]
+                : []
+            }
+          />
         }
       />
 
@@ -724,7 +741,7 @@ function QuotesListContent({
         {data.quotes.length > 0 ? (
           <div
             data-testid="quotes-summary"
-            className={`grid gap-3 border-b border-border px-3 py-3 ${
+            className={`grid gap-3 border-b border-divider px-3 py-3 ${
               embedded ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'
             }`}
           >
@@ -781,7 +798,7 @@ function QuotesListContent({
           <ul aria-label={t('office.quotations.list_label')}>
             <li
               data-testid="quotes-list-header"
-              className={`${embedded ? QUOTE_GRID_EMBEDDED : QUOTE_GRID_FULL} hidden border-b border-border bg-surface-2 py-2 text-small text-text-muted lg:grid`}
+              className={`${embedded ? QUOTE_GRID_EMBEDDED : QUOTE_GRID_FULL} hidden border-b border-divider bg-surface-2 py-2 text-small text-text-muted lg:grid`}
             >
               <SortHeader
                 label={t('office.quotations.col_quote')}

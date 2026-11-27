@@ -13,6 +13,7 @@ import { ListPager } from '../components/ListPager.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
+import { PageActions } from '../components/PageActions.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
@@ -161,6 +162,10 @@ export function UdhaarList({
     setSort(next);
     setDirection(defaultCustomerSortDirection(next));
   };
+  const exportCsv = () => {
+    if (!data) return;
+    downloadText('bikri-udhaar.csv', customersCsv(data.rows, timeZone));
+  };
 
   return (
     <div
@@ -175,39 +180,56 @@ export function UdhaarList({
         headingLevel={detailOpen ? 'h2' : 'h1'}
         hideTitleOnPhone
         actions={
-          <>
-            <Link to="/udhaar/chase" className={buttonQuiet}>
-              {t('office.udhaar.chase_list')}
-            </Link>
-            {can('export.data') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={!data || data.rows.length === 0}
-                onClick={() =>
-                  data &&
-                  downloadText(
-                    'bikri-udhaar.csv',
-                    customersCsv(data.rows, timeZone),
-                  )
-                }
-              >
-                {t('office.udhaar.export_csv')}
-              </button>
-            ) : null}
-            {can('party.edit') &&
-            !detailOpen &&
-            (Boolean(readOnly) || !data || data.rows.length > 0) ? (
-              <button
-                type="button"
-                className={`${buttonPrimary} gap-2 max-sm:order-first`}
-                disabled={readOnly}
-                onClick={() => setNewOpen(true)}
-              >
-                {t('office.udhaar.new_customer')}
-              </button>
-            ) : null}
-          </>
+          <PageActions
+            primary={
+              can('party.edit') &&
+              !detailOpen &&
+              (Boolean(readOnly) || !data || data.rows.length > 0) ? (
+                <button
+                  type="button"
+                  className={`${buttonPrimary} gap-2`}
+                  disabled={readOnly}
+                  onClick={() => setNewOpen(true)}
+                >
+                  {t('office.udhaar.new_customer')}
+                </button>
+              ) : undefined
+            }
+            secondary={
+              <>
+                <Link to="/udhaar/chase" className={buttonQuiet}>
+                  {t('office.udhaar.chase_list')}
+                </Link>
+                {can('export.data') ? (
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    disabled={!data || data.rows.length === 0}
+                    onClick={exportCsv}
+                  >
+                    {t('office.udhaar.export_csv')}
+                  </button>
+                ) : null}
+              </>
+            }
+            more={[
+              {
+                label: t('office.udhaar.chase_list'),
+                to: '/udhaar/chase',
+                mobileOnly: true,
+              },
+              ...(can('export.data')
+                ? [
+                    {
+                      label: t('office.udhaar.export_csv'),
+                      mobileOnly: true,
+                      disabled: !data || data.rows.length === 0,
+                      onSelect: exportCsv,
+                    },
+                  ]
+                : []),
+            ]}
+          />
         }
       />
 
@@ -347,9 +369,9 @@ export function UdhaarList({
 
         {data && data.rows.length > 0 ? (
           <>
-            <ul className="flex flex-col divide-y divide-border">
+            <ul className="flex flex-col divide-y divide-divider">
               <li
-                className={`${CUSTOMER_GRID} hidden border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
+                className={`${CUSTOMER_GRID} hidden border-s-2 border-b border-s-transparent border-divider bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
                 data-testid="udhaar-list-header"
               >
                 <SortHeader
@@ -493,7 +515,7 @@ export function UdhaarList({
                             className={`inline-flex max-w-full items-center rounded-full px-2 py-0.5 ${
                               String(row.promise.promised_on) <= today
                                 ? 'bg-warning-subtle text-warning-subtle-ink'
-                                : 'border border-border'
+                                : 'border border-divider'
                             }`}
                           >
                             <span className="truncate">

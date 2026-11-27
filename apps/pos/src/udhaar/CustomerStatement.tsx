@@ -381,7 +381,11 @@ export function CustomerStatement({
           phone || address ? (
             <span className="flex flex-col gap-0.5">
               {phone ? (
-                <a href={`tel:${phone}`} dir="ltr" className="underline">
+                <a
+                  href={`tel:${phone}`}
+                  dir="ltr"
+                  className="inline-flex min-h-11 items-center underline"
+                >
                   {phone}
                 </a>
               ) : null}
@@ -463,12 +467,44 @@ export function CustomerStatement({
                     },
                   ]
                 : []),
+              {
+                label: t('office.udhaar.send_reminder'),
+                mobileOnly: true,
+                disabled: !reminder,
+                onSelect: () => {
+                  if (reminder) window.open(reminder, '_blank', 'noopener');
+                },
+              },
+              ...(can('export.data')
+                ? [
+                    {
+                      label: t('office.udhaar.print_statement'),
+                      mobileOnly: true,
+                      onSelect: () => void printStatement(),
+                    },
+                    {
+                      label: t('ui.export_csv'),
+                      mobileOnly: true,
+                      onSelect: () => void exportCsv(),
+                    },
+                    {
+                      label: t('ui.export_pdf'),
+                      mobileOnly: true,
+                      onSelect: () => void exportPdf(),
+                    },
+                    {
+                      label: t('ui.export_share'),
+                      mobileOnly: true,
+                      onSelect: () => void share(),
+                    },
+                  ]
+                : []),
             ]}
           />
         }
       />
 
-      <section className="rounded-card border border-border bg-surface p-4 shadow-card">
+      <section className="rounded-card border border-divider bg-surface p-4 shadow-card">
         <div className="grid grid-cols-2 gap-3">
           <div data-testid="statement-balance">
             <p className="text-small text-text-muted">
@@ -500,7 +536,7 @@ export function CustomerStatement({
             </p>
           </div>
         </div>
-        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-border pt-3 text-small">
+        <div className="mt-3 flex flex-wrap items-center gap-3 border-t border-divider pt-3 text-small">
           {percent !== null ? (
             <>
               <span
@@ -594,7 +630,7 @@ export function CustomerStatement({
       {!wide ? (
         <ul className="flex flex-col gap-2">
           {shownOpening !== 0 ? (
-            <li className="flex items-center justify-between gap-2 rounded-card border border-border bg-surface p-3 text-small">
+            <li className="flex items-center justify-between gap-2 rounded-card border border-divider bg-surface p-3 text-small">
               <span>{t('office.udhaar.entry_opening')}</span>
               <span className="font-medium">
                 <MoneyText paisa={shownOpening} />
@@ -602,14 +638,14 @@ export function CustomerStatement({
             </li>
           ) : null}
           {rows.length === 0 ? (
-            <li className="rounded-card border border-border bg-surface p-4 text-center text-text-muted">
+            <li className="rounded-card border border-divider bg-surface p-4 text-center text-text-muted">
               {t('office.udhaar.no_entries')}
             </li>
           ) : (
             shownRows.map((row, index) => (
               <li
                 key={row.entry.id}
-                className="rounded-card border border-border bg-surface p-3 text-small"
+                className="rounded-card border border-divider bg-surface p-3 text-small"
               >
                 <div className="flex items-start justify-between gap-2">
                   <span className="text-text-muted">{rows[index]?.date}</span>
@@ -622,7 +658,7 @@ export function CustomerStatement({
                     <Link
                       to="/sales/$id"
                       params={{ id: row.saleId }}
-                      className="underline"
+                      className="inline-flex min-h-11 items-center underline"
                       onClick={(event) =>
                         openPeek(
                           event,
@@ -672,11 +708,11 @@ export function CustomerStatement({
       {wide ? (
         <div
           ref={tableRef}
-          className="max-h-[60vh] overflow-auto rounded-card border border-border"
+          className="max-h-[60vh] overflow-auto rounded-card border border-divider"
         >
           <table className="w-full min-w-[34rem] text-small">
             <thead className="sticky top-0 bg-surface">
-              <tr className="border-b border-border text-text-muted">
+              <tr className="border-b border-divider text-text-muted">
                 <th className="p-2 text-start">{t('office.udhaar.date')}</th>
                 <th className="p-2 text-start">
                   {t('office.udhaar.description')}
@@ -688,7 +724,7 @@ export function CustomerStatement({
             </thead>
             <tbody>
               {shownOpening !== 0 ? (
-                <tr className="border-b border-border">
+                <tr className="border-b border-divider">
                   <td className="p-2" />
                   <td className="p-2">{t('office.udhaar.entry_opening')}</td>
                   <td className="p-2" />
@@ -708,7 +744,7 @@ export function CustomerStatement({
                 shownRows.map((row, index) => (
                   <tr
                     key={row.entry.id}
-                    className="border-b border-border last:border-0"
+                    className="border-b border-divider last:border-0"
                   >
                     <td className="p-2 whitespace-nowrap">
                       {rows[index]?.date}
@@ -719,7 +755,7 @@ export function CustomerStatement({
                           <Link
                             to="/sales/$id"
                             params={{ id: row.saleId }}
-                            className="underline"
+                            className="inline-flex min-h-11 items-center underline"
                             onClick={(event) =>
                               openPeek(
                                 event,

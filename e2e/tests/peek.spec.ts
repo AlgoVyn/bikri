@@ -1,5 +1,5 @@
 import { expect, test } from '@playwright/test';
-import { openReadyShop } from './helpers.ts';
+import { clickPageAction, openReadyShop } from './helpers.ts';
 
 // Reference peek: a product line in a bill opens a read-only summary without losing
 // the bill; closing returns to it and Open full keeps a back path to the origin.
@@ -46,10 +46,7 @@ test('a bill line opens a product peek and returns to the bill', async ({
   await expect(page.getByRole('dialog')).toHaveCount(0);
 
   // A child edit screen must not lose the bill return context.
-  await page
-    .getByTestId('product-actions')
-    .getByRole('link', { name: 'Edit', exact: true })
-    .click();
+  await clickPageAction(page, 'Edit');
   await page.getByRole('button', { name: 'Cancel', exact: true }).click();
   if (phone) {
     await expect(page.getByTestId('topbar-back')).toContainText(/Bill A-A-/u);

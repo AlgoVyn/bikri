@@ -14,7 +14,7 @@ export function DialogFooter({
 }) {
   return (
     <div
-      className={`-mx-4 -mb-4 mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-border bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:sticky max-md:bottom-0 max-md:z-10 max-md:mb-0 ${className}`}
+      className={`-mx-4 -mb-4 mt-auto flex flex-wrap items-center justify-end gap-2 border-t border-divider bg-surface px-4 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))] max-md:sticky max-md:bottom-0 max-md:z-10 max-md:mb-0 ${className}`}
     >
       {children}
     </div>

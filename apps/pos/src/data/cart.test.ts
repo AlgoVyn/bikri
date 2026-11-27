@@ -77,6 +77,30 @@ describe('bundle cart groups (v1.1)', () => {
     { product: b, qty_milli: 1000 },
   ];
 
+  it('snapshots Urdu names for simple and bundle lines', () => {
+    const urdu = product('urdu', 10000, { name_ur: 'اردو' });
+    const simple = addProduct(emptyCart('c1'), urdu, 1000, 'avg');
+    expect(simple.lines[0]?.name_ur).toBe('اردو');
+
+    const urduBundle = {
+      ...bundle,
+      name_ur: 'اسٹارٹر پیک',
+    };
+    const urduComponents = [
+      { product: { ...a, name_ur: 'اے' }, qty_milli: 1000 },
+      { product: { ...b, name_ur: 'بی' }, qty_milli: 1000 },
+    ];
+    const bundled = addBundle(
+      emptyCart('c2'),
+      urduBundle,
+      urduComponents,
+      1,
+      'avg',
+    );
+    expect(bundled.lines.map((line) => line.name_ur)).toEqual(['اے', 'بی']);
+    expect(bundled.lines[0]?.bundle_name_ur).toBe('اسٹارٹر پیک');
+  });
+
   it('adds one block of component lines and merges the same snapshot', () => {
     let cart = addBundle(emptyCart('c1'), bundle, recipe, 1, 'avg');
     expect(cart.lines).toHaveLength(2);

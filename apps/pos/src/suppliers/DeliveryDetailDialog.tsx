@@ -295,7 +295,7 @@ export function DeliveryDetailDialog({
             >
               {t('office.suppliers.lines')}
             </h3>
-            <ul className="divide-y divide-border rounded-card border border-border">
+            <ul className="divide-y divide-divider rounded-card border border-divider">
               {lines.map((line) => (
                 <li
                   key={String(line.line.id)}
@@ -375,7 +375,7 @@ export function DeliveryDetailDialog({
               >
                 {t('office.suppliers.delivery_returns')}
               </h3>
-              <ul className="divide-y divide-border rounded-card border border-border text-small">
+              <ul className="divide-y divide-divider rounded-card border border-divider text-small">
                 {returns.map((row) => (
                   <li
                     key={String(row.id)}
@@ -405,7 +405,7 @@ export function DeliveryDetailDialog({
             </section>
           ) : null}
 
-          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-border pt-3">
+          <div className="flex flex-wrap items-center justify-end gap-2 border-t border-divider pt-3">
             {canReturn ? (
               <button
                 type="button"

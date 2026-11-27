@@ -435,11 +435,50 @@ export function ProductDetailPage({
             ...(canEdit
               ? [
                   {
+                    label: t('products.edit'),
+                    mobileOnly: true,
+                    onSelect: () =>
+                      void navigate({
+                        to: '/products/$id/edit',
+                        params: { id },
+                        state: (previous) => ({
+                          ...previous,
+                          bikriChild: 'product',
+                        }),
+                      }),
+                  },
+                  {
                     label: t('products.duplicate'),
                     onSelect: () =>
                       void navigate({
                         to: '/products/new',
                         search: { duplicate: id },
+                        state: (previous) => ({
+                          ...previous,
+                          bikriChild: 'product',
+                        }),
+                      }),
+                  },
+                ]
+              : []),
+            ...(can('catalog.edit') || can('purchase.create')
+              ? [
+                  {
+                    label: t('products.print_label'),
+                    mobileOnly: true,
+                    onSelect: () => setLabelsOpen(true),
+                  },
+                ]
+              : []),
+            ...(p.track_stock === 1 && can('stock.adjust') && !readOnly
+              ? [
+                  {
+                    label: t('adjust.button'),
+                    mobileOnly: true,
+                    onSelect: () =>
+                      void navigate({
+                        to: '/products/$id/adjust',
+                        params: { id },
                         state: (previous) => ({
                           ...previous,
                           bikriChild: 'product',
@@ -505,7 +544,7 @@ export function ProductDetailPage({
           ) : null}
         </div>
         {bundle ? (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-border bg-surface p-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-divider bg-surface p-3 sm:grid-cols-3">
             {showCost ? (
               <Figure label={t('products.avg_cost')} testId="detail-avg-cost">
                 <MoneyText paisa={bundle.cost} />
@@ -526,7 +565,7 @@ export function ProductDetailPage({
           </div>
         ) : null}
         {!bundle && (showCost || p.track_stock === 1) ? (
-          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-border bg-surface p-3 sm:grid-cols-3">
+          <div className="grid grid-cols-2 gap-x-4 gap-y-3 rounded-card border border-divider bg-surface p-3 sm:grid-cols-3">
             {showCost ? (
               <>
                 <Figure label={t('products.avg_cost')} testId="detail-avg-cost">
@@ -559,7 +598,7 @@ export function ProductDetailPage({
                         ...previous,
                         bikriChild: 'product',
                       })}
-                      className="underline underline-offset-2"
+                      className="inline-flex min-h-11 items-center underline underline-offset-2"
                     >
                       {t('products.min_stock_off')}
                     </Link>
@@ -586,7 +625,7 @@ export function ProductDetailPage({
       {totalQty > 0 && !privacy ? (
         <section
           aria-labelledby="last14-heading"
-          className="rounded-card border border-border bg-surface p-4"
+          className="rounded-card border border-divider bg-surface p-4"
         >
           <h2 id="last14-heading" className="text-title font-semibold">
             {t('products.last14')}
@@ -644,13 +683,13 @@ export function ProductDetailPage({
       {bundle ? (
         <section
           aria-labelledby="bundle-items-heading"
-          className="rounded-card border border-border bg-surface p-4"
+          className="rounded-card border border-divider bg-surface p-4"
           data-testid="bundle-recipe"
         >
           <h2 id="bundle-items-heading" className="text-title font-semibold">
             {t('products.bundle_items_title')}
           </h2>
-          <ul className="mt-2 flex flex-col divide-y divide-border">
+          <ul className="mt-2 flex flex-col divide-y divide-divider">
             {bundle.items.map((item) => (
               <li
                 key={item.product.id}
@@ -704,7 +743,7 @@ export function ProductDetailPage({
       {String(p.notes ?? '').trim() !== '' ? (
         <section
           aria-labelledby="notes-heading"
-          className="rounded-card border border-border bg-surface p-4"
+          className="rounded-card border border-divider bg-surface p-4"
           data-testid="product-notes"
         >
           <h2 id="notes-heading" className="text-title font-semibold">
@@ -744,7 +783,7 @@ export function ProductDetailPage({
         ) : (
           <>
             {wide ? (
-              <div className="overflow-x-auto rounded-card border border-border bg-surface">
+              <div className="overflow-x-auto rounded-card border border-divider bg-surface">
                 <table className="w-full text-start">
                   <thead className="text-small text-text-muted">
                     <tr>
@@ -767,7 +806,7 @@ export function ProductDetailPage({
                   </thead>
                   <tbody>
                     {historyView.map((h) => (
-                      <tr key={h.key} className="border-t border-border">
+                      <tr key={h.key} className="border-t border-divider">
                         <td className="px-3 py-2">
                           <bdi dir="ltr" className="text-small">
                             {formatTimestamp(h.at, i18n.language, timeZone)}
@@ -815,11 +854,11 @@ export function ProductDetailPage({
                 </table>
               </div>
             ) : (
-              <ul className="flex flex-col rounded-card border border-border bg-surface">
+              <ul className="flex flex-col rounded-card border border-divider bg-surface">
                 {historyView.map((h) => (
                   <li
                     key={h.key}
-                    className="flex flex-col gap-1 border-b border-border p-3 last:border-0"
+                    className="flex flex-col gap-1 border-b border-divider p-3 last:border-0"
                   >
                     <div className="flex items-baseline justify-between gap-2">
                       <span className="min-w-0 font-medium">
@@ -1037,7 +1076,7 @@ function Figure({
       ? 'border-danger/30 bg-danger-subtle text-danger-subtle-ink'
       : tone === 'warning'
         ? 'border-warning/30 bg-warning-subtle text-warning-subtle-ink'
-        : 'border-primary/20 bg-primary-subtle text-primary-subtle-ink';
+        : 'border-divider bg-surface-2 text-text';
   return (
     <div
       className={`${emphasize ? `rounded-card border p-3 ${toneClass}` : 'p-0'} ${className}`}

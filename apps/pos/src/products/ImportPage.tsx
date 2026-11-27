@@ -159,7 +159,7 @@ export function ImportPage() {
               ? 3
               : ['choose', 'map', 'preview', 'importing'].indexOf(stage.step));
           const circleTone = active
-            ? 'bg-primary-ink/15'
+            ? 'bg-primary-ink text-primary'
             : done
               ? 'bg-success/15'
               : 'bg-surface-2';
@@ -172,7 +172,7 @@ export function ImportPage() {
                   ? 'border-primary bg-primary font-semibold text-primary-ink'
                   : done
                     ? 'border-success-subtle bg-success-subtle text-success-subtle-ink'
-                    : 'border-border bg-surface text-text-muted'
+                    : 'border-divider bg-surface text-text-muted'
               }`}
             >
               <span
@@ -344,7 +344,7 @@ export function ImportPage() {
         ) : null}
 
         {stage.step === 'done' ? (
-          <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
+          <section className="flex flex-col gap-3 rounded-card border border-divider bg-surface p-4">
             <p role="status" className="text-title" data-testid="import-result">
               {t('import.result', {
                 created: stage.result.created,
@@ -470,7 +470,7 @@ function PreviewTable({
   const { t } = useTranslation();
   const shown = preview.rows.slice(0, PREVIEW_LIMIT);
   return (
-    <div className="overflow-x-auto rounded-card border border-border">
+    <div className="overflow-x-auto rounded-card border border-divider">
       <table className="w-full text-start text-small">
         <thead className="bg-surface-2">
           <tr>
@@ -488,7 +488,7 @@ function PreviewTable({
             <tr
               key={r.line}
               data-testid="import-row"
-              className="border-t border-border"
+              className="border-t border-divider"
             >
               <td className="px-2 py-1">{r.line}</td>
               <td className="px-2 py-1">{r.parsed.name_en}</td>

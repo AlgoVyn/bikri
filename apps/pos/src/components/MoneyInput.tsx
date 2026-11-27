@@ -3,16 +3,19 @@ import { type ReactNode, useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 
 const TRUE_MINUS = '\u2212';
+const GROUP = new Intl.NumberFormat('en-US', { maximumFractionDigits: 0 });
 
-function formatEditable(paisa: number): string {
+function formatEditable(paisa: number, grouped: boolean): string {
   const negative = paisa < 0;
   const absolute = Math.abs(paisa);
   const whole = Math.trunc(absolute / 100);
   const fraction = absolute % 100;
   const body =
     fraction === 0
-      ? String(whole)
-      : `${whole}.${String(fraction).padStart(2, '0')}`;
+      ? grouped
+        ? GROUP.format(whole)
+        : String(whole)
+      : `${grouped ? GROUP.format(whole) : String(whole)}.${String(fraction).padStart(2, '0')}`;
   return negative ? `-${body}` : body;
 }
 
@@ -94,7 +97,7 @@ export function MoneyInput({
     lastEmitted.current = value;
     setDraft(null);
   }, [value]);
-  const shown = draft ?? (value === null ? '' : formatEditable(value));
+  const shown = draft ?? (value === null ? '' : formatEditable(value, true));
   const parsed =
     shown.trim() === '' ? null : parseMoneyToPaisa(shown, { allowNegative });
   const invalid = touched && shown.trim() !== '' && parsed === null;
@@ -116,7 +119,7 @@ export function MoneyInput({
       >
         {leading ?? (
           <bdi
-            className={`flex shrink-0 items-center font-mono text-text-muted ${compact ? 'ps-2 text-small' : 'ps-3'}`}
+            className={`flex shrink-0 items-center font-sans tabular-nums text-text-muted ${compact ? 'ps-2 text-small' : 'ps-3'}`}
           >
             Rs
           </bdi>
@@ -128,7 +131,7 @@ export function MoneyInput({
           inputMode="decimal"
           autoComplete="off"
           placeholder={placeholder}
-          className={`bikri-focus-wrapper min-w-0 flex-1 bg-transparent font-mono text-text outline-none placeholder:text-text-muted disabled:cursor-not-allowed disabled:text-text-muted rtl:text-end ${compact ? 'text-small' : large ? 'text-title' : 'text-body'} ${leading ? (compact ? 'px-1' : 'px-3') : compact ? 'ps-1 pe-2' : 'ps-2 pe-3'}`}
+          className={`bikri-focus-wrapper min-w-0 flex-1 bg-transparent font-sans tabular-nums text-text outline-none placeholder:text-text-muted disabled:cursor-not-allowed disabled:text-text-muted rtl:text-end ${compact ? 'text-small' : large ? 'text-title' : 'text-body'} ${leading ? (compact ? 'px-1' : 'px-3') : compact ? 'ps-1 pe-2' : 'ps-2 pe-3'}`}
           value={shown}
           disabled={disabled}
           aria-invalid={invalid || undefined}

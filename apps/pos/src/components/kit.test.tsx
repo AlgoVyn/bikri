@@ -58,6 +58,11 @@ function QtyCommitHarness() {
   );
 }
 
+function MoneyHarness() {
+  const [value, setValue] = useState<number | null>(5400000);
+  return <MoneyInput label="Amount" value={value} onChange={setValue} />;
+}
+
 function PhoneHarness() {
   const [value, setValue] = useState('');
   return (
@@ -179,6 +184,20 @@ describe('money and quantity fields', () => {
     render(<MoneyInput label="Amount" value={null} onChange={onChange} />);
     await user.type(screen.getByLabelText('Amount'), '43.5');
     expect(onChange).toHaveBeenLastCalledWith(4350);
+  });
+
+  it('groups digits when unfocused and ungroups them while editing', async () => {
+    const user = userEvent.setup();
+    render(<MoneyHarness />);
+    const input = screen.getByLabelText('Amount') as HTMLInputElement;
+    expect(input.value).toBe('54,000');
+    await user.click(input);
+    expect(input.value).toBe('54,000');
+    await user.clear(input);
+    await user.type(input, '55000');
+    expect(input.value).toBe('55000');
+    fireEvent.blur(input);
+    expect(input.value).toBe('55,000');
   });
 
   it('steps quantity in whole units', async () => {

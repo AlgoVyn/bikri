@@ -291,7 +291,7 @@ export function NewShopPage() {
               {t('admin.err_budget')}
             </p>
           ) : null}
-          <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-5 flex flex-wrap justify-end gap-2 border-t border-border bg-surface px-4 py-3">
+          <div className="sticky bottom-0 z-10 -mx-4 -mb-4 mt-5 flex flex-wrap justify-end gap-2 border-t border-divider bg-surface px-4 py-3">
             <a href={adminHref('/admin/tenants')} className={quietBtn}>
               {t('common.cancel')}
             </a>

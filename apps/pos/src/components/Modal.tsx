@@ -5,7 +5,7 @@ import { CloseIcon } from './icons.tsx';
 
 const overlayClass = 'bikri-overlay fixed inset-0 z-40 bg-scrim';
 const base =
-  'bikri-dialog fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] flex-col gap-4 overflow-y-auto rounded-modal border border-border bg-surface p-4 text-text shadow-modal';
+  'bikri-dialog fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] flex-col gap-4 overflow-y-auto rounded-modal border border-divider bg-surface p-4 text-text shadow-modal';
 const SIZES = {
   normal: `${base} w-[min(32rem,calc(100%-2rem))]`,
   wide: `${base} w-[min(40rem,calc(100%-2rem))]`,
@@ -79,7 +79,7 @@ export function Modal({
           {sheet ? (
             <span
               aria-hidden="true"
-              className="absolute left-1/2 top-2 h-1 w-9 -translate-x-1/2 rounded-full bg-border-strong md:hidden"
+              className="absolute inset-x-0 top-2 mx-auto h-1 w-9 rounded-full bg-border-strong md:hidden"
             />
           ) : null}
           <div className="flex flex-wrap items-baseline justify-between gap-2 pe-12">

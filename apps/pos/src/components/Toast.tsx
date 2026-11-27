@@ -97,7 +97,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
   return (
     <ToastContext.Provider value={api}>
       {children}
-      <div className="pointer-events-none fixed end-4 bottom-20 z-[60] flex w-[min(20rem,calc(100%-2rem))] flex-col gap-2 lg:bottom-6">
+      <div className="bikri-toast-host pointer-events-none fixed end-4 top-16 z-[60] flex w-[min(20rem,calc(100%-2rem))] flex-col gap-2 lg:top-auto lg:bottom-6">
         {items.map((item) => (
           <div
             key={item.id}
@@ -105,7 +105,7 @@ export function ToastProvider({ children }: { children: ReactNode }) {
             className={
               item.tone === 'error'
                 ? 'bikri-toast flex min-h-11 items-center gap-3 rounded-control bg-danger-subtle px-3 py-2 text-danger-subtle-ink shadow-card'
-                : 'bikri-toast flex min-h-11 items-center gap-3 rounded-control border border-border bg-surface px-3 py-2 text-text shadow-card'
+                : 'bikri-toast flex min-h-11 items-center gap-3 rounded-control border border-divider bg-surface px-3 py-2 text-text shadow-card'
             }
           >
             <span className="min-w-0 flex-1">{item.message}</span>

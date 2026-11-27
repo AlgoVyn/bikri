@@ -348,14 +348,14 @@ export function CommandPalette() {
         <Dialog.Content
           aria-describedby={undefined}
           aria-modal="true"
-          className="bikri-dialog fixed inset-x-3 top-16 z-50 mx-auto flex max-h-[calc(100dvh-6rem)] w-auto max-w-2xl flex-col overflow-hidden rounded-modal border border-border bg-surface p-0 text-text shadow-modal"
+          className="bikri-dialog fixed inset-x-3 top-16 z-50 mx-auto flex max-h-[calc(100dvh-6rem)] w-auto max-w-2xl flex-col overflow-hidden rounded-modal border border-divider bg-surface p-0 text-text shadow-modal"
         >
           <Dialog.Title className="sr-only font-semibold">
             {mode === 'commands' ? t('shell.commands') : t('shell.shortcuts')}
           </Dialog.Title>
           {mode === 'commands' ? (
             <>
-              <div className="flex items-center gap-2 border-b border-border px-3 transition-colors focus-within:border-primary">
+              <div className="flex items-center gap-2 border-b border-divider px-3 transition-colors focus-within:border-primary">
                 <SearchIcon />
                 <input
                   ref={inputRef}

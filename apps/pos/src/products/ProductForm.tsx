@@ -592,7 +592,7 @@ export function ProductFormPage({
       />
 
       <div className="grid gap-4 lg:grid-cols-2 lg:items-stretch">
-        <div className="flex min-w-0 flex-col gap-4 rounded-card border border-border bg-surface p-4 shadow-card">
+        <div className="flex min-w-0 flex-col gap-4 rounded-card border border-divider bg-surface p-4 shadow-card">
           <fieldset className="flex flex-wrap items-center gap-3">
             <legend className="mb-1 text-small">{t('form.photo')}</legend>
             {(draft.photo === undefined ? existingUrl : photoUrl) ? (
@@ -960,7 +960,7 @@ export function ProductFormPage({
           </div>
         </div>
 
-        <div className="flex min-w-0 flex-col gap-4 rounded-card border border-border bg-surface p-4 shadow-card">
+        <div className="flex min-w-0 flex-col gap-4 rounded-card border border-divider bg-surface p-4 shadow-card">
           <label className="flex min-h-11 items-center gap-3">
             <input
               id={fieldId('kind')}
@@ -1236,7 +1236,7 @@ export function ProductFormPage({
         </div>
       </div>
 
-      <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-border bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
+      <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-divider bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
         <div className="mx-auto flex w-full max-w-[1152px] flex-wrap justify-end gap-2">
           <button
             type="button"
@@ -1407,7 +1407,7 @@ function BundleRecipeEditor({
     setQuery('');
   };
   return (
-    <fieldset className="flex flex-col gap-2 rounded-control border border-border p-3">
+    <fieldset className="flex flex-col gap-2 rounded-control border border-divider p-3">
       <legend className="px-1 text-small font-medium">
         {t('form.bundle_items')}
       </legend>
@@ -1416,7 +1416,7 @@ function BundleRecipeEditor({
           {t('form.bundle_items_empty')}
         </p>
       ) : (
-        <ul className="flex flex-col divide-y divide-border">
+        <ul className="flex flex-col divide-y divide-divider">
           {items.map((item, index) => {
             const product = byId.get(item.component_product_id);
             const componentUnit =
@@ -1512,7 +1512,7 @@ function BundleRecipeEditor({
           onChange={(e) => setQuery(e.target.value)}
         />
         {matches.length > 0 ? (
-          <ul className="flex flex-col rounded-control border border-border">
+          <ul className="flex flex-col rounded-control border border-divider">
             {matches.map((product) => (
               <li key={product.id}>
                 <button

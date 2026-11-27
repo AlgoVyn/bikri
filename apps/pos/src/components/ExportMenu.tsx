@@ -24,7 +24,7 @@ export function ExportMenu({
       </Dropdown.Trigger>
       <Dropdown.Portal>
         <Dropdown.Content
-          className="z-50 min-w-40 rounded-control border border-border bg-surface p-1 shadow-card"
+          className="z-50 min-w-40 rounded-control border border-divider bg-surface p-1 shadow-card"
           sideOffset={4}
           align="end"
         >

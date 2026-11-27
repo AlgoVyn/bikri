@@ -117,7 +117,7 @@ export function ChaseList() {
       {data ? (
         <p
           data-testid="chase-total"
-          className="rounded-card border border-border bg-surface p-3 text-small"
+          className="rounded-card border border-divider bg-surface p-3 text-small"
         >
           {t('office.udhaar.total_owed')}:{' '}
           <span className="text-title font-semibold">
@@ -127,7 +127,7 @@ export function ChaseList() {
       ) : null}
 
       {data && data.groups.length === 0 ? (
-        <p className="rounded-card border border-border bg-surface p-4 text-center text-text-muted">
+        <p className="rounded-card border border-divider bg-surface p-4 text-center text-text-muted">
           {t('office.udhaar.no_chase')}
         </p>
       ) : null}
@@ -138,7 +138,7 @@ export function ChaseList() {
           : group.rows.slice(0, CHASE_PAGE);
         return (
           <section key={group.key} className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border pb-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-divider pb-1">
               <h2 className="text-title font-semibold">
                 {groupLabel(t, group.key)}
               </h2>
@@ -146,11 +146,11 @@ export function ChaseList() {
                 <MoneyText paisa={group.total} />
               </p>
             </div>
-            <ul className="flex flex-col rounded-card border border-border bg-surface">
+            <ul className="flex flex-col rounded-card border border-divider bg-surface">
               {visible.map((row, rowIndex) => (
                 <li
                   key={row.customer.customer.id}
-                  className="flex flex-wrap items-center gap-2 border-b border-border p-2 last:border-0"
+                  className="flex flex-wrap items-center gap-2 border-b border-divider p-2 last:border-0"
                 >
                   <Link
                     to="/udhaar/$customerId"

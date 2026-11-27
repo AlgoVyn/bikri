@@ -94,12 +94,12 @@ export function GlobalSearchHost() {
             event.preventDefault();
             inputRef.current?.focus();
           }}
-          className="bikri-dialog fixed inset-x-3 top-20 z-50 mx-auto flex h-fit max-h-[calc(100dvh-7rem)] w-auto max-w-2xl flex-col overflow-hidden rounded-modal border border-border bg-surface p-0 text-text shadow-modal lg:top-6"
+          className="bikri-dialog fixed inset-x-3 top-20 z-50 mx-auto flex h-fit max-h-[calc(100dvh-7rem)] w-auto max-w-2xl flex-col overflow-hidden rounded-modal border border-divider bg-surface p-0 text-text shadow-modal lg:top-6"
         >
           <Dialog.Title className="sr-only">
             {t('shell.search_label')}
           </Dialog.Title>
-          <div className="flex min-h-14 items-center gap-2 border-b border-border px-3">
+          <div className="flex min-h-14 items-center gap-2 border-b border-divider px-3">
             <SearchIcon className="shrink-0 text-text-muted" />
             <input
               ref={inputRef}

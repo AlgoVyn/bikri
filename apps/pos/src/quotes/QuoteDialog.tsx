@@ -83,7 +83,7 @@ export function QuoteDialog({
           if (validUntil) onSave({ validUntil, terms });
         }}
       >
-        <div className="rounded-control border border-border bg-surface-2/60 px-3 py-2 text-small">
+        <div className="rounded-control border border-divider bg-surface-2/60 px-3 py-2 text-small">
           <div className="flex items-center justify-between gap-2">
             <span>
               <span className="text-text-muted">
@@ -122,7 +122,7 @@ export function QuoteDialog({
             onChange={(event) => setTerms(event.target.value)}
           />
         </label>
-        <div className="flex items-center justify-between rounded-control border border-border bg-surface-2/60 px-3 py-2 text-small">
+        <div className="flex items-center justify-between rounded-control border border-divider bg-surface-2/60 px-3 py-2 text-small">
           <span>{t('office.quotations.items', { count: itemCount })}</span>
           <b className="text-title">
             <MoneyText paisa={total} />

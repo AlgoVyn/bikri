@@ -368,6 +368,12 @@ export function SupplierStatement({
               ...(can('purchase.create')
                 ? [
                     {
+                      label: t('office.suppliers.pay_supplier'),
+                      mobileOnly: true,
+                      disabled: readOnly,
+                      onSelect: () => setPayOpen(true),
+                    },
+                    {
                       label: t('office.suppliers.return_supplier'),
                       to: `/suppliers/${supplierId}/return/new`,
                       disabled: readOnly,
@@ -383,12 +389,31 @@ export function SupplierStatement({
                     },
                   ]
                 : []),
+              ...(can('export.data') && rows.length > 0
+                ? [
+                    {
+                      label: t('ui.export_csv'),
+                      mobileOnly: true,
+                      onSelect: () => void exportCsv(),
+                    },
+                    {
+                      label: t('ui.export_pdf'),
+                      mobileOnly: true,
+                      onSelect: () => void exportPdf(),
+                    },
+                    {
+                      label: t('ui.export_share'),
+                      mobileOnly: true,
+                      onSelect: () => void share(),
+                    },
+                  ]
+                : []),
             ]}
           />
         }
       />
 
-      <section className="rounded-card border border-border bg-surface p-4 shadow-card">
+      <section className="rounded-card border border-divider bg-surface p-4 shadow-card">
         <div data-testid="supplier-balance">
           <p className="text-small text-text-muted">
             {balance > 0
@@ -439,7 +464,7 @@ export function SupplierStatement({
       {!wide ? (
         <ul className="flex flex-col gap-2">
           {shownOpening !== 0 ? (
-            <li className="flex items-center justify-between gap-2 rounded-card border border-border bg-surface p-3 text-small">
+            <li className="flex items-center justify-between gap-2 rounded-card border border-divider bg-surface p-3 text-small">
               <span>{t('office.suppliers.entry_opening')}</span>
               <span className="font-medium">
                 <MoneyText paisa={shownOpening} />
@@ -447,7 +472,7 @@ export function SupplierStatement({
             </li>
           ) : null}
           {rows.length === 0 ? (
-            <li className="rounded-card border border-border bg-surface p-4 text-center text-text-muted">
+            <li className="rounded-card border border-divider bg-surface p-4 text-center text-text-muted">
               {t('office.suppliers.no_entries')}
             </li>
           ) : (
@@ -461,7 +486,7 @@ export function SupplierStatement({
               return (
                 <li
                   key={row.entry.id}
-                  className={`relative rounded-card border border-border bg-surface p-3 text-small ${
+                  className={`relative rounded-card border border-divider bg-surface p-3 text-small ${
                     purchaseId ? 'hover:bg-surface-2' : ''
                   }`}
                 >
@@ -518,12 +543,12 @@ export function SupplierStatement({
 
       {wide ? (
         <section
-          className="overflow-auto rounded-card border border-border"
+          className="overflow-auto rounded-card border border-divider"
           aria-label={t('office.suppliers.statement')}
         >
           <table className="w-full min-w-[32rem] text-small">
             <thead className="bg-surface">
-              <tr className="border-b border-border text-text-muted">
+              <tr className="border-b border-divider text-text-muted">
                 <th className="p-2 text-start">{t('office.suppliers.date')}</th>
                 <th className="p-2 text-start">
                   {t('office.suppliers.description')}
@@ -537,7 +562,7 @@ export function SupplierStatement({
             </thead>
             <tbody>
               {shownOpening !== 0 ? (
-                <tr className="border-b border-border">
+                <tr className="border-b border-divider">
                   <td className="p-2" />
                   <td className="p-2">{t('office.suppliers.entry_opening')}</td>
                   <td className="p-2" />
@@ -564,7 +589,7 @@ export function SupplierStatement({
                   return (
                     <tr
                       key={row.entry.id}
-                      className={`border-b border-border last:border-0 ${
+                      className={`border-b border-divider last:border-0 ${
                         purchaseId ? 'hover:bg-surface-2' : ''
                       }`}
                     >

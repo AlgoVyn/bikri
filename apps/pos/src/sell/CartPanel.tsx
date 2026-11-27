@@ -234,7 +234,7 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
         })}
       </div>
 
-      <div className="flex min-h-11 items-center gap-2 rounded-control border border-border bg-surface-2/60 px-2.5 lg:min-h-12">
+      <div className="flex min-h-11 items-center gap-2 rounded-control border border-divider bg-surface-2/60 px-2.5 lg:min-h-12">
         <span className="flex size-6 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink [&_svg]:size-4">
           <UdhaarIcon />
         </span>
@@ -306,7 +306,7 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
       </ul>
 
       <dl
-        className="flex flex-col gap-0.5 rounded-card border border-border bg-surface-2/50 px-2.5 py-1.5 text-small"
+        className="flex flex-col gap-0.5 rounded-card border border-divider bg-surface-2/50 px-2.5 py-1.5 text-small"
         data-testid="cart-totals"
       >
         <Row
@@ -426,9 +426,9 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
         ) : null}
       </dl>
 
-      <div className="flex flex-wrap items-center gap-1.5">
-        {p.quote && p.quote.mode !== 'convert' ? (
-          <>
+      <div className="flex flex-col gap-1.5 2xl:flex-row 2xl:items-stretch">
+        <div className="flex flex-wrap items-center gap-1.5 2xl:min-w-0 2xl:flex-1">
+          {p.quote && p.quote.mode !== 'convert' ? (
             <button
               type="button"
               className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
@@ -436,61 +436,70 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
             >
               {t('sell.quote_cancel_edit')}
             </button>
-            <button
-              type="button"
-              data-testid="save-quote"
-              className={`${buttonPrimary} max-sm:px-3 text-small lg:ms-auto lg:min-h-12 lg:px-3`}
-              disabled={cart.lines.length === 0}
-              onClick={p.onSaveQuote}
-            >
-              {t('sell.save_quote')}
-            </button>
-          </>
-        ) : (
-          <>
-            <button
-              type="button"
-              className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
-              disabled={cart.lines.length === 0}
-              onClick={p.onHold}
-            >
-              {t('sell.hold')}
-            </button>
-            <button
-              type="button"
-              className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
-              onClick={p.onHeld}
-            >
-              {t('sell.held_bills', { count: p.heldCount })}
-            </button>
-            <button
-              type="button"
-              className={`${buttonDangerQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
-              disabled={isEmptyCart(cart)}
-              onClick={p.onClear}
-            >
-              {t('sell.clear')}
-            </button>
-            {p.quote?.mode !== 'convert' ? (
+          ) : (
+            <>
               <button
                 type="button"
-                data-testid="save-quote"
                 className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
                 disabled={cart.lines.length === 0}
-                onClick={p.onSaveQuote}
+                onClick={p.onHold}
               >
-                {t('sell.save_quote')}
+                {t('sell.hold')}
               </button>
-            ) : null}
-            <button
-              type="button"
-              className={`${buttonPrimary} max-sm:px-3 text-small lg:ms-auto lg:min-h-12 lg:px-3`}
-              onClick={isEmptyCart(cart) ? p.onAddItem : p.onPay}
-            >
-              {isEmptyCart(cart) ? t('sell.add_items') : t('sell.take_payment')}
-            </button>
-          </>
-        )}
+              <button
+                type="button"
+                className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+                onClick={p.onHeld}
+              >
+                {t('sell.held_bills', { count: p.heldCount })}
+              </button>
+              <button
+                type="button"
+                className={`${buttonDangerQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+                disabled={isEmptyCart(cart)}
+                onClick={p.onClear}
+              >
+                {t('sell.clear')}
+              </button>
+              {p.quote?.mode !== 'convert' ? (
+                <button
+                  type="button"
+                  data-testid="save-quote"
+                  className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+                  disabled={cart.lines.length === 0}
+                  onClick={p.onSaveQuote}
+                >
+                  {t('sell.save_quote')}
+                </button>
+              ) : null}
+            </>
+          )}
+        </div>
+        <button
+          type="button"
+          data-testid={
+            p.quote && p.quote.mode !== 'convert' ? 'save-quote' : undefined
+          }
+          className={`${buttonPrimary} min-h-14 w-full text-title 2xl:ms-auto 2xl:min-h-12 2xl:w-auto 2xl:px-4 2xl:text-body`}
+          disabled={
+            p.quote && p.quote.mode !== 'convert'
+              ? cart.lines.length === 0
+              : false
+          }
+          onClick={
+            p.quote && p.quote.mode !== 'convert'
+              ? p.onSaveQuote
+              : isEmptyCart(cart)
+                ? p.onAddItem
+                : p.onPay
+          }
+        >
+          {p.quote && p.quote.mode !== 'convert'
+            ? t('sell.save_quote')
+            : isEmptyCart(cart)
+              ? t('sell.add_items')
+              : t('sell.take_payment')}
+        </button>
       </div>
     </div>
   );
@@ -528,7 +537,7 @@ function BundleRows({
   expanded: boolean;
   p: CartPanelProps;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const ref = useRef<HTMLLIElement>(null);
   const first = lines[0]?.line;
   const qty = Number(first?.bundle_qty ?? 0);
@@ -557,6 +566,11 @@ function BundleRows({
     if (expanded) ref.current?.scrollIntoView({ block: 'nearest' });
   }, [expanded]);
   if (!first) return null;
+  const urdu = i18n.language === 'ur';
+  const bundleName =
+    urdu && first.bundle_name_ur
+      ? first.bundle_name_ur
+      : String(first.bundle_name ?? first.name);
   return (
     <li
       ref={ref}
@@ -565,7 +579,7 @@ function BundleRows({
       className={
         expanded
           ? 'rounded-card border border-primary bg-surface-2/60'
-          : `border-b border-border last:border-b-0 ${selected ? 'bg-surface-2/60' : ''}`
+          : `border-b border-divider last:border-b-0 ${selected ? 'bg-surface-2/60' : ''}`
       }
     >
       <div className="flex items-center gap-1.5 px-1">
@@ -584,10 +598,10 @@ function BundleRows({
           <span className="min-w-0 flex-1">
             <span className="flex min-w-0 items-center gap-1.5">
               <span
-                className={`data-name min-w-0 truncate font-medium ${isLatinName(String(first.bundle_name ?? first.name)) ? 'ltr-name' : ''}`}
+                className={`data-name min-w-0 truncate font-medium ${isLatinName(bundleName) ? 'ltr-name' : ''}`}
                 data-testid="line-name"
               >
-                {String(first.bundle_name ?? first.name)}
+                {bundleName}
               </span>
               <span className="shrink-0 rounded-full bg-surface-2 px-1.5 text-caption font-medium text-text-muted">
                 {t('sell.bundle_pill')}
@@ -625,8 +639,8 @@ function BundleRows({
         <button
           type="button"
           className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface hover:text-danger"
-          aria-label={`${t('sell.remove_line')} ${String(first.bundle_name ?? '')}`}
-          title={`${t('sell.remove_line')} ${String(first.bundle_name ?? '')}`}
+          aria-label={`${t('sell.remove_line')} ${bundleName}`}
+          title={`${t('sell.remove_line')} ${bundleName}`}
           onClick={() => p.onRemoveBundle(group)}
         >
           <CloseIcon className="size-5" />
@@ -634,26 +648,33 @@ function BundleRows({
       </div>
       {expanded ? (
         <ul className="pb-1">
-          {lines.map(({ line }) => (
-            <li
-              key={line.key}
-              className="flex items-baseline justify-between gap-2 px-3 ps-8 text-small text-text-muted"
-              data-testid="bundle-component"
-            >
-              <span
-                className={`data-name min-w-0 truncate ${isLatinName(line.name) ? 'ltr-name' : ''}`}
+          {lines.map(({ line }) => {
+            const name = urdu && line.name_ur ? line.name_ur : line.name;
+            return (
+              <li
+                key={line.key}
+                className="flex items-baseline justify-between gap-2 px-3 ps-8 text-small text-text-muted"
+                data-testid="bundle-component"
               >
-                {line.name}
-              </span>
-              <span className="shrink-0 whitespace-nowrap">
-                {qtyWithUnit(t, line.qty_milli, (line.unit ?? 'pc') as QtyUnit)}
-              </span>
-            </li>
-          ))}
+                <span
+                  className={`data-name min-w-0 truncate ${isLatinName(name) ? 'ltr-name' : ''}`}
+                >
+                  {name}
+                </span>
+                <span className="shrink-0 whitespace-nowrap">
+                  {qtyWithUnit(
+                    t,
+                    line.qty_milli,
+                    (line.unit ?? 'pc') as QtyUnit,
+                  )}
+                </span>
+              </li>
+            );
+          })}
         </ul>
       ) : null}
       {expanded ? (
-        <div className="border-t border-border px-2 pb-1.5 pt-1">
+        <div className="border-t border-divider px-2 pb-1.5 pt-1">
           <div className="grid grid-cols-[minmax(120px,auto)_minmax(140px,1fr)] items-start gap-1.5 sm:grid-cols-2">
             <QtyInput
               dense
@@ -836,9 +857,11 @@ function LineRow({
   isExpanded: boolean;
   p: CartPanelProps;
 }) {
-  const { t } = useTranslation();
+  const { t, i18n } = useTranslation();
   const ref = useRef<HTMLLIElement>(null);
   const unit = (line.unit ?? 'pc') as QtyUnit;
+  const name =
+    i18n.language === 'ur' && line.name_ur ? line.name_ur : line.name;
   const short =
     line.track_stock === 1 && onHand !== undefined && line.qty_milli > onHand;
   // Keep the line being edited (usually the one just scanned) inside the visible list.
@@ -853,7 +876,7 @@ function LineRow({
       className={
         expanded
           ? 'rounded-card border border-primary bg-surface-2/60'
-          : `border-b border-border last:border-b-0 ${selected ? 'bg-surface-2/60' : ''}`
+          : `border-b border-divider last:border-b-0 ${selected ? 'bg-surface-2/60' : ''}`
       }
     >
       <div className="flex items-center gap-1.5 px-1">
@@ -871,11 +894,11 @@ function LineRow({
           />
           <span className="min-w-0 flex-1">
             <span
-              className={`data-name block truncate font-medium ${isLatinName(line.name) ? 'ltr-name' : ''}`}
-              title={line.name}
+              className={`data-name block truncate font-medium ${isLatinName(name) ? 'ltr-name' : ''}`}
+              title={name}
               data-testid="line-name"
             >
-              {line.name}
+              {name}
             </span>
             <span className="flex min-w-0 flex-wrap items-center gap-x-2 gap-y-0.5 text-small text-text-muted">
               <span className="shrink-0 whitespace-nowrap">
@@ -939,8 +962,8 @@ function LineRow({
         <button
           type="button"
           className="flex size-11 shrink-0 items-center justify-center rounded-control text-text-muted hover:bg-surface hover:text-danger"
-          aria-label={`${t('sell.remove_line')} ${line.name}`}
-          title={`${t('sell.remove_line')} ${line.name}`}
+          aria-label={`${t('sell.remove_line')} ${name}`}
+          title={`${t('sell.remove_line')} ${name}`}
           onClick={() => p.onRemoveLine(line.key)}
         >
           <CloseIcon className="size-5" />
@@ -948,14 +971,14 @@ function LineRow({
       </div>
 
       {expanded ? (
-        <div className="border-t border-border px-2 pb-1.5 pt-1">
+        <div className="border-t border-divider px-2 pb-1.5 pt-1">
           <div className="grid grid-cols-[minmax(140px,auto)_minmax(90px,1fr)] items-start gap-1.5 sm:grid-cols-2">
             <QtyInput
               dense
               hideLabel
               commitOnBlur
               label={t('ui.qty_label')}
-              ariaLabel={t('sell.qty_of', { name: line.name })}
+              ariaLabel={t('sell.qty_of', { name })}
               unit={unit}
               value={line.qty_milli}
               onChange={(milli) => {

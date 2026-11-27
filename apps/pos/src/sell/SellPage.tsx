@@ -1139,7 +1139,7 @@ export function SellPage() {
           <label htmlFor="sell-search" className="sr-only">
             {t('sell.search_label')}
           </label>
-          <div className="flex h-12 items-center gap-2 rounded-control border border-border bg-surface px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 lg:h-12">
+          <div className="flex h-12 items-center gap-2 rounded-control border border-divider bg-surface px-3 focus-within:border-primary focus-within:ring-2 focus-within:ring-primary/20 lg:h-12">
             <SearchIcon />
             <input
               id="sell-search"
@@ -1288,7 +1288,7 @@ export function SellPage() {
       </section>
       <aside
         aria-label={t('sell.cart')}
-        className={`flex-col border-border bg-surface p-2 lg:flex lg:basis-2/5 lg:border-s ${sheet ? 'fixed inset-0 z-40 flex' : 'hidden'}`}
+        className={`flex-col border-divider bg-surface p-2 lg:flex lg:basis-2/5 lg:border-s ${sheet ? 'fixed inset-0 z-40 flex' : 'hidden'}`}
       >
         {sheet ? (
           <button

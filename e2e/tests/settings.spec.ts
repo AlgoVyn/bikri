@@ -463,16 +463,33 @@ test.describe('Settings (T-050)', () => {
     page,
   }) => {
     await openReadyShop(page, '/bikri/settings/display');
-    await page.getByLabel('Theme').selectOption('dark');
+    await page
+      .getByRole('group', { name: 'Theme' })
+      .getByRole('button', { name: 'Dark' })
+      .click();
     await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
-    await page.getByLabel('Text size').selectOption('130');
+    await page
+      .getByRole('group', { name: 'Text size' })
+      .getByRole('button', { name: '130%' })
+      .click();
     await expect(page.locator('html')).toHaveCSS('font-size', '19.5px');
-    await page.getByLabel('Lock-screen keypad').selectOption('computer');
+    await page
+      .getByRole('group', { name: 'Lock-screen keypad' })
+      .getByRole('button', { name: /Computer/ })
+      .click();
     await page.getByRole('button', { name: 'Save', exact: true }).click();
     await expect(page.getByText('Display settings saved.')).toBeVisible();
     await page.reload();
-    await expect(page.getByLabel('Lock-screen keypad')).toHaveValue('computer');
-    await page.getByRole('main').getByLabel('Language').selectOption('ur');
+    await expect(
+      page
+        .getByRole('group', { name: 'Lock-screen keypad' })
+        .getByRole('button', { name: /Computer/ }),
+    ).toHaveAttribute('aria-pressed', 'true');
+    await page
+      .getByRole('main')
+      .getByRole('group', { name: 'Language' })
+      .getByRole('button', { name: 'اردو' })
+      .click();
     await expect(page.locator('html')).toHaveAttribute('dir', 'rtl');
   });
 

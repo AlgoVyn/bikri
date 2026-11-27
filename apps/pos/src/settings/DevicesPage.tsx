@@ -256,7 +256,7 @@ export function DevicesPage() {
         <p className="p-4 text-small text-text-muted">
           {t('devices.support_view')}
         </p>
-        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+        <ul className="flex flex-col divide-y divide-divider rounded-card border border-divider bg-surface">
           {localDevices.map((device) => (
             <li
               key={String(device.id)}
@@ -309,7 +309,7 @@ export function DevicesPage() {
         />
       ) : null}
       {enrolled === false ? null : (
-        <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
+        <section className="flex flex-col gap-3 rounded-card border border-divider bg-surface p-4">
           <h2 className="text-title font-semibold">{t('devices.add_title')}</h2>
           <form
             className="grid gap-3 sm:grid-cols-2"
@@ -399,7 +399,7 @@ export function DevicesPage() {
           {codes.length > 0 ? (
             <div className="flex flex-col gap-2">
               <h3 className="font-medium">{t('devices.unused_codes')}</h3>
-              <ul className="flex flex-col divide-y divide-border">
+              <ul className="flex flex-col divide-y divide-divider">
                 {codes.map((c) => (
                   <li
                     key={c.id}
@@ -455,7 +455,7 @@ export function DevicesPage() {
           {devices === null ? (
             <div
               role="status"
-              className="h-24 animate-pulse rounded-card border border-border bg-surface-2"
+              className="h-24 animate-pulse rounded-card border border-divider bg-surface-2"
               aria-label={t('common.loading')}
             />
           ) : devices.length === 0 ? (
@@ -467,7 +467,7 @@ export function DevicesPage() {
             />
           ) : (
             <ul
-              className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface"
+              className="flex flex-col divide-y divide-divider rounded-card border border-divider bg-surface"
               data-testid="device-list"
             >
               {devices.map((d) => (
@@ -645,7 +645,7 @@ export function DevicesPage() {
       )}
 
       {enrolled === false ? null : (
-        <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
+        <section className="flex flex-col gap-3 rounded-card border border-divider bg-surface p-4">
           <h2 className="text-title font-semibold">
             {t('devices.import_title')}
           </h2>

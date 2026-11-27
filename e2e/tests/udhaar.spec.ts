@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
 import {
+  clickPageAction,
   clickRecordBack,
   expectNoHorizontalScroll,
   idbAll,
@@ -9,6 +10,26 @@ import {
 } from './helpers.ts';
 
 // T-043/T-044: customers, statement, payments, reminders, promises and chase (screens/12).
+
+async function exportStatement(
+  page: Page,
+  container: string,
+  kind: 'CSV' | 'PDF',
+) {
+  const direct = page
+    .getByTestId(container)
+    .getByRole('button', { name: 'Export', exact: true });
+  if (await direct.isVisible()) {
+    await direct.click();
+    await page.getByRole('menuitem', { name: kind }).click();
+    return;
+  }
+  await page.getByTestId('page-actions-more').click();
+  await page
+    .getByRole('button', { name: kind, exact: true })
+    .filter({ visible: true })
+    .click();
+}
 
 async function seedAli(page: Page, phone = '03001234567') {
   return (await page.evaluate(
@@ -166,7 +187,7 @@ test.describe('Credit (T-043, T-044)', () => {
     });
 
     await captureOpen(page);
-    await page.getByRole('button', { name: 'Send reminder' }).click();
+    await clickPageAction(page, 'Send reminder');
     const url = await opened(page);
     expect(url).toContain('https://wa.me/923001234567?text=');
     expect(url).toContain('Assalam-o-Alaikum%20Ali%2C');
@@ -174,26 +195,18 @@ test.describe('Credit (T-043, T-044)', () => {
 
     // Statement PDF works offline (AC 7).
     await context.setOffline(true);
-    await page
-      .getByTestId('udhaar-detail')
-      .getByRole('button', { name: 'Export', exact: true })
-      .click();
     const [pdf] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('menuitem', { name: 'PDF' }).click(),
+      exportStatement(page, 'udhaar-detail', 'PDF'),
     ]);
     const bytes = await readFile((await pdf.path()) ?? '');
     expect(bytes.subarray(0, 8).toString('latin1')).toBe('%PDF-1.4');
     await context.setOffline(false);
 
     // Statement CSV has the documented header (AC 7).
-    await page
-      .getByTestId('udhaar-detail')
-      .getByRole('button', { name: 'Export', exact: true })
-      .click();
     const [statementCsv] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('menuitem', { name: 'CSV' }).click(),
+      exportStatement(page, 'udhaar-detail', 'CSV'),
     ]);
     const statementText = await readFile(
       (await statementCsv.path()) ?? '',
@@ -204,7 +217,7 @@ test.describe('Credit (T-043, T-044)', () => {
     await clickRecordBack(page, 'Back to customers');
     const [csv] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Export CSV' }).click(),
+      clickPageAction(page, 'Export CSV'),
     ]);
     const text = await readFile((await csv.path()) ?? '', 'utf8');
     expect(text).toContain(
@@ -212,7 +225,7 @@ test.describe('Credit (T-043, T-044)', () => {
     );
     expect(text).toContain('Ali');
 
-    await page.getByRole('link', { name: 'Chase list' }).click();
+    await clickPageAction(page, 'Chase list');
     await expect(page.getByRole('heading', { name: '0–7 days' })).toBeVisible();
     await expect(page.getByText('Total owed to you:')).toBeVisible();
     await expect(page.getByTestId('chase-total')).toContainText('Rs 890');
@@ -235,13 +248,9 @@ test.describe('Credit (T-043, T-044)', () => {
     await expect(page.getByTestId('statement-balance')).toBeVisible();
     await expect(page.getByTestId('statement-include-items')).toHaveCount(0);
 
-    await page
-      .getByTestId('udhaar-detail')
-      .getByRole('button', { name: 'Export', exact: true })
-      .click();
     const [file] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('menuitem', { name: 'CSV' }).click(),
+      exportStatement(page, 'udhaar-detail', 'CSV'),
     ]);
     const csv = await readFile((await file.path()) ?? '', 'utf8');
     expect(csv).toContain('Charger × 1 · Rs 500 each — Rs 500');
@@ -283,8 +292,13 @@ test.describe('Credit (T-043, T-044)', () => {
     expect(opening).toMatchObject([{ source_type: 'opening', amount: 50000 }]);
 
     await page.getByRole('link', { name: /Sana/ }).click();
+    if ((page.viewportSize()?.width ?? 0) < 768) {
+      await page.getByTestId('page-actions-more').click();
+    }
     await expect(
-      page.getByRole('button', { name: 'Send reminder' }),
+      page
+        .getByRole('button', { name: 'Send reminder' })
+        .filter({ visible: true }),
     ).toBeDisabled();
   });
 
@@ -299,7 +313,7 @@ test.describe('Credit (T-043, T-044)', () => {
         page.getByRole('columnheader', { name: 'تفصیل' }),
       ).toBeVisible();
     await captureOpen(page);
-    await page.getByRole('button', { name: 'یاد دہانی بھیجیں' }).click();
+    await clickPageAction(page, 'یاد دہانی بھیجیں');
     const url = await opened(page);
     expect(url.startsWith('https://wa.me/923001234567?text=%D8%A7')).toBe(true);
   });

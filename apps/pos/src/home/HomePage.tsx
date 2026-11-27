@@ -410,7 +410,7 @@ export function HomePage() {
 
   return (
     <div className={pageClass('standard', 'gap-6')}>
-      <header className="relative overflow-hidden rounded-card border border-border bg-surface px-4 py-5 shadow-card sm:px-6 sm:py-6">
+      <header className="relative overflow-hidden rounded-card border border-divider bg-surface px-4 py-3 shadow-card sm:px-5">
         <span
           aria-hidden="true"
           className="pointer-events-none absolute -end-14 -top-24 size-56 rounded-full bg-primary-subtle/70"
@@ -419,22 +419,22 @@ export function HomePage() {
           aria-hidden="true"
           className="pointer-events-none absolute -bottom-24 end-24 size-44 rounded-full border border-accent/30"
         />
-        <div className="relative flex flex-wrap items-start justify-between gap-x-6 gap-y-4 sm:items-center">
-          <div className="min-w-0">
-            <p className="flex items-center gap-2 text-caption font-semibold uppercase tracking-[0.16em] text-primary-subtle-ink">
+        <div className="relative flex flex-wrap items-center justify-between gap-3">
+          <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
+            <p className="hidden items-center gap-2 text-caption font-semibold uppercase tracking-[0.16em] text-primary-subtle-ink sm:flex">
               <span
                 aria-hidden="true"
                 className="size-1.5 shrink-0 rounded-full bg-accent"
               />
               {t('home.overview')}
             </p>
-            <h1 className="mt-2 text-h1 font-semibold tracking-tight">
+            <h1 className="text-title font-semibold tracking-tight">
               {t('home.welcome', { name: String(staff?.name ?? '') })}
             </h1>
-            <p className="mt-1.5 text-small text-text-muted">{dateText}</p>
+            <p className="text-small text-text-muted">{dateText}</p>
           </div>
           {data?.branchName ? (
-            <span className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-border bg-surface-2 px-3 text-small font-medium text-text">
+            <span className="inline-flex min-h-9 max-w-full items-center gap-2 rounded-full border border-divider bg-surface-2 px-3 text-small font-medium text-text">
               <span aria-hidden="true" className="shrink-0 text-primary">
                 <StoreIcon />
               </span>
@@ -446,7 +446,7 @@ export function HomePage() {
 
       {justSetUp ? (
         <section
-          className="rounded-card border border-border bg-surface p-4 shadow-card"
+          className="rounded-card border border-divider bg-surface p-4 shadow-card"
           aria-labelledby="ready-heading"
         >
           <h2 id="ready-heading" className="text-title font-semibold">
@@ -504,7 +504,7 @@ export function HomePage() {
       {data && data.products === 0 ? (
         <div className="flex flex-col gap-6">
           <section
-            className="rounded-card border border-border bg-surface p-4 shadow-card"
+            className="rounded-card border border-divider bg-surface p-4 shadow-card"
             aria-labelledby="first-heading"
           >
             <div className="flex items-start gap-3">
@@ -554,7 +554,7 @@ export function HomePage() {
             {readOnly ? (
               <section
                 aria-labelledby="read-only-heading"
-                className="order-1 flex flex-col gap-3 rounded-card border border-border bg-surface p-4 text-text shadow-card"
+                className="order-1 flex flex-col gap-3 rounded-card border border-divider bg-surface p-4 text-text shadow-card"
               >
                 <div className="flex items-start gap-3">
                   <span
@@ -622,7 +622,7 @@ export function HomePage() {
                 >
                   {t('home.attention')}
                 </h2>
-                <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface shadow-card">
+                <ul className="flex flex-col divide-y divide-divider overflow-hidden rounded-card border border-divider bg-surface shadow-card">
                   {visibleAttention.map((item) => (
                     <li key={item.kind}>
                       <Link
@@ -775,7 +775,7 @@ function GettingStarted({
     <section
       aria-labelledby="getting-started"
       data-testid="getting-started"
-      className="rounded-card border border-border bg-surface p-3 shadow-card"
+      className="rounded-card border border-divider bg-surface p-3 shadow-card"
     >
       <div className="flex items-center gap-2">
         <h2 id="getting-started" className="me-auto text-title font-semibold">
@@ -857,7 +857,7 @@ function QuickActions({
             <Link
               to={tile.to}
               title={tile.keys ? `${t(tile.label)} (${tile.keys})` : undefined}
-              className="group flex min-h-20 items-start gap-3 rounded-card border border-border bg-surface p-3 text-start shadow-card transition-colors duration-150 hover:border-border-strong hover:bg-surface-2 hover:shadow-card-hover"
+              className="group flex min-h-20 items-start gap-3 rounded-card border border-divider bg-surface p-3 text-start shadow-card transition-colors duration-150 hover:border-border-strong hover:bg-surface-2 hover:shadow-card-hover"
             >
               <span className="flex size-10 shrink-0 items-center justify-center rounded-control bg-primary-subtle text-primary-subtle-ink">
                 <tile.Icon />
@@ -927,7 +927,7 @@ function RegisterCard({
   return (
     <section
       aria-labelledby="register-heading"
-      className="rounded-card border border-border bg-surface p-4 shadow-card"
+      className="rounded-card border border-divider bg-surface p-4 shadow-card"
     >
       <div className="flex items-center gap-2">
         <h2 id="register-heading" className="text-title font-semibold">
@@ -971,7 +971,7 @@ function RegisterCard({
             </div>
           </div>
         </div>
-        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-border pt-4 sm:grid-cols-[1fr_1fr_auto]">
+        <div className="mt-4 grid grid-cols-2 gap-x-6 gap-y-4 border-t border-divider pt-4 sm:grid-cols-[1fr_1fr_auto]">
           {metrics.map((metric) => (
             <Metric
               key={metric.id}
@@ -1045,9 +1045,9 @@ function RecentBillsCard({
   return (
     <section
       aria-labelledby="recent-heading"
-      className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
+      className="overflow-hidden rounded-card border border-divider bg-surface shadow-card"
     >
-      <div className="flex items-center gap-2 border-b border-border px-4 py-3">
+      <div className="flex items-center gap-2 border-b border-divider px-4 py-3">
         <h2 id="recent-heading" className="me-auto text-title font-semibold">
           {t('home.recent_bills')}
         </h2>
@@ -1067,7 +1067,7 @@ function RecentBillsCard({
         </div>
       ) : null}
       {recent.length > 0 ? (
-        <ul className="divide-y divide-border">
+        <ul className="divide-y divide-divider">
           {recent.map(({ sale, methods }) => (
             <li key={sale.id}>
               <Link
@@ -1076,7 +1076,10 @@ function RecentBillsCard({
                 className="flex flex-col gap-1 px-4 py-3 transition-colors duration-150 hover:bg-surface-2"
               >
                 <span className="flex items-center justify-between gap-2">
-                  <bdi dir="ltr" className="font-mono text-small font-medium">
+                  <bdi
+                    dir="ltr"
+                    className="font-sans tabular-nums text-small font-medium"
+                  >
                     {String(sale.invoice_no)}
                   </bdi>
                   <span className="text-body font-semibold">

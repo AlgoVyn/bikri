@@ -20,7 +20,7 @@ export function ListPager({
   if (pageCount <= 1) return null;
   return (
     <nav
-      className="flex items-center justify-between gap-2 border-t border-border p-3"
+      className="flex items-center justify-between gap-2 border-t border-divider p-3"
       aria-label={label ?? t('office.sales.pagination')}
     >
       <button

@@ -1,6 +1,7 @@
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import {
+  clickPageAction,
   expectNoHorizontalScroll,
   idbAll,
   openReadyShop,
@@ -52,7 +53,7 @@ test.describe('Stock adjust (T-021)', () => {
   }) => {
     const [cable] = await shop(page);
     await go(page, `/products/${cable}`);
-    await page.getByRole('link', { name: 'Adjust stock' }).click();
+    await clickPageAction(page, 'Adjust stock');
     await expect(dialog(page)).toContainText('On hand 12 pc');
     await dialog(page).getByRole('tab', { name: 'Stock out' }).click();
     await dialog(page).getByLabel('Reason').selectOption('damaged');
@@ -75,14 +76,14 @@ test.describe('Stock adjust (T-021)', () => {
     await expect(page).toHaveURL(new RegExp(`/products/${cable}$`, 'u'));
 
     // Count 7 on 9 → −2000; again 7 → nothing.
-    await page.getByRole('link', { name: 'Adjust stock' }).click();
+    await clickPageAction(page, 'Adjust stock');
     await dialog(page).getByRole('tab', { name: 'Count' }).click();
     await dialog(page)
       .getByLabel('Counted quantity', { exact: true })
       .fill('7');
     await dialog(page).getByRole('button', { name: 'Save' }).click();
     await expect(page.getByTestId('detail-on-hand')).toContainText('7');
-    await page.getByRole('link', { name: 'Adjust stock' }).click();
+    await clickPageAction(page, 'Adjust stock');
     await dialog(page).getByRole('tab', { name: 'Count' }).click();
     await dialog(page)
       .getByLabel('Counted quantity', { exact: true })
@@ -96,7 +97,7 @@ test.describe('Stock adjust (T-021)', () => {
     ]);
 
     // Lost needs a note.
-    await page.getByRole('link', { name: 'Adjust stock' }).click();
+    await clickPageAction(page, 'Adjust stock');
     await dialog(page).getByRole('tab', { name: 'Stock out' }).click();
     await dialog(page).getByLabel('Reason').selectOption('lost');
     await dialog(page).getByLabel('Quantity', { exact: true }).fill('1');
@@ -123,7 +124,7 @@ test.describe('Stock adjust (T-021)', () => {
     const [, charger] = await shop(page);
     await go(page, `/products/${charger}/adjust`);
     await dialog(page).getByLabel('Reason').selectOption('received_local');
-    await expect(dialog(page).getByLabel('Cost per item')).toHaveValue('1100');
+    await expect(dialog(page).getByLabel('Cost per item')).toHaveValue('1,100');
     await dialog(page).getByLabel('Cost per item').fill('1200');
     await dialog(page).getByLabel('Quantity', { exact: true }).fill('5');
     await expect(dialog(page).getByTestId('adjust-new')).toContainText(

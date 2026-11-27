@@ -100,7 +100,7 @@ export function DeleteTab({
               {t('admin.delete_progress')}
             </p>
           ) : null}
-          <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+          <div className="flex flex-wrap gap-2 border-t border-divider pt-4">
             <button type="button" className={quietBtn} onClick={onExport}>
               {t('admin.tab_export')}
             </button>

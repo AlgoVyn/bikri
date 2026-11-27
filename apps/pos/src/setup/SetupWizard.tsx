@@ -356,7 +356,7 @@ export function SetupWizard() {
 
   return (
     <main className="flex min-h-dvh items-center justify-center bg-bg px-3 py-6 text-text">
-      <div className="grid w-full max-w-[896px] gap-6 lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-stretch">
+      <div className="grid w-full max-w-[896px] gap-6 lg:min-h-[calc(100dvh-3rem)] lg:grid-cols-[20rem_minmax(0,1fr)] lg:items-stretch">
         <aside className="hidden flex-col justify-between gap-8 rounded-card bg-rail p-6 text-rail-ink shadow-card lg:flex">
           <div>
             <div className="flex items-center gap-2">
@@ -390,11 +390,11 @@ export function SetupWizard() {
           ref={cardRef}
           noValidate
           onSubmit={onSubmit}
-          className="w-full rounded-card border border-border bg-surface p-5 shadow-card"
+          className="w-full rounded-card border border-divider bg-surface p-5 shadow-card"
         >
           <header className="mb-4 flex items-center gap-2.5">
-            <BikriMark className="size-8" />
-            <span className="text-h2 font-semibold tracking-wordmark">
+            <BikriMark className="size-8 lg:hidden" />
+            <span className="text-h2 font-semibold tracking-wordmark lg:hidden">
               {t('common.app_name')}
             </span>
             {step > 0 ? (

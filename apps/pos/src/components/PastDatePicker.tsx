@@ -122,7 +122,7 @@ export function PastDatePicker({
         ))}
       </div>
 
-      <div className="rounded-control border border-border bg-surface p-2">
+      <div className="rounded-control border border-divider bg-surface p-2">
         <div className="flex items-center justify-between gap-2">
           <button
             type="button"

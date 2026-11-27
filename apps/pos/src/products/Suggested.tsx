@@ -47,7 +47,7 @@ export function SuggestedPage() {
           return (
             <li
               key={name}
-              className="flex flex-wrap items-end gap-3 rounded-card border border-border bg-surface p-3"
+              className="flex flex-wrap items-end gap-3 rounded-card border border-divider bg-surface p-3"
             >
               <label className="flex min-h-11 flex-1 items-center gap-3">
                 <input

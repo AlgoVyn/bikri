@@ -82,7 +82,7 @@ function StaffList() {
       {rows.length === 0 ? (
         <EmptyState message={t('office.staff.empty')} />
       ) : (
-        <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+        <ul className="flex flex-col divide-y divide-divider rounded-card border border-divider bg-surface">
           {rows.map((row) => (
             <li key={row.staff.id}>
               <button
@@ -384,7 +384,7 @@ function StaffDialog({
             {t('office.staff.reset_permissions')}
           </button>
         </div>
-        <ul className="grid max-h-64 gap-1 overflow-y-auto rounded-control border border-border p-2 sm:grid-cols-2">
+        <ul className="grid max-h-64 gap-1 overflow-y-auto rounded-control border border-divider p-2 sm:grid-cols-2">
           {PERMISSIONS.map((permission) => {
             const isOwner = role === 'owner';
             const ownerOnly = !isOwner && OWNER_ONLY.has(permission);

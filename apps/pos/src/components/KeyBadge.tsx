@@ -59,7 +59,7 @@ export function KeyBadge({
   return (
     <kbd
       dir="ltr"
-      className="inline-flex items-center rounded-control border border-border bg-surface-2 px-1.5 font-mono text-small text-text-muted"
+      className="inline-flex items-center rounded-control border border-divider bg-surface-2 px-1.5 font-mono text-small text-text-muted"
     >
       {keys}
     </kbd>

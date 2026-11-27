@@ -503,7 +503,7 @@ export function PrinterWizard({
   return (
     <section
       aria-labelledby="wizard-title"
-      className="flex flex-col gap-4 rounded-card border border-border bg-surface p-4"
+      className="flex flex-col gap-4 rounded-card border border-divider bg-surface p-4"
     >
       <h2 id="wizard-title" className="text-title font-semibold">
         {t('printer.wizard_title')}{' '}
@@ -539,7 +539,7 @@ export function PrinterWizard({
             ))}
           </div>
           {draft.paper_mm === 80 ? (
-            <fieldset className="rounded-card border border-border bg-surface-2/40 p-3">
+            <fieldset className="rounded-card border border-divider bg-surface-2/40 p-3">
               <legend className="px-1 text-small font-medium">
                 {t('printer.chars_per_line')}
               </legend>
@@ -714,7 +714,7 @@ export function PrinterWizard({
             </div>
           ) : null}
           {draft.transport === 'agent' ? (
-            <div className="flex flex-col gap-3 rounded-card border border-border bg-surface-2 p-3">
+            <div className="flex flex-col gap-3 rounded-card border border-divider bg-surface-2 p-3">
               {agentChecking ? (
                 <p className="text-small text-text-muted">
                   {t('printer.agent_checking')}

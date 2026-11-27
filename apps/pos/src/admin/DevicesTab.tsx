@@ -239,7 +239,7 @@ export function DevicesTab({
           <div className="overflow-x-auto">
             <table className="w-full min-w-[860px] text-start text-small">
               <caption className="sr-only">{t('admin.tab_devices')}</caption>
-              <thead className="border-b border-border bg-surface-2 text-text-muted">
+              <thead className="border-b border-divider bg-surface-2 text-text-muted">
                 <tr>
                   <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_name')}
@@ -439,7 +439,7 @@ function DeviceRow({
   const { t } = useTranslation();
   const revoked = device.revoked_at !== null;
   return (
-    <tr className="border-b border-border last:border-b-0 hover:bg-surface-2/60">
+    <tr className="border-b border-divider last:border-b-0 hover:bg-surface-2/60">
       <td className="px-4 py-3">
         <div className="flex flex-wrap items-center gap-2">
           <span className="font-medium">{device.name}</span>

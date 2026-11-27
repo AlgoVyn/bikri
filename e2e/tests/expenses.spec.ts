@@ -1,6 +1,11 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
-import { idbAll, openReadyShop, setLanguage } from './helpers.ts';
+import {
+  clickPageAction,
+  idbAll,
+  openReadyShop,
+  setLanguage,
+} from './helpers.ts';
 
 // T-046: expenses, reversal and cash in/out (screens/14 ACs 1–4).
 
@@ -45,7 +50,7 @@ test.describe('Expenses (T-046)', () => {
     await page.goto('/bikri/expenses');
     const [csv] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Export CSV' }).click(),
+      clickPageAction(page, 'Export CSV'),
     ]);
     const text = await readFile((await csv.path()) ?? '', 'utf8');
     expect(text).toContain(
@@ -53,7 +58,7 @@ test.describe('Expenses (T-046)', () => {
     );
     expect(text).toContain('Tea shop');
 
-    await page.getByRole('button', { name: 'Cash in / out' }).click();
+    await clickPageAction(page, 'Cash in / out');
     const cash = dialog(page, 'Cash in / out');
     await cash.getByLabel('Amount').fill('500');
     await cash.getByLabel('Reason').fill('Change float from bank');

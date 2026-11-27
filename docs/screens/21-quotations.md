@@ -10,30 +10,6 @@ A quotation is a **non-financial sales document**. It stores the prices and term
 
 There is no quotation screen in the Dukaan reference set. The list/detail structure follows [Sales history](10-sales-and-bill-detail.md) and the Sell cart; the visual language is the Algovyn design system in [08](../08-ux-guidelines.md). Do not copy any third-party quotation design.
 
-## Design mockups
-
-These are static design renders for review (not implemented screenshots). The source of truth is the written spec below.
-
-**Desktop: Sales → Quotations, list and selected quote**
-
-![Quotations desktop list and detail](mockups/21-quotations-desktop-list-detail.png)
-
-**Sell: Save quotation dialog**
-
-![Save quotation dialog on Sell](mockups/21-quotations-sell-save-dialog.png)
-
-**Phone: quotation detail**
-
-![Quotation detail on a phone](mockups/21-quotations-mobile-detail.png)
-
-**Urdu (RTL): list and detail**
-
-![Quotations in Urdu, RTL](mockups/21-quotations-desktop-urdu.png)
-
-**80 mm quotation slip**
-
-![Quotation print preview at 80 mm](mockups/21-quotations-print-preview.png)
-
 ## Lifecycle
 
 | State | Meaning | Actions |

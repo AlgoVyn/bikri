@@ -54,7 +54,7 @@ export function PrivacyCurtain({ className = '' }: { className?: string }) {
     <div
       role="img"
       aria-label={`${t('privacy.chart_hidden')}. ${t('privacy.chart_hint')}`}
-      className={`flex min-h-40 flex-col items-center justify-center gap-2 rounded-card border border-border bg-surface p-6 text-center ${className}`}
+      className={`flex min-h-40 flex-col items-center justify-center gap-2 rounded-card border border-divider bg-surface p-6 text-center ${className}`}
     >
       <span
         aria-hidden="true"

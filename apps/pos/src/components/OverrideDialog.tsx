@@ -6,7 +6,7 @@ import { buttonPrimary, buttonQuiet, fieldClass } from './classes.ts';
 
 const overlayClass = 'bikri-overlay fixed inset-0 z-40 bg-scrim';
 const contentClass =
-  'bikri-dialog fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 rounded-modal border border-border bg-surface p-4 text-text shadow-modal';
+  'bikri-dialog fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 rounded-modal border border-divider bg-surface p-4 text-text shadow-modal';
 
 const PIN_PATTERN = /^\d{4,6}$/u;
 

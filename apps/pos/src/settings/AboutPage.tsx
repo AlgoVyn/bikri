@@ -33,7 +33,7 @@ function AboutContent() {
   };
   return (
     <SettingsPageLayout title={t('office.about.title')} icon={<InfoIcon />}>
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4 text-small">
+      <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-4 text-small">
         <p>
           <span className="text-text-muted">{t('office.about.version')}: </span>
           <bdi dir="ltr" className="font-mono">
@@ -51,7 +51,7 @@ function AboutContent() {
           </button>
         </div>
       </section>
-      <details className="rounded-card border border-border bg-surface p-4">
+      <details className="rounded-card border border-divider bg-surface p-4">
         <summary className="min-h-11 cursor-pointer">
           <h2 className="inline text-title font-semibold">
             {t('office.about.terms')}
@@ -63,7 +63,7 @@ function AboutContent() {
           ))}
         </ol>
       </details>
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4 text-small">
+      <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-4 text-small">
         <h2 className="text-title font-semibold">
           {t('office.about.privacy')}
         </h2>

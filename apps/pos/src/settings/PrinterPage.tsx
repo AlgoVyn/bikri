@@ -187,7 +187,7 @@ export function PrinterPage() {
   return (
     <SettingsPageLayout title={t('printer.title')} icon={<PrinterIcon />}>
       <section
-        className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4"
+        className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-4"
         aria-labelledby="printer-status"
       >
         <h2 id="printer-status" className="text-title font-semibold">
@@ -291,7 +291,7 @@ export function PrinterPage() {
 
       {printer?.transport && editable && !wizard ? (
         <section
-          className="flex flex-col gap-1 rounded-card border border-border bg-surface p-4"
+          className="flex flex-col gap-1 rounded-card border border-divider bg-surface p-4"
           aria-labelledby="printer-options"
         >
           <h2 id="printer-options" className="text-title font-semibold">
@@ -369,10 +369,10 @@ export function PrinterPage() {
       ) : null}
 
       <section
-        className="overflow-hidden rounded-card border border-border bg-surface"
+        className="overflow-hidden rounded-card border border-divider bg-surface"
         aria-labelledby="recent-prints"
       >
-        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-center justify-between gap-2 border-b border-divider px-4 py-3">
           <h2 id="recent-prints" className="text-title font-semibold">
             {t('printer.recent')}
           </h2>
@@ -400,7 +400,7 @@ export function PrinterPage() {
           />
         ) : null}
         {jobs.length > 0 ? (
-          <ul className="flex flex-col divide-y divide-border">
+          <ul className="flex flex-col divide-y divide-divider">
             {jobs.map(({ job, invoice }) => (
               <li
                 key={job.id}

@@ -195,7 +195,7 @@ export function SyncPage() {
             </ul>
           </div>
         ) : null}
-        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-card border border-border bg-surface p-4">
+        <dl className="grid grid-cols-[auto_1fr] gap-x-4 gap-y-1 rounded-card border border-divider bg-surface p-4">
           <dt className="text-text-muted">{t('syncpage.last_sync')}</dt>
           <dd>
             {formatWhen(
@@ -271,7 +271,7 @@ export function SyncPage() {
             <h2 className="text-title font-semibold">
               {t('syncpage.failed_title', { count: data.failed.length })}
             </h2>
-            <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+            <ul className="flex flex-col divide-y divide-divider rounded-card border border-divider bg-surface">
               {data.failed.map((e) => (
                 <li
                   key={e.seq}
@@ -322,7 +322,7 @@ export function SyncPage() {
             <p className="text-small text-text-muted">
               {t('syncpage.files_hint')}
             </p>
-            <ul className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+            <ul className="flex flex-col divide-y divide-divider rounded-card border border-divider bg-surface">
               {data.failedFiles.map((e) => (
                 <li
                   key={e.id}
@@ -370,8 +370,8 @@ export function SyncPage() {
           </section>
         ) : null}
 
-        <section className="overflow-hidden rounded-card border border-border bg-surface">
-          <h2 className="border-b border-border px-4 py-3 text-title font-semibold">
+        <section className="overflow-hidden rounded-card border border-divider bg-surface">
+          <h2 className="border-b border-divider px-4 py-3 text-title font-semibold">
             {t('syncpage.conflicts_title')}
           </h2>
           {data.conflicts.length === 0 ? (
@@ -381,7 +381,7 @@ export function SyncPage() {
               message={t('syncpage.no_conflicts')}
             />
           ) : (
-            <ul className="flex flex-col divide-y divide-border">
+            <ul className="flex flex-col divide-y divide-divider">
               {data.conflicts.map((c) => (
                 <li
                   key={String(c.id)}

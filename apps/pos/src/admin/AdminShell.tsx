@@ -123,14 +123,17 @@ export function AdminShell() {
         {t('admin.skip_content')}
       </a>
 
-      <header className="sticky top-0 z-30 border-b border-border bg-surface shadow-topbar lg:hidden">
+      <header className="sticky top-0 z-30 border-b border-divider bg-surface shadow-topbar lg:hidden">
         <div className="flex h-topbar items-center gap-2 px-4">
-          <Link to="/admin" className="flex min-w-0 items-center gap-2">
+          <Link
+            to="/admin"
+            className="flex min-h-11 min-w-0 items-center gap-2"
+          >
             <BikriMark className="size-8" />
             <span className="truncate text-h2 font-semibold tracking-wordmark">
               {t('common.app_name')}
             </span>
-            <span className="shrink-0 rounded-full bg-primary-subtle px-2 py-0.5 text-micro font-medium text-primary-subtle-ink">
+            <span className="shrink-0 rounded-full bg-primary-subtle px-2 py-0.5 text-caption font-medium text-primary-subtle-ink">
               {t('admin.operator_short')}
             </span>
           </Link>
@@ -185,7 +188,7 @@ export function AdminShell() {
           <span className="rail-label text-small font-semibold tracking-wordmark text-rail-ink">
             {t('common.app_name')}
           </span>
-          <span className="rail-label text-micro font-medium uppercase tracking-[0.12em] text-rail-muted">
+          <span className="rail-label text-caption font-medium uppercase tracking-[0.12em] text-rail-muted">
             {t('admin.operator_short')}
           </span>
           <span className="sr-only">{t('shell.compact_rail')}</span>
@@ -255,14 +258,14 @@ export function AdminShell() {
             <div
               id={menuId}
               data-testid="admin-operator-panel"
-              className="absolute bottom-0 start-full z-50 ms-3 max-h-[calc(100dvh-6rem)] w-80 overflow-y-auto rounded-card border border-border bg-surface p-3 text-text shadow-modal"
+              className="absolute bottom-0 start-full z-50 ms-3 max-h-[calc(100dvh-6rem)] w-80 overflow-y-auto rounded-card border border-divider bg-surface p-3 text-text shadow-modal"
             >
-              <div className="flex items-center gap-2 border-b border-border pb-3">
+              <div className="flex items-center gap-2 border-b border-divider pb-3">
                 <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
                   <UserIcon />
                 </span>
                 <div className="min-w-0">
-                  <p className="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">
+                  <p className="text-caption font-medium uppercase tracking-[0.12em] text-text-muted">
                     {t('admin.operator_label')}
                   </p>
                   <p
@@ -273,7 +276,7 @@ export function AdminShell() {
                   </p>
                 </div>
               </div>
-              <div className="mt-2 border-b border-border py-2">
+              <div className="mt-2 border-b border-divider py-2">
                 <LanguageMenu
                   onPicked={() => {
                     setMenuOpen(false);

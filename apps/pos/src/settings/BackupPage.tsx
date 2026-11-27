@@ -137,7 +137,7 @@ function BackupContent() {
           </button>
         </div>
       ) : null}
-      <section className="flex flex-col divide-y divide-border rounded-card border border-border bg-surface">
+      <section className="flex flex-col divide-y divide-divider rounded-card border border-divider bg-surface">
         <div className="p-4">
           <p>{t('office.backup.nightly')}</p>
           <p className="mt-1 text-small text-text-muted">

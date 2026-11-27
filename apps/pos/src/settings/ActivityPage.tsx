@@ -100,8 +100,8 @@ function ActivityContent() {
   const pageRows = rows?.slice(page * PAGE, (page + 1) * PAGE) ?? [];
   return (
     <SettingsPageLayout title={t('office.activity.title')} icon={<ClockIcon />}>
-      <div className="rounded-card border border-border bg-surface">
-        <div className="border-b border-border p-3">
+      <div className="rounded-card border border-divider bg-surface">
+        <div className="border-b border-divider p-3">
           <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-5">
             <DateField
               label={t('office.activity.from')}
@@ -205,7 +205,7 @@ function ActivityContent() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[44rem] border-collapse text-small">
               <thead>
-                <tr className="border-b border-border bg-surface-2">
+                <tr className="border-b border-divider bg-surface-2">
                   <th className="px-3 py-2 text-start">
                     {t('office.activity.time')}
                   </th>
@@ -227,7 +227,7 @@ function ActivityContent() {
                 {pageRows.map((entry) => (
                   <tr
                     key={String(entry.row.id)}
-                    className="border-b border-border last:border-0"
+                    className="border-b border-divider last:border-0"
                   >
                     <td className="px-3 py-2 whitespace-nowrap">
                       {longDate(

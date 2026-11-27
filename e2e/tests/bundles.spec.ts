@@ -373,12 +373,16 @@ test.describe('Bundles (journeys 26–27)', () => {
       await showCart(page);
       const group = page.getByTestId('bundle-group');
       await expect(group).toBeVisible();
-      await expect(group).toContainText(BUNDLE);
+      await expect(group).toContainText(bundleName(locale));
       // One bundle group is one row with four component quantities, not four rows.
       const groupHeader = group.getByRole('button').first();
       if ((await groupHeader.getAttribute('aria-expanded')) !== 'true')
         await groupHeader.click();
       await expect(group.getByTestId('bundle-component')).toHaveCount(4);
+      if (locale === 'ur') {
+        for (const component of COMPONENTS)
+          await expect(group).toContainText(component.name_ur);
+      }
       // Asking for more than the recipe can make shows the amber warning, not a block.
       await group.locator('input[inputmode="numeric"]').fill('4');
       await page.keyboard.press('Enter');

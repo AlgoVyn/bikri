@@ -542,6 +542,7 @@ export async function startQuoteCart(
         key: String(line.id),
         product_id: line.product_id ? String(line.product_id) : null,
         name: String(line.name_snapshot),
+        name_ur: product ? String(product.name_ur ?? '') : undefined,
         sku: String(line.sku_snapshot ?? ''),
         qty_milli: Number(line.qty_milli),
         unit_price: priced?.unitPrice ?? Number(line.unit_price),
@@ -571,6 +572,9 @@ export async function startQuoteCart(
               bundle_id: String(line.bundle_id),
               bundle_group: String(line.bundle_group ?? ''),
               bundle_name: String(line.bundle_name ?? ''),
+              bundle_name_ur: String(
+                products.get(String(line.bundle_id))?.name_ur ?? '',
+              ),
               bundle_qty: Number(line.bundle_qty ?? 0),
               bundle_price: priced?.bundleNet ?? bundlePrice - bundleDiscount,
               bundle_list_price: bundlePrice,

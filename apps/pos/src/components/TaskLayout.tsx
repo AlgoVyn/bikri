@@ -28,7 +28,7 @@ export function TaskAside({
   items: readonly string[];
 }) {
   return (
-    <section className="rounded-card border border-border bg-surface p-4 shadow-card">
+    <section className="rounded-card border border-divider bg-surface p-4 shadow-card">
       <h2 className="text-title font-semibold">{title}</h2>
       <ul className="mt-2 flex list-disc flex-col gap-1.5 ps-4 text-small text-text-muted">
         {items.map((item) => (

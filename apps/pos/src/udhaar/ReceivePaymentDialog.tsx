@@ -151,7 +151,7 @@ export function ReceivePaymentDialog({
         description={t('office.udhaar.receive_for', { name: customerName })}
         sheet
       >
-        <p className="flex items-center justify-between gap-2 border-b border-border pb-2 text-small">
+        <p className="flex items-center justify-between gap-2 border-b border-divider pb-2 text-small">
           <span className="text-text-muted">
             {balance > 0
               ? t('office.udhaar.owes_label')

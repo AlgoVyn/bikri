@@ -15,12 +15,12 @@ export function SalesTabs({
 }) {
   const { t } = useTranslation();
   const base =
-    'inline-flex min-h-9 items-center rounded-[8px] px-4 text-small font-medium transition-colors';
+    'inline-flex min-h-11 items-center rounded-md px-4 text-small font-medium transition-colors lg:min-h-9';
   return (
     <div
       role="tablist"
       aria-label={t('office.quotations.tabs_label')}
-      className="inline-flex gap-1 self-start rounded-control bg-surface-2 p-1"
+      className="inline-flex gap-1 self-start rounded-control border border-border bg-surface-2 p-1"
     >
       <Link
         to="/sales"

@@ -190,7 +190,7 @@ const Tile = memo(function Tile({
       data-testid="sell-tile"
       title={name}
       aria-current={active || undefined}
-      className={`relative flex size-full flex-col items-start gap-2 overflow-hidden rounded-card border bg-surface p-3 text-start shadow-card transition-[border-color,box-shadow] duration-150 hover:border-border-strong active:scale-[0.995] ${active ? 'border-primary ring-2 ring-primary' : 'border-border'}`}
+      className={`relative flex size-full flex-col items-start gap-2 overflow-hidden rounded-card border bg-surface p-3 text-start shadow-card transition-[border-color,box-shadow] duration-150 hover:border-border-strong active:scale-[0.995] ${active ? 'border-primary ring-2 ring-primary' : 'border-divider'}`}
       onClick={() => onAdd(row)}
     >
       {cartQty > 0 ? (
@@ -218,7 +218,7 @@ const Tile = memo(function Tile({
             : t('sell.bundle_items', { count: row.bundle.items.length })}
         </span>
       ) : null}
-      <span className="mt-auto flex w-full shrink-0 flex-wrap items-center justify-between gap-x-1 gap-y-0.5 text-small">
+      <span className="mt-auto flex h-12 w-full shrink-0 flex-col items-start gap-y-1 text-small">
         <span className="min-w-0 whitespace-nowrap text-body font-semibold">
           <MoneyText paisa={Number(p.price ?? 0)} />
         </span>

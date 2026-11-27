@@ -7,6 +7,7 @@ export function EmptyState({
   message,
   actionLabel,
   onAction,
+  actions,
   variant = 'card',
   showHeading = false,
 }: {
@@ -15,6 +16,8 @@ export function EmptyState({
   message: string;
   actionLabel?: string;
   onAction?: () => void;
+  /** Secondary onboarding links/buttons shown beside the one primary action. */
+  actions?: ReactNode;
   /** `plain` when the empty state already sits inside a list surface. */
   variant?: 'card' | 'plain';
   /** Show the heading visually (404). Other callers keep it as a landmark only. */
@@ -24,7 +27,7 @@ export function EmptyState({
     <div
       className={
         variant === 'card'
-          ? 'flex flex-col items-center gap-3 rounded-card border border-border bg-surface px-6 py-12 text-center shadow-card'
+          ? 'flex flex-col items-center gap-3 rounded-card border border-divider bg-surface px-6 py-12 text-center shadow-card'
           : 'flex flex-col items-center gap-3 px-6 py-12 text-center'
       }
     >
@@ -47,6 +50,11 @@ export function EmptyState({
         <button type="button" className={buttonPrimary} onClick={onAction}>
           {actionLabel}
         </button>
+      ) : null}
+      {actions !== undefined ? (
+        <div className="flex flex-wrap items-center justify-center gap-2">
+          {actions}
+        </div>
       ) : null}
     </div>
   );

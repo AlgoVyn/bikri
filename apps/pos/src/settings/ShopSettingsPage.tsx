@@ -216,7 +216,7 @@ function ShopForm() {
 
   return (
     <SettingsPageLayout title={t('office.settings.title')} icon={<StoreIcon />}>
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
+      <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-4">
         <h2 className="text-title font-semibold">{t('setup.shop_title')}</h2>
         <label className="flex flex-col gap-1 text-small">
           {t('setup.shop_name')}
@@ -379,7 +379,7 @@ function ShopForm() {
         </button>
       </section>
 
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
+      <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-4">
         <h2 className="text-title font-semibold">{t('setup.receipt_title')}</h2>
         <label className="flex flex-col gap-1 text-small">
           {t('setup.header')}
@@ -631,7 +631,7 @@ function ShopForm() {
       </section>
 
       {data.branch ? (
-        <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
+        <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-4">
           <h2 className="text-title font-semibold">
             {t('office.settings.branch')}
           </h2>
@@ -698,7 +698,7 @@ function ShopForm() {
         </section>
       ) : null}
 
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-4">
+      <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-4">
         <h2 className="text-title font-semibold">
           {t('office.settings.categories')}
         </h2>

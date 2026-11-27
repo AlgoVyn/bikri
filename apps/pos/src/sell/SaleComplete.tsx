@@ -301,7 +301,7 @@ export function SaleComplete({
         <dl>
           <div className="flex items-center justify-between gap-2">
             <dt className="text-text-muted">{t('done.invoice')}</dt>
-            <dd className="font-mono">{invoice}</dd>
+            <dd className="font-sans tabular-nums">{invoice}</dd>
           </div>
           <div className="mt-1 flex items-center justify-between gap-2">
             <dt className="text-text-muted">{t('done.date')}</dt>
