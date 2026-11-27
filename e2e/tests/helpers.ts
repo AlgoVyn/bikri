@@ -33,18 +33,15 @@ export async function clickPageAction(
   page: Page,
   name: string | RegExp,
 ): Promise<void> {
-  const match = () =>
-    page
-      .getByRole('button', { name })
-      .or(page.getByRole('link', { name }))
-      .filter({ visible: true })
-      .first();
-  if (await match().isVisible()) {
-    await match().click();
+  const match = page
+    .getByRole('button', { name })
+    .or(page.getByRole('link', { name }));
+  if ((page.viewportSize()?.width ?? 0) >= 768) {
+    await match.first().click();
     return;
   }
   await page.getByTestId('page-actions-more').click();
-  await match().click();
+  await match.filter({ visible: true }).first().click();
 }
 
 /** Record-page back: top bar below 1024, icon-only in-page link at 1024+. */

@@ -590,11 +590,6 @@ select:not([multiple]) {
 }
 
 /*
-  A toast must never sit on a modal's submit row. On phones the sheet covers the viewport, so
-  suppress the toast host while a dialog is open; the live region remains mounted for AT.
+  Phone toasts sit under the top bar, not over a sheet footer. Desktop keeps the bottom-right
+  position; the live region remains mounted for assistive tech in both cases.
 */
-@media (max-width: 767px) {
-  body:has([role="dialog"]) .bikri-toast-host {
-    display: none;
-  }
-}

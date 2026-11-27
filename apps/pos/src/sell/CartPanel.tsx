@@ -426,8 +426,8 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
         ) : null}
       </dl>
 
-      <div className="flex flex-col gap-1.5">
-        <div className="flex flex-wrap items-center gap-1.5">
+      <div className="flex flex-col gap-1.5 2xl:flex-row 2xl:items-stretch">
+        <div className="flex flex-wrap items-center gap-1.5 2xl:min-w-0 2xl:flex-1">
           {p.quote && p.quote.mode !== 'convert' ? (
             <button
               type="button"
@@ -480,7 +480,7 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
           data-testid={
             p.quote && p.quote.mode !== 'convert' ? 'save-quote' : undefined
           }
-          className={`${buttonPrimary} min-h-14 w-full text-title`}
+          className={`${buttonPrimary} min-h-14 w-full text-title 2xl:ms-auto 2xl:min-h-12 2xl:w-auto 2xl:px-4 2xl:text-body`}
           disabled={
             p.quote && p.quote.mode !== 'convert'
               ? cart.lines.length === 0

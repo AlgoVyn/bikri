@@ -1,5 +1,11 @@
 import { expect, test } from '@playwright/test';
-import { idbCount, makePng, openReadyShop, setLanguage } from './helpers.ts';
+import {
+  clickPageAction,
+  idbCount,
+  makePng,
+  openReadyShop,
+  setLanguage,
+} from './helpers.ts';
 
 // T-015: product photos — square 512 px WebP, stored on the device, queued for upload, shown offline.
 
@@ -119,7 +125,7 @@ test.describe('Product photos (T-015)', () => {
     await expect(
       page.getByTestId('products-detail').getByTestId('product-photo'),
     ).toBeVisible();
-    await page.getByRole('link', { name: /تبدیل کریں/ }).click();
+    await clickPageAction(page, 'تبدیل کریں');
     await expect(page.getByTestId('form-photo')).toBeVisible();
     await page.getByRole('button', { name: 'تصویر ہٹائیں' }).click();
     await expect(page.getByTestId('form-photo')).toHaveCount(0);
