@@ -295,7 +295,8 @@
       "bundle_qty_value": "{{qty}} poore bundle wapas",
       "bundle_includes": "Shamil:",
       "bundle_whole_only": "Sirf poora bundle — cheezein alag se wapas nahi ho sakti.",
-      "error_bundle": "Sirf poore bundle wapas karein; bundle ki har cheez shamil honi chahiye."
+      "error_bundle": "Sirf poore bundle wapas karein; bundle ki har cheez shamil honi chahiye.",
+      "restock_hint": "Wapas ki gayi cheezein dobara stock mein shamil kar di jayengi."
     },
     "udhaar": {
       "add_promise": "Wada shamil karein",
