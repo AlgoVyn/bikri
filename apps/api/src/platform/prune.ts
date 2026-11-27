@@ -1,9 +1,11 @@
 /** Retention prune and tenant deletion (03 §4.4, 13 §7.4). Raw D1 allowed here (platform/). */
 import { tenantDb } from '../db/tenantDb.ts';
+import { tenantDeleteChunkSql } from '../db/tenantDelete.ts';
 import { auditStatements } from '../sync/audit.ts';
 import { revokeSupportDeviceStatements } from '../sync/status.ts';
 import { APPLY_ORDER } from '../sync/tables.ts';
 import type { TenantRow } from '../types.ts';
+import { endSupportStatement } from './tenantAdmin.ts';
 import { utcDay } from './tenants.ts';
 
 export const MAX_CRON_CALLS = 50;
@@ -17,6 +19,14 @@ const APPLIED_OPS_MAX_PER_RUN = 20_000;
 /** Stay below the Free plan's 100k daily rows-written cap, leaving headroom for shops. */
 const ACCOUNT_WRITE_BUDGET = 90_000;
 const APPLIED_OPS_CHUNK = 5_000;
+/**
+ * The change_log phase gets the largest share, but sections 3–5 must never be starved by
+ * a busy or numerous set of tenants (M15). These are D1 calls, not writes.
+ */
+const LOG_PHASE_CALLS = 30;
+const CLEANUP_PHASE_CALLS = 7;
+const SUPPORT_PHASE_CALLS = 6;
+const DELETION_RESERVE = 8;
 
 /** Tables of a tenant, children first, for deletion (13 §7.4). */
 export const DELETE_ORDER = [
@@ -106,7 +116,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   const [tenantRows, cursorRow, usageRow] = await calls.run(() =>
     DB.batch([
       DB.prepare(
-        "SELECT id, created_at FROM tenants WHERE status NOT IN ('deleted', 'deleting') ORDER BY id",
+        "SELECT id, created_at, change_log_floor FROM tenants WHERE status NOT IN ('deleted', 'deleting') ORDER BY id",
       ),
       DB.prepare("SELECT value FROM meta WHERE key = 'prune_cursor'"),
       DB.prepare(
@@ -122,22 +132,33 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     (tenantRows?.results ?? []) as Array<{
       id: string;
       created_at: number;
+      change_log_floor: number;
     }>
   ).map((row) => ({
     id: String(row.id),
     createdAt: Number(row.created_at ?? 0),
+    floor: Number(row.change_log_floor ?? 0),
   }));
   const tenantIds = tenants.map((tenant) => tenant.id);
+  // The floor travels in the initial tenants query; a per-tenant SELECT spent one D1
+  // call on every prune run for a value already read (M15).
+  const floorByTenant = new Map(
+    tenants.map((tenant) => [tenant.id, tenant.floor]),
+  );
   // `undefined` = no watermark covers the cutoff day yet; 0 is a real watermark that says
   // "this shop had nothing old". Conflating the two re-ran the fallback scan every night
   // for 30 nights (API-H7).
   const targetByTenant = new Map<string, number>();
-  // Record today's watermark and read each tenant's cutoff watermark in one batch
-  // per 40 tenants (two statements each). `deleting` shops are skipped: their log is
-  // being deleted and their watermark would leak (API-H7).
+  // Record a watermark only when MAX(seq) advanced since the latest stored watermark;
+  // an idle shop used to write a row every night (M15). The cutoff watermark read stays
+  // in the same batch.
   for (let at = 0; at < tenantIds.length; at += 40) {
     const chunk = tenantIds.slice(at, at + 40);
-    if (!calls.ok() || !calls.hasWrites(chunk.length * 2)) {
+    if (
+      !calls.ok() ||
+      calls.used >= LOG_PHASE_CALLS ||
+      !calls.hasWrites(chunk.length * 2)
+    ) {
       break;
     }
     const statements: D1PreparedStatement[] = [];
@@ -145,7 +166,9 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       statements.push(
         DB.prepare(
           `INSERT INTO change_log_watermarks (tenant_id, day, max_seq)
-           SELECT ?1, ?2, COALESCE(MAX(seq), 0) FROM change_log WHERE tenant_id = ?1
+           SELECT ?1, ?2, COALESCE((SELECT MAX(seq) FROM change_log WHERE tenant_id = ?1), 0)
+           WHERE COALESCE((SELECT MAX(seq) FROM change_log WHERE tenant_id = ?1), 0) >
+             COALESCE((SELECT max_seq FROM change_log_watermarks WHERE tenant_id = ?1 ORDER BY day DESC LIMIT 1), -1)
            ON CONFLICT(tenant_id, day) DO UPDATE SET max_seq =
              CASE WHEN excluded.max_seq > max_seq THEN excluded.max_seq ELSE max_seq END`,
         ).bind(id, today),
@@ -173,7 +196,8 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       targetByTenant.set(tenant.id, 0);
       continue;
     }
-    if (!calls.ok(2) || !calls.hasWrites(2)) break;
+    if (!calls.ok(2) || calls.used + 2 > LOG_PHASE_CALLS || !calls.hasWrites(2))
+      break;
     const old = await calls.run(() =>
       DB.prepare(
         'SELECT MAX(seq) AS n FROM change_log WHERE tenant_id = ?1 AND at < ?2',
@@ -215,16 +239,16 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       continue;
     }
     // Leave one call for the cursor write at the end of this pass.
-    if (budget <= 0 || !calls.ok(4) || !calls.hasWrites(4)) {
+    if (
+      budget <= 0 ||
+      !calls.ok(4) ||
+      calls.used + 4 > LOG_PHASE_CALLS ||
+      !calls.hasWrites(4)
+    ) {
       completed = false;
       break;
     }
-    const floorRow = await calls.run(() =>
-      DB.prepare('SELECT change_log_floor FROM tenants WHERE id = ?1')
-        .bind(tenant_id)
-        .first<{ change_log_floor: number }>(),
-    );
-    let floor = floorRow?.change_log_floor ?? 0;
+    let floor = floorByTenant.get(tenant_id) ?? 0;
     if (floor >= target) {
       lastTenant = nextTenant;
       continue;
@@ -284,9 +308,10 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
   }
 
   // 3–4. applied_ops (90 days), expired codes, old usage rows.
-  if (calls.ok() && calls.hasWrites(3)) {
+  const cleanupLimit = calls.used + CLEANUP_PHASE_CALLS;
+  if (calls.used < cleanupLimit && calls.hasWrites(3)) {
     let appliedLeft = APPLIED_OPS_MAX_PER_RUN;
-    while (appliedLeft > 0 && calls.ok() && calls.hasWrites(3)) {
+    while (appliedLeft > 0 && calls.used < cleanupLimit && calls.hasWrites(3)) {
       const limit = Math.min(
         APPLIED_OPS_CHUNK,
         appliedLeft,
@@ -305,7 +330,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
       appliedLeft -= n;
       if (n < limit) break;
     }
-    if (calls.ok() && calls.hasWrites(100)) {
+    if (calls.used < cleanupLimit && calls.hasWrites(100)) {
       const day90 = new Date(now - 90 * DAY).toISOString().slice(0, 10);
       await calls.run(() =>
         DB.batch([
@@ -340,8 +365,13 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     }
   }
 
-  // 4b. support access that ran out with live support devices (13 §7.5).
-  if (calls.ok() && calls.hasWrites(2)) {
+  // 4b. support access that ran out with live support devices (13 §7.5). The same batch
+  // clears `support_until`, so `/api/me` does not repeat the revoke batch forever (M14).
+  const supportLimit = Math.min(
+    calls.used + SUPPORT_PHASE_CALLS,
+    MAX_CRON_CALLS - DELETION_RESERVE,
+  );
+  if (calls.used < supportLimit && calls.hasWrites(2)) {
     const expired = await calls.run(() =>
       DB.prepare(
         "SELECT t.* FROM tenants t WHERE t.support_until IS NOT NULL AND t.support_until <= ?1 AND EXISTS (SELECT 1 FROM devices d WHERE d.tenant_id = t.id AND d.kind = 'support' AND d.revoked_at IS NULL)",
@@ -350,10 +380,13 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
         .all<TenantRow>(),
     );
     for (const tenant of expired.results) {
-      if (!calls.ok(2) || !calls.hasWrites(2)) break;
+      if (calls.used + 2 > supportLimit || !calls.hasWrites(2)) break;
       const db = tenantDb(env, tenant);
       const [revoked] = await calls.run(() =>
-        db.batch(revokeSupportDeviceStatements(db, now, true)),
+        db.batch([
+          ...revokeSupportDeviceStatements(db, now, true),
+          endSupportStatement(env, tenant.id, now, true),
+        ]),
       );
       if ((revoked?.meta.changes ?? 0) === 0) continue;
       await calls.run(() =>
@@ -420,9 +453,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
               Math.max(1, Math.floor(calls.writesLeft() / 5)),
             );
             const res = await calls.run(() =>
-              DB.prepare(
-                `DELETE FROM ${tbl} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${tbl} WHERE tenant_id = ?1 AND ${where} ORDER BY rowid DESC LIMIT ?2)`,
-              )
+              DB.prepare(tenantDeleteChunkSql(tbl, where))
                 .bind(t.id, limit)
                 .run(),
             );

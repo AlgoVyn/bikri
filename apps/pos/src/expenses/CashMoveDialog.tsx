@@ -2,6 +2,7 @@ import { newId } from '@bikri/core';
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -11,7 +12,6 @@ import { getDb } from '../data/db.ts';
 import { cashMove, ExpenseError } from '../data/expenses.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
-import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 const field =

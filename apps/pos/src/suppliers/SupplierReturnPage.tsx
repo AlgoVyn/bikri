@@ -35,8 +35,8 @@ import {
 } from '../data/supplierReturns.ts';
 import { supplierBalance } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
+import { isLatinName } from '../lib/productFormat.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
-import { isLatinName } from '../products/format.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Unlinked = {

@@ -321,6 +321,10 @@ function planOp(
   );
   // A delete always wins over a concurrent edit (03 §5).
   if (cur.deleted_at !== null) set = set.filter((c) => c !== 'deleted_at');
+  // Deterministic column order keeps the prepared statement identical for every op with
+  // the same changed-field set, so it hits the tenant-scope cache instead of creating a
+  // new variant per client object key order (M16).
+  set = [...set].sort();
   const assignments = [
     ...set.map((c, i) => `${c} = ?${i + 4}`),
     'rev = rev + 1',
@@ -836,11 +840,7 @@ function applyQuoteChanges(look: Lookups, ops: PushOp[]): void {
     const row = op.row ?? {};
     const id = String(row.id ?? '');
     if (!id) continue;
-    const stored =
-      look.quoteLineById.get(id) ??
-      [...look.quoteLinesByQuote.values()]
-        .flat()
-        .find((line) => line.id === id);
+    const stored = look.quoteLineById.get(id);
     const quoteId = stored?.quote_id ?? String(row.quote_id ?? '');
     if (!quoteId) continue;
     const lines = look.quoteLinesByQuote.get(quoteId) ?? [];

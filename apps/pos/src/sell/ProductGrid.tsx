@@ -3,8 +3,8 @@ import type { TFunction } from 'i18next';
 import { memo, useEffect, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { MoneyText } from '../components/MoneyText.tsx';
-import { isLatinName } from '../products/format.ts';
-import { ProductThumb } from '../products/ProductThumb.tsx';
+import { ProductThumb } from '../components/ProductThumb.tsx';
+import { isLatinName } from '../lib/productFormat.ts';
 import type { SellRow } from './useSell.ts';
 
 const TILE_MIN = 128;

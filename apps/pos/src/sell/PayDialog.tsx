@@ -30,6 +30,7 @@ import {
   CashIcon,
   UdhaarIcon,
 } from '../components/icons.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -55,12 +56,11 @@ import {
 } from '../data/sale.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { formatBusinessDate } from '../lib/date.ts';
+import { useHotkey } from '../lib/hotkeys.ts';
 import { formatShopMoney } from '../lib/money';
 import { kickDrawerForCash } from '../print/drawer.ts';
-import { useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { cartItemCount } from './itemCount.ts';
-import { Modal } from './Modal.tsx';
 
 const SaleComplete = lazy(() =>
   import('./SaleComplete.tsx').then((m) => ({ default: m.SaleComplete })),

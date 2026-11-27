@@ -257,17 +257,42 @@ describe('sales history (screens/10)', () => {
       blankNote?.lines.find((l) => l.line.name_snapshot === 'Earbuds')?.note,
     ).toBe('');
 
-    await db.sync_conflicts.put({
-      id: 'conflict-1',
-      tbl: 'refund_lines',
-      row_id: 'rl-1',
-      kind: 'over_refund',
-      fields_json: JSON.stringify({ sale_id: firstId, excess_milli: 1000 }),
-      resolution: 'needs_owner',
-      at: NOW + 4000,
-    });
+    const refundLineId = String(detail?.refunds[0]?.lines[0]?.id ?? '');
+    const refundId = String(detail?.refunds[0]?.refund.id ?? '');
+    await db.sync_conflicts.bulkPut([
+      {
+        id: 'conflict-1',
+        tbl: 'refund_lines',
+        row_id: refundLineId,
+        kind: 'over_refund',
+        fields_json: JSON.stringify({ sale_id: firstId, excess_milli: 1000 }),
+        resolution: 'needs_owner',
+        at: NOW + 4000,
+      },
+      {
+        id: 'conflict-2',
+        tbl: 'refunds',
+        row_id: refundId,
+        kind: 'over_refund',
+        fields_json: JSON.stringify({ sale_id: firstId }),
+        resolution: 'needs_owner',
+        at: NOW + 4001,
+      },
+      {
+        id: 'conflict-other',
+        tbl: 'refunds',
+        row_id: 'another-refund',
+        kind: 'over_refund',
+        fields_json: JSON.stringify({ sale_id: 'another-sale' }),
+        resolution: 'needs_owner',
+        at: NOW + 4002,
+      },
+    ]);
     const withConflict = await billDetail(db, firstId);
-    expect(withConflict?.conflicts).toHaveLength(1);
+    expect(withConflict?.conflicts.map((row) => row.id).sort()).toEqual([
+      'conflict-1',
+      'conflict-2',
+    ]);
   });
 
   it('flags a failed print until a reprint succeeds', async () => {

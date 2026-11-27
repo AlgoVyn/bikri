@@ -4,8 +4,8 @@ import {
   fitPageCss,
   renderReceiptHtml,
   resolvePaper,
-  saleBasicInput,
 } from '@bikri/printer';
+import { saleBasicInput } from '@bikri/printer/testing';
 import { expect, test } from '@playwright/test';
 
 // T-019 / 06 §5.3: the window.print fallback. Real print dialogs cannot be driven headlessly, so this

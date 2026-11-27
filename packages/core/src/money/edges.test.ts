@@ -946,6 +946,15 @@ describe('ledger and stock', () => {
     expect(() =>
       stockValuePaisa([{ on_hand_milli: 1000, avg_cost: -1, track_stock: 1 }]),
     ).toThrow(RangeError);
+    expect(() =>
+      stockValuePaisa(
+        Array.from({ length: 10 }, () => ({
+          on_hand_milli: 1_000_000_000,
+          avg_cost: 1_000_000_000,
+          track_stock: 1 as const,
+        })),
+      ),
+    ).toThrow(RangeError);
     expect(movementChangesAvgCost('purchase')).toBe(true);
     expect(movementChangesAvgCost('opening')).toBe(true);
     expect(movementChangesAvgCost('received_godown')).toBe(true);

@@ -21,6 +21,10 @@ const INDEX_EXCEPTIONS = new Set([
   'applied_ops_at',
   // Platform cron sums all tenants for one UTC day.
   'tenant_usage_day',
+  // M15: the nightly retention delete filters by time across every tenant.
+  'enrolment_codes_expiry',
+  'owner_email_codes_expiry',
+  'change_log_watermarks_day',
 ]);
 /**
  * Platform tables that still key per tenant. They are written only by the Worker/cron, but

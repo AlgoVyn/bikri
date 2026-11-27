@@ -6,6 +6,7 @@ import {
   adjustDelta,
   adjustStock,
   type CountDraft,
+  countAppliedKey,
   countProducts,
   DRAFT_KEY,
   DRAFT_STAMP_KEY,
@@ -341,6 +342,19 @@ describe('stock count (screens/09)', () => {
     const r = await finishCount(db, draft, { zeroUncounted: false }, ctx, NOW);
     expect(r).toEqual({ movements: 0, counted: 0, valueDiff: 0 });
     expect(await onHand(db, p.id)).toBe(12000);
+  });
+
+  it('reads applied ids from their own key after a chunk crash', async () => {
+    const { db, ctx, p } = await shop('stk-applied-key');
+    const draft = await startCount(db, { kind: 'all' }, NOW);
+    draft.counted[p.id] = 9000;
+    await saveCountDraft(db, draft);
+    // The chunk transaction commits this small key, not the 250 KB draft.
+    await db.kv.put({ key: countAppliedKey(draft), value: [p.id] });
+    const r = await finishCount(db, draft, { zeroUncounted: false }, ctx, NOW);
+    expect(r).toEqual({ movements: 0, counted: 0, valueDiff: 0 });
+    expect(await onHand(db, p.id)).toBe(12000);
+    expect(await db.kv.get(countAppliedKey(draft))).toBeUndefined();
   });
 
   it('isolation: adjustments and counts stay in their own shop', async () => {

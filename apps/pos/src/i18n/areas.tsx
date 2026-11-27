@@ -9,10 +9,18 @@ import { useTranslation } from 'react-i18next';
 import { languageKeys } from './i18n.ts';
 
 const loaded = new Set<string>();
+/** Several components can mount the same area at once; download its catalog once. */
+const inFlight = new Map<string, Promise<Record<string, unknown>>>();
+
+function canonicalLanguage(language: string): LocaleCode {
+  if (language === 'ur') return 'ur';
+  if (language === 'roman-ur' || language === 'roman-UR') return 'roman-ur';
+  return 'en';
+}
 
 export function useAreaStrings(area: CatalogArea): boolean {
   const { i18n } = useTranslation();
-  const lang = i18n.language as LocaleCode;
+  const lang = canonicalLanguage(i18n.language);
   const id = `${area}:${lang}`;
   const [ready, setReady] = useState(() => loaded.has(id));
   useEffect(() => {
@@ -22,7 +30,15 @@ export function useAreaStrings(area: CatalogArea): boolean {
     }
     setReady(false);
     let alive = true;
-    void loadAreaCatalog(area, lang).then((bundle) => {
+    let pending = inFlight.get(id);
+    if (pending === undefined) {
+      pending = loadAreaCatalog(area, lang);
+      inFlight.set(id, pending);
+      void pending.finally(() => {
+        if (inFlight.get(id) === pending) inFlight.delete(id);
+      });
+    }
+    void pending.then((bundle) => {
       for (const key of languageKeys(lang))
         i18n.addResourceBundle(key, 'translation', bundle, true, false);
       loaded.add(id);

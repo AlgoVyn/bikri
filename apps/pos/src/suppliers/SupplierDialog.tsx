@@ -3,6 +3,7 @@ import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DialogFooter } from '../components/DialogFooter.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -11,7 +12,6 @@ import { ledgerContext } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { createSupplier, updateSupplier } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 /** New / edit supplier (screens/13). */

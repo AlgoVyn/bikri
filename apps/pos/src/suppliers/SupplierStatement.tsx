@@ -25,9 +25,9 @@ import {
   supplierStatementCsv,
 } from '../data/suppliers.ts';
 import { downloadText } from '../lib/download.ts';
+import { plainKey, useHotkey } from '../lib/hotkeys.ts';
 import { useRecordBack } from '../peek/recordBack.ts';
 import { downloadBlob } from '../print/receiptImage.ts';
-import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';

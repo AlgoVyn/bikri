@@ -10,9 +10,9 @@ import { getDb } from '../data/db.ts';
 import { type SearchHit, searchAll } from '../data/search.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { composing } from '../lib/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { seesAllDates } from '../state/reportScope.ts';
-import { composing } from './hotkeys.ts';
 import { useGlobalSearch } from './searchStore.ts';
 
 /** Rail or top-bar trigger for the global search overlay (screens/04). */

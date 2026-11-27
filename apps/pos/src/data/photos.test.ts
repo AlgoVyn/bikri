@@ -1,5 +1,5 @@
 import type { BikriDb } from '@bikri/db';
-import { afterEach, beforeEach, describe, expect, it } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 import {
   encodeUnderLimit,
   PHOTO_MAX_BYTES,
@@ -19,10 +19,35 @@ import {
 } from './fileCache.ts';
 import { dropTestDbs, freshDb } from './testDb.ts';
 
+/**
+ * jsdom's Response stringifies a Blob body (`[object Blob]`) even though browsers accept
+ * it as BodyInit; `putFile` now passes the Blob directly, so the fake cache stores a
+ * browser-shaped response. This is a test-environment shim, not production behaviour.
+ */
+class BlobResponse {
+  readonly body: BodyInit | null;
+  readonly headers: Headers;
+  constructor(body: BodyInit | null = null, init?: ResponseInit) {
+    this.body = body;
+    this.headers = new Headers(init?.headers);
+  }
+  async blob(): Promise<Blob> {
+    const type = this.headers.get('content-type') ?? '';
+    if (this.body instanceof Blob)
+      return type === '' || this.body.type === type
+        ? this.body
+        : new Blob([this.body], { type });
+    return new Blob([this.body as BlobPart], type === '' ? {} : { type });
+  }
+  clone(): BlobResponse {
+    return new BlobResponse(this.body, { headers: this.headers });
+  }
+}
+
 /** Minimal in-memory Cache Storage (jsdom has none). */
 class FakeCache {
-  readonly map = new Map<string, Response>();
-  async put(url: string, res: Response) {
+  readonly map = new Map<string, BlobResponse>();
+  async put(url: string, res: BlobResponse) {
     this.map.set(url, res);
   }
   async match(url: string) {
@@ -38,9 +63,11 @@ class FakeCache {
 let cache: FakeCache;
 beforeEach(() => {
   cache = new FakeCache();
+  vi.stubGlobal('Response', BlobResponse);
   Object.assign(globalThis, { caches: { open: async () => cache } });
 });
 afterEach(async () => {
+  vi.unstubAllGlobals();
   Reflect.deleteProperty(globalThis, 'caches');
   await dropTestDbs();
 });

@@ -10,6 +10,7 @@ import {
   buttonQuiet,
 } from '../components/classes.ts';
 import { DialogFooter } from '../components/DialogFooter.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -25,7 +26,6 @@ import {
 } from '../data/customers.ts';
 import { getDb } from '../data/db.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Duplicate = { id: string; name: string };

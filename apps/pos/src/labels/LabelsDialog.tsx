@@ -9,6 +9,7 @@ import { useLiveQuery } from 'dexie-react-hooks';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -19,7 +20,6 @@ import { getKv } from '../data/kv.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { formatShopMoney } from '../lib/money';
-import { Modal } from '../sell/Modal.tsx';
 import type { LabelSettings } from '../settings/LabelsPage.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -152,21 +152,25 @@ function LabelsDialogContent({
     return urduLabels && ur !== '' ? ur : String(product.name_en);
   };
 
+  const chosen = useMemo(
+    () => new Set(rows.map((row) => row.productId)),
+    [rows],
+  );
   const searchMatches = useMemo(() => {
     const q = query.trim().toLowerCase();
     if (!q) return [];
     return (data?.products ?? [])
       .filter(
         (product) =>
-          String(product.name_en).toLowerCase().includes(q) ||
-          String(product.name_ur ?? '')
-            .toLowerCase()
-            .includes(q) ||
-          String(product.sku).toLowerCase().includes(q),
+          !chosen.has(product.id) &&
+          (String(product.name_en).toLowerCase().includes(q) ||
+            String(product.name_ur ?? '')
+              .toLowerCase()
+              .includes(q) ||
+            String(product.sku).toLowerCase().includes(q)),
       )
-      .filter((product) => !rows.some((row) => row.productId === product.id))
       .slice(0, 8);
-  }, [query, data?.products, rows]);
+  }, [query, data?.products, chosen]);
 
   const totalCopies = rowsWithProducts.reduce(
     (sum, row) => sum + (row.barcode ? Math.max(0, row.copies) : 0),

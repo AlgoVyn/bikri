@@ -433,8 +433,16 @@ async function sendSerialNow(
     }
     if (!port.writable) throw new PrintError('DISCONNECTED');
     writer = port.writable.getWriter();
-    // A timed-out write would otherwise keep the WritableStream locked until reload.
-    await withDeadline(writer.write(bytes), timeoutMs, cleanup);
+    // A raw receipt can be several KB. Writing it in one call made a wedged
+    // driver unresponsive to the deadline until the whole transfer finished;
+    // 4096-byte chunks match WebUSB and let the deadline abort between chunks.
+    const deadline = Date.now() + timeoutMs;
+    for (const chunk of chunks(bytes)) {
+      const left = deadline - Date.now();
+      if (left <= 0) throw new PrintError('TIMEOUT');
+      // A timed-out write would otherwise keep the WritableStream locked until reload.
+      await withDeadline(writer.write(chunk), left, cleanup);
+    }
     // The port stays open for the next receipt; release only the writer lock.
     writer.releaseLock();
     writer = null;

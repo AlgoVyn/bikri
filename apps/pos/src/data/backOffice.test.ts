@@ -537,7 +537,7 @@ describe('back-office branch coverage', () => {
       customer: null,
     });
 
-    // Conflicts are matched by the sale_id inside fields_json; bad JSON is ignored.
+    // Conflicts are matched by their conflicted row (V18 [tbl+row_id]); bad JSON is ignored.
     await db.sync_conflicts.bulkAdd([
       {
         id: 'c1',
@@ -550,8 +550,8 @@ describe('back-office branch coverage', () => {
       },
       {
         id: 'c2',
-        tbl: 'refund_lines',
-        row_id: 'y',
+        tbl: 'sales',
+        row_id: 's1',
         kind: 'over_refund',
         fields_json: JSON.stringify({ sale_id: 's1' }),
         resolution: 'needs_owner',

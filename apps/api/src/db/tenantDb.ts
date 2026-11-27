@@ -138,8 +138,17 @@ const ALIAS_REF =
  * one `tenant_id = ?1` per reference, where an INSERT's leading `(tenant_id, …) VALUES (?1, …)`
  * counts for its target table.
  */
-const SCOPE_CACHE = new Set<string>();
+const SCOPE_CACHE = new Map<string, true>();
 export const SCOPE_CACHE_MAX = 1_000;
+/**
+ * Collapse a variable-length `IN (?, ?, …)` run to one cache key. The checks depend on
+ * table references and tenant predicates, not on how many ids a query binds; without
+ * this, every chunk size (1…90) of the same statement evicted a hot entry (M16).
+ */
+const IN_PLACEHOLDERS = /\bIN\s*\(\s*\?(?:\d+)?(?:\s*,\s*\?\d+)*\s*\)/giu;
+function scopeCacheKey(sql: string): string {
+  return sql.replace(IN_PLACEHOLDERS, 'IN (?)');
+}
 /* Aliases that are SQL keywords, not table aliases, when scanning `FROM tbl x`. */
 const ALIAS_KEYWORDS: ReadonlySet<string> = new Set([
   'on',
@@ -197,12 +206,19 @@ function scopeRefs(sql: string): Array<{ refs: number; aliased: number }> {
 }
 
 export function assertTenantScoped(sql: string): void {
-  if (SCOPE_CACHE.has(sql)) return;
+  const cacheKey = scopeCacheKey(sql);
+  const cached = SCOPE_CACHE.get(cacheKey);
+  if (cached !== undefined) {
+    // LRU on hit: a hot static statement stays while one-off chunk variants age out.
+    SCOPE_CACHE.delete(cacheKey);
+    SCOPE_CACHE.set(cacheKey, true);
+    return;
+  }
   const named = tenantTablesIn(sql);
   const comma = commaJoinedTables(sql);
   const refs = named.length + comma.length;
   if (refs === 0) {
-    rememberScoped(sql);
+    rememberScoped(cacheKey);
     return;
   }
   if (CTE.test(sql) || DERIVED_TABLE.test(sql)) {
@@ -267,10 +283,10 @@ export function assertTenantScoped(sql: string): void {
       );
     }
   }
-  rememberScoped(sql);
+  rememberScoped(cacheKey);
 }
 
-/** Test hook: how many statements the scope cache holds (bounded FIFO, API-L7). */
+/** Test hook: how many statements the scope cache holds (bounded LRU, API-L7/M16). */
 export function scopeCacheSize(): number {
   return SCOPE_CACHE.size;
 }
@@ -281,14 +297,15 @@ export function resetScopeCache(): void {
 }
 
 /** Caches only successful checks; a bad statement must throw every time it is used. */
-function rememberScoped(sql: string): void {
+function rememberScoped(cacheKey: string): void {
   if (SCOPE_CACHE.size >= SCOPE_CACHE_MAX) {
-    // FIFO: Set iteration follows insertion order. Evict one entry per new statement
-    // instead of clearing 1,000 verified statements on the 1,001st.
-    const oldest = SCOPE_CACHE.values().next().value;
+    // Map iteration follows insertion order; a hit re-inserts its key at the end, so the
+    // first key is the least recently used. Evict one entry instead of clearing 1,000
+    // verified statements on the 1,001st.
+    const oldest = SCOPE_CACHE.keys().next().value;
     if (oldest !== undefined) SCOPE_CACHE.delete(oldest);
   }
-  SCOPE_CACHE.add(sql);
+  SCOPE_CACHE.set(cacheKey, true);
 }
 
 function assertTable(table: string): asserts table is TenantTable {

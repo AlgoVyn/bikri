@@ -8,7 +8,7 @@ import type { TableSource } from './caches.ts';
 import { deviceInfo } from './localTenant.ts';
 import type { LedgerContext } from './products.ts';
 import { type StatementItem, statementItemLabel } from './udhaar.ts';
-import { onLocalWrite, writeAction, writeScope } from './write.ts';
+import { writeAction, writeScope } from './write.ts';
 
 const n = (v: unknown): number => Number(v ?? 0);
 const NAME_COLLATOR = new Intl.Collator();
@@ -118,69 +118,24 @@ export type SupplierListOptions = {
   direction?: SortDirection;
 };
 
-/** Latest-delivery map cache; it changes only when a purchase is written/pulled. */
-type DeliveryCache = {
-  epoch: number;
-  latest: string;
-  last: Map<string, string>;
-};
-let deliveryCacheEpoch = 0;
-const deliveryCache = new WeakMap<object, DeliveryCache>();
-
-/** Drops cached supplier last-delivery dates (local purchase write, pull or restore). */
-export function clearSupplierDeliveryCache(src?: object): void {
-  if (src !== undefined) deliveryCache.delete(src);
-  else deliveryCacheEpoch += 1;
-}
-
-onLocalWrite((_count, tables) => {
-  if (tables.includes('purchases')) clearSupplierDeliveryCache();
-});
-
 /** Loads suppliers, balances and last-delivery dates once; filtering stays in memory. */
 export async function loadSupplierListData(
   src: TableSource,
 ): Promise<SupplierListData> {
   const balances = await balancesOf(src);
-  const purchasesTable = src.table('purchases') as Table<SyncedRow>;
-  // Reading the newest row registers the live-query dependency without scanning the
-  // whole table. A normal delivery moves it; a backdated edit also triggers a local
-  // cache clear (onLocalWrite) / pull clear.
-  const latest = String(
-    (await purchasesTable.orderBy('business_date').last())?.business_date ?? '',
-  );
-  const cached = deliveryCache.get(src);
-  let last: Map<string, string>;
-  if (
-    cached !== undefined &&
-    cached.epoch === deliveryCacheEpoch &&
-    cached.latest === latest
-  ) {
-    last = cached.last;
-  } else {
-    const purchases = await purchasesTable.toArray();
-    last = new Map<string, string>();
-    for (const purchase of purchases) {
-      const key = String(purchase.supplier_id);
-      const date = String(purchase.business_date ?? '');
-      if (date > (last.get(key) ?? '')) last.set(key, date);
-    }
-    deliveryCache.set(src, {
-      epoch: deliveryCacheEpoch,
-      latest,
-      last,
-    });
-  }
   const all: SupplierRow[] = [];
   for (const supplier of (
     await (src.table('suppliers') as Table<MasterRow>).toArray()
   ).filter((row) => !row.deleted_at)) {
+    const balance = balances.get(supplier.id);
     all.push({
       supplier,
       searchName: String(supplier.name ?? '').toLowerCase(),
       searchDigits: String(supplier.phone ?? '').replace(/\D/gu, ''),
-      balance: balances.get(supplier.id)?.balance ?? 0,
-      lastDeliveryDate: last.get(supplier.id) ?? null,
+      balance: balance?.balance ?? 0,
+      // Kept on the party cache when a purchase is written or pulled (Dexie V18), so the
+      // supplier directory never scans lifetime purchases.
+      lastDeliveryDate: balance?.last_delivery_date ?? null,
     });
   }
   return {

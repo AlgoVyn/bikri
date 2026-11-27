@@ -30,6 +30,8 @@ import {
   type ReportOptions,
   type ReportSummary,
   reportBundle,
+  type SlowMover,
+  slowMoversReport,
 } from '../data/reportBundle.ts';
 import { type ReportTab, reportCsv } from '../data/reportCsv.ts';
 import {
@@ -46,9 +48,6 @@ import {
 } from '../data/useShopTimeZone.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
-import { downloadBlob } from '../print/receiptImage.ts';
-import { useCurrentStaff } from '../state/currentStaff.ts';
-import { DailyChart, HourlyChart, PaymentMixBar } from './charts.tsx';
 import {
   bucketLabel,
   categoryName,
@@ -57,7 +56,10 @@ import {
   longDate,
   percentText,
   qtyText,
-} from './format.ts';
+} from '../lib/reportFormat.ts';
+import { downloadBlob } from '../print/receiptImage.ts';
+import { useCurrentStaff } from '../state/currentStaff.ts';
+import { DailyChart, HourlyChart, PaymentMixBar } from './charts.tsx';
 import type { ReportFileMeta } from './reportFile.ts';
 
 type Preset =
@@ -197,6 +199,7 @@ function ReportsPageContent() {
   });
   const [deviceId, setDeviceId] = useState('');
   const [tab, setTab] = useState<ReportTab>('summary');
+  const [slowMovers, setSlowMovers] = useState<SlowMover[] | null>(null);
   const workerRef = useRef<Worker | null>(null);
   // 'starting' must not fall back to the main thread: that computed the whole bundle
   // on the counter and then again in the worker, doubling the first Reports visit.
@@ -204,6 +207,7 @@ function ReportsPageContent() {
     'starting' | 'ready' | 'unavailable'
   >('starting');
   const requestId = useRef(0);
+  const slowRequestId = useRef(0);
   const workerFailures = useRef(new Map<number, (error: Error) => void>());
   const firstRequest = useRef(true);
   const lastRequestKey = useRef('');
@@ -306,16 +310,7 @@ function ReportsPageContent() {
       // A clock can return the same millisecond twice; a counter is strictly increasing.
       dataVersionRef.current += 1;
       return dataVersionRef.current;
-    }, [
-      workerState,
-      preset,
-      custom.from,
-      custom.to,
-      deviceId,
-      limited,
-      timeZone,
-      businessToday,
-    ]) ?? 0;
+    }, [workerState, limited, timeZone, businessToday]) ?? 0;
 
   const data = useLiveQuery(async () => {
     if (workerState === 'starting' || dataVersion === 0) return undefined;
@@ -336,13 +331,13 @@ function ReportsPageContent() {
       ...range,
       deviceId: deviceId || undefined,
     };
-    // Slow movers are only needed by the Products tab. The bundle (and the scan)
-    // stays in the worker, and the existing 250 ms coalescing below debounces it.
+    // The base bundle is tab-independent. Products asks for slow movers separately so
+    // a tab click never clones the whole multi-megabyte bundle.
     const options: ReportOptions = {
       now,
       today,
       timeZone,
-      slowMovers: tab === 'products',
+      slowMovers: false,
     };
     // daysBetween is inclusive (Today = 1); the previous window is the same span.
     const span = daysBetween(range.from, range.to);
@@ -449,9 +444,7 @@ function ReportsPageContent() {
       timeZone,
       devices,
       shopName: String(shop?.name ?? ''),
-      // The previous bundle can be on screen while the Products bundle is still
-      // being computed; only then is the slow-movers table still loading.
-      slowMoversReady: options.slowMovers === true,
+      range: reportRangeValue,
     };
   }, [
     preset,
@@ -463,8 +456,61 @@ function ReportsPageContent() {
     timeZone,
     businessToday,
     dataVersion,
-    tab,
   ]);
+
+  // Products is the only tab that needs the expensive slow-mover scan. Ask for just
+  // that list, so switching tabs never structured-clones the whole report bundle.
+  // biome-ignore lint/correctness/useExhaustiveDependencies: a new range/device/data version invalidates the slow-mover list even when the values are not read here
+  useEffect(() => {
+    setSlowMovers(null);
+  }, [preset, custom.from, custom.to, deviceId, dataVersion]);
+
+  useEffect(() => {
+    if (tab !== 'products' || slowMovers !== null || !data) return;
+    let alive = true;
+    const fallback = () =>
+      slowMoversReport(getDb(), businessDate(Date.now(), timeZone)).then(
+        (items) => {
+          if (alive) setSlowMovers(items);
+        },
+      );
+    const worker = workerRef.current;
+    if (worker === null || workerState === 'unavailable') {
+      void fallback().catch(() => undefined);
+      return () => {
+        alive = false;
+      };
+    }
+    const id = ++slowRequestId.current;
+    const onMessage = (
+      event: MessageEvent<{ id: number; slowMovers?: SlowMover[] }>,
+    ) => {
+      if (event.data.id !== id) return;
+      worker.removeEventListener('message', onMessage);
+      if (event.data.slowMovers !== undefined) {
+        if (alive) setSlowMovers(event.data.slowMovers);
+      } else {
+        void fallback().catch(() => undefined);
+      }
+    };
+    worker.addEventListener('message', onMessage);
+    worker.postMessage({
+      id,
+      tenantId: getDb().tenantId,
+      range: data.range,
+      options: {
+        now: Date.now(),
+        today: businessDate(Date.now(), timeZone),
+        timeZone,
+        slowMoversOnly: true,
+      },
+      version: dataVersion,
+    });
+    return () => {
+      alive = false;
+      worker.removeEventListener('message', onMessage);
+    };
+  }, [tab, slowMovers, data, workerState, timeZone, dataVersion]);
 
   if (!can('report.view'))
     return (
@@ -719,7 +765,8 @@ function ReportsPageContent() {
             bundle={bundle}
             cost={cost}
             lang={lang}
-            slowMoversReady={data.slowMoversReady}
+            slowMovers={slowMovers}
+            slowMoversReady={slowMovers !== null}
           />
         ) : null}
         {tab === 'stock' ? (
@@ -821,20 +868,23 @@ function NoRows({ message }: { message: string }) {
 
 const REPORT_PAGE = 50;
 
-function ReportTable({
+function ReportTable<T>({
   title,
   headers,
   rows,
   empty,
   testId,
   rowKeys,
+  renderRow,
 }: {
   title: string;
   headers: readonly string[];
-  rows: readonly ReactNode[][];
+  rows: readonly T[];
   empty: string;
   testId?: string;
   rowKeys?: readonly string[];
+  /** Build cells only for the visible page instead of mapping the whole table. */
+  renderRow?: (row: T) => ReactNode[];
 }) {
   const [page, setPage] = useState(0);
   // The rows array is rebuilt on each render; reset only when the row count changes.
@@ -864,21 +914,26 @@ function ReportTable({
               </tr>
             </thead>
             <tbody>
-              {pageRows.map((row, index) => (
-                <tr
-                  key={rowKeys?.[page * REPORT_PAGE + index] ?? String(row[0])}
-                  className="border-b border-border last:border-0"
-                >
-                  {row.map((cell, cellIndex) => (
-                    <td
-                      key={headers[cellIndex]}
-                      className="px-3 py-2 text-start"
-                    >
-                      {cell}
-                    </td>
-                  ))}
-                </tr>
-              ))}
+              {pageRows.map((row, index) => {
+                const cells = renderRow ? renderRow(row) : (row as ReactNode[]);
+                return (
+                  <tr
+                    key={
+                      rowKeys?.[page * REPORT_PAGE + index] ?? String(cells[0])
+                    }
+                    className="border-b border-border last:border-0"
+                  >
+                    {cells.map((cell, cellIndex) => (
+                      <td
+                        key={headers[cellIndex]}
+                        className="px-3 py-2 text-start"
+                      >
+                        {cell}
+                      </td>
+                    ))}
+                  </tr>
+                );
+              })}
             </tbody>
           </table>
         </div>
@@ -1178,16 +1233,17 @@ function ProductsTab({
   bundle,
   cost,
   lang,
+  slowMovers,
   slowMoversReady,
 }: {
   bundle: ReportBundle;
   cost: boolean;
   lang: string;
+  slowMovers: SlowMover[] | null;
   slowMoversReady: boolean;
 }) {
   const { t } = useTranslation();
   const products = bundle.products;
-  const slowMovers = products.slowMovers;
   const name = (row: { name: string; nameUr?: string }) =>
     groupName({ name: row.name, nameUr: row.nameUr ?? '' }, lang);
   return (
@@ -1296,13 +1352,14 @@ function ProductsTab({
           t('office.reports.on_hand'),
           t('office.reports.last_sale'),
         ]}
-        rows={(slowMovers ?? []).map((row) => [
+        rows={slowMovers ?? []}
+        renderRow={(row) => [
           productName(row.product, lang),
           qtyText(row.onHand, String(row.product.unit ?? 'pc')),
           row.lastSale
             ? longDate(row.lastSale, lang)
             : t('office.reports.never_sold'),
-        ])}
+        ]}
         rowKeys={(slowMovers ?? []).map((row) => String(row.product.id))}
         empty={
           slowMoversReady
@@ -1367,7 +1424,8 @@ function StockTab({
           t('office.reports.status'),
           ...(cost ? [t('office.reports.stock_value')] : []),
         ]}
-        rows={stock.attention.map((row) => [
+        rows={stock.attention}
+        renderRow={(row) => [
           productName(row.product, lang),
           qtyText(row.onHand, String(row.product.unit ?? 'pc')),
           qtyText(
@@ -1376,7 +1434,7 @@ function StockTab({
           ),
           statusLabel(row.status),
           ...(cost ? [<MoneyText key="value" paisa={row.value} />] : []),
-        ])}
+        ]}
         rowKeys={stock.attention.map((row) => String(row.product.id))}
         empty={t('office.reports.no_stock_issues')}
       />

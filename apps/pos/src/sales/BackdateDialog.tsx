@@ -8,6 +8,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { Modal } from '../components/Modal.tsx';
 import { PastDatePicker } from '../components/PastDatePicker.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { useSubmitGuard } from '../components/useSubmitGuard.ts';
@@ -22,7 +23,6 @@ import { getDb } from '../data/db.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 const roleOrder: Record<string, number> = { owner: 0, manager: 1, cashier: 2 };

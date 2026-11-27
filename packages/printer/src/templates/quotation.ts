@@ -14,6 +14,7 @@ import {
 } from '../layout.ts';
 import type { Block } from '../types.ts';
 import {
+  bundleLinesByGroup,
   labelsFrom,
   pushBundleComponent,
   pushCenter,
@@ -69,14 +70,13 @@ function pushQuoteItems(
   }
   const money = (paisa: number): string =>
     formatReceiptMoney(paisa, shop.numberGrouping);
+  const bundleGroups = bundleLinesByGroup(lines);
   const renderedGroups = new Set<string>();
   for (const line of lines) {
     if (line.bundleGroup) {
       if (renderedGroups.has(line.bundleGroup)) continue;
       renderedGroups.add(line.bundleGroup);
-      const group = lines.filter(
-        (candidate) => candidate.bundleGroup === line.bundleGroup,
-      );
+      const group = bundleGroups.get(line.bundleGroup) ?? [line];
       const bundleQty = line.bundleQty ?? group[0]?.bundleQty ?? 1;
       const bundleTotal =
         line.bundlePrice != null

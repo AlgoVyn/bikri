@@ -9,6 +9,7 @@ import {
   paperRuler,
   renderReceiptText,
   resolvePaper,
+  sanitizeInline,
   wrapText,
 } from './layout.ts';
 
@@ -44,6 +45,28 @@ describe('wrapText', () => {
     const urdu = wrapText('بَبَبَبَ', 2);
     expect(urdu.join('')).toBe('بَبَبَبَ');
     expect(urdu.every((line) => line.length % 2 === 0)).toBe(true);
+  });
+
+  it('uses the ASCII fast path with the same break and trim rules', () => {
+    expect(wrapText('one two three four', 7)).toEqual([
+      'one two',
+      'three',
+      'four',
+    ]);
+    expect(wrapText('a  b   c', 2)).toEqual(['a', 'b', 'c']);
+    expect(wrapText('   ', 5)).toEqual([]);
+    expect(wrapText('ABCDEF', 3)).toEqual(['ABC', 'DEF']);
+    // Control characters become spaces before wrapping, including at the end.
+    expect(wrapText('Cable\t1m\r', 12)).toEqual(['Cable 1m']);
+  });
+});
+
+describe('sanitizeInline', () => {
+  it('returns clean ASCII unchanged and replaces controls otherwise', () => {
+    expect(sanitizeInline('USB-C cable 1m')).toBe('USB-C cable 1m');
+    expect(sanitizeInline('a\tb\u007fc')).toBe('a b c');
+    // Non-ASCII is never touched by the ASCII check.
+    expect(sanitizeInline('چائے')).toBe('چائے');
   });
 });
 

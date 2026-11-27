@@ -132,6 +132,9 @@ export function allocate(amount: number, weights: readonly number[]): number[] {
     baseSum += base;
   }
   let leftover = absolute - baseSum;
+  if (leftover === 0n) {
+    return bases.map((base) => Number(negative ? -base : base));
+  }
   remainders.sort((left, right) => {
     if (left.remainder === right.remainder) {
       return left.index - right.index;

@@ -1,6 +1,6 @@
 import { lazy, Suspense, useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
-import { Modal } from '../sell/Modal.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { usePriceCheck } from './priceCheckStore.ts';
 
 /**

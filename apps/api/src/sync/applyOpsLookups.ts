@@ -267,55 +267,75 @@ export async function loadLookups(
         partyIds.supplier.add(op.row.party_id);
     }
   }
-  const preloadedQuoteLines = new Map<string, QuoteLineInfo>();
+  const preloadedQuoteLines: QuoteLineInfo[] = [];
   let preRowsRead = 0;
-  if (quoteLineIds.size > 0) {
-    const ids = [...quoteLineIds];
-    for (let i = 0; i < ids.length; i += 90) {
-      const chunk = ids.slice(i, i + 90);
-      const rows = await db
-        .prepare(
-          `SELECT id, quote_id, line_no, product_id, name_snapshot, sku_snapshot,
-            qty_milli, unit_price, gross, discount_type, discount_value, discount,
-            net, note, unit_cost_snapshot, bundle_id, bundle_group, bundle_name,
-            bundle_qty, bundle_price, bundle_component_qty_milli, bundle_discount,
-            deleted_at, rev, updated_by
-           FROM quotation_lines WHERE tenant_id = ?1 AND id IN (${chunk
-             .map((_, j) => `?${j + 2}`)
-             .join(', ')})`,
-          ...chunk,
-        )
-        .all<Record<string, unknown>>();
-      preRowsRead += Number(rows.meta.rows_read ?? rows.results.length);
-      for (const row of rows.results) {
-        const line = quoteLineFromRow(row);
-        preloadedQuoteLines.set(line.id, line);
-        quoteIds.add(line.quote_id);
-      }
-    }
-  }
-  // A header-only edit still validates every stored line, so its product and bundle
-  // rows must be in `look.products`; the op payload carries no line columns (API-M2).
-  if (quoteIds.size > 0) {
-    const ids = [...quoteIds];
-    for (let i = 0; i < ids.length; i += 90) {
-      const chunk = ids.slice(i, i + 90);
-      const rows = await db
-        .prepare(
-          `SELECT product_id, bundle_id FROM quotation_lines WHERE tenant_id = ?1 AND quote_id IN (${chunk
-            .map((_, j) => `?${j + 2}`)
+  const quoteLineColumns = `id, quote_id, line_no, product_id, name_snapshot, sku_snapshot,
+    qty_milli, unit_price, gross, discount_type, discount_value, discount,
+    net, note, unit_cost_snapshot, bundle_id, bundle_group, bundle_name,
+    bundle_qty, bundle_price, bundle_component_qty_milli, bundle_discount,
+    deleted_at, rev, updated_by`;
+  if (quoteLineIds.size > 0 || quoteIds.size > 0) {
+    // One budgeted batch replaces two sequential preload loops and the duplicate
+    // full-column query in the main batch (H9). A line referenced by id and also
+    // belonging to a touched quote may come back twice; the maps below de-duplicate it.
+    const lineIds = [...quoteLineIds];
+    const quoteList = [...quoteIds];
+    const stmts: D1PreparedStatement[] = [];
+    let lineAt = 0;
+    let quoteAt = 0;
+    while (lineAt < lineIds.length || quoteAt < quoteList.length) {
+      const lineChunk = lineIds.slice(lineAt, lineAt + 90);
+      const quoteChunk = quoteList.slice(
+        quoteAt,
+        quoteAt + Math.max(0, 90 - lineChunk.length),
+      );
+      const selects: string[] = [];
+      const params: string[] = [];
+      let param = 2;
+      if (lineChunk.length > 0) {
+        selects.push(
+          `SELECT ${quoteLineColumns} FROM quotation_lines WHERE tenant_id = ?1 AND id IN (${lineChunk
+            .map((_, j) => `?${param + j}`)
             .join(', ')})`,
-          ...chunk,
-        )
-        .all<{ product_id: string | null; bundle_id: string | null }>();
-      preRowsRead += Number(rows.meta.rows_read ?? rows.results.length);
-      for (const row of rows.results) {
-        if (typeof row.product_id === 'string') {
-          products.add(row.product_id);
-          saleProductIds.add(row.product_id);
+        );
+        params.push(...lineChunk);
+        param += lineChunk.length;
+      }
+      if (quoteChunk.length > 0) {
+        selects.push(
+          `SELECT ${quoteLineColumns} FROM quotation_lines WHERE tenant_id = ?1 AND quote_id IN (${quoteChunk
+            .map((_, j) => `?${param + j}`)
+            .join(', ')})`,
+        );
+        params.push(...quoteChunk);
+      }
+      if (selects.length === 0) break;
+      // UNION ALL (not OR) keeps both tenant-leading index probes: an OR over `id` and
+      // `quote_id` made SQLite scan every quotation line of the tenant (H9).
+      stmts.push(db.prepare(selects.join(' UNION ALL '), ...params));
+      lineAt += lineChunk.length;
+      quoteAt += quoteChunk.length;
+    }
+    ctx.budget.take();
+    const res = await db.batch(stmts);
+    for (const result of res) preRowsRead += Number(result.meta.rows_read ?? 0);
+    for (const result of res) {
+      for (const row of (result.results ?? []) as Array<
+        Record<string, unknown>
+      >) {
+        const line = quoteLineFromRow(row);
+        preloadedQuoteLines.push(line);
+        // A header-only edit still validates every stored line, so its product and
+        // bundle rows must be in `look.products`; the op payload carries no line
+        // columns (API-M2).
+        if (line.product_id !== null) {
+          products.add(line.product_id);
+          saleProductIds.add(line.product_id);
         }
-        if (typeof row.bundle_id === 'string')
-          saleProductIds.add(row.bundle_id);
+        if (line.bundle_id !== null) saleProductIds.add(line.bundle_id);
+        // A recovery line op may omit `quote_id`; the stored parent is authoritative and
+        // the main batch must still load that quote header and its other lines.
+        quoteIds.add(line.quote_id);
       }
     }
   }
@@ -335,7 +355,6 @@ export async function loadLookups(
     | { tbl: string }
     | { productRows: true }
     | { quotes: true }
-    | { quoteLines: true }
     | { sales: true }
     | { refundUdhaar: true }
     | { payments: 'refund' | 'sret' | 'purchase' | 'sale' }
@@ -450,17 +469,6 @@ export async function loadLookups(
         cancelled_reason, cancelled_at, updated_by
        FROM quotations WHERE tenant_id = ?1 AND id IN (${p})`,
     { quotes: true },
-  );
-  chunked(
-    quoteIds,
-    (p) =>
-      `SELECT id, quote_id, line_no, product_id, name_snapshot, sku_snapshot,
-        qty_milli, unit_price, gross, discount_type, discount_value, discount,
-        net, note, unit_cost_snapshot, bundle_id, bundle_group, bundle_name,
-        bundle_qty, bundle_price, bundle_component_qty_milli, bundle_discount,
-        deleted_at, rev, updated_by
-       FROM quotation_lines WHERE tenant_id = ?1 AND quote_id IN (${p})`,
-    { quoteLines: true },
   );
   chunked(
     saleIds,
@@ -595,20 +603,19 @@ export async function loadLookups(
       { partyBalance: type },
     );
   }
-  chunked(
-    closeDevices,
-    (p) =>
-      `SELECT d.device_id AS id, d.id AS close_id, d.period_end, d.counted_cash
-       FROM day_closes d
-       WHERE d.tenant_id = ?1 AND d.device_id IN (${p})
-         AND NOT EXISTS (
-           SELECT 1 FROM day_closes d2
-           WHERE d2.tenant_id = ?1 AND d2.device_id = d.device_id
-             AND (d2.period_end > d.period_end
-               OR (d2.period_end = d.period_end AND d2.id > d.id))
-         )`,
-    { lastClose: true },
-  );
+  // One indexed equality probe per device returns its latest close; the old correlated
+  // NOT EXISTS scanned every close the device had ever recorded (H11).
+  for (const deviceId of closeDevices) {
+    stmts.push(
+      db.prepare(
+        `SELECT device_id AS id, id AS close_id, period_end, counted_cash
+         FROM day_closes WHERE tenant_id = ?1 AND device_id = ?2
+         ORDER BY period_end DESC LIMIT 1`,
+        deviceId,
+      ),
+    );
+    kinds.push({ lastClose: true });
+  }
   const closeList = [...closeDevices];
   if (
     closeList.length > 0 &&
@@ -699,7 +706,7 @@ export async function loadLookups(
       preRowsRead +
       res.reduce((sum, result) => sum + (result.meta.rows_read ?? 0), 0),
   };
-  for (const line of preloadedQuoteLines.values()) {
+  for (const line of preloadedQuoteLines) {
     look.quoteLineById.set(line.id, line);
     const list = look.quoteLinesByQuote.get(line.quote_id) ?? [];
     if (!list.some((candidate) => candidate.id === line.id)) list.push(line);
@@ -813,15 +820,6 @@ export async function loadLookups(
             typeof r.cancelled_at === 'number' ? r.cancelled_at : null,
           updated_by: typeof r.updated_by === 'string' ? r.updated_by : null,
         });
-      } else if ('quoteLines' in k) {
-        const line = quoteLineFromRow(r);
-        const quoteId = line.quote_id;
-        const list = look.quoteLinesByQuote.get(quoteId) ?? [];
-        const index = list.findIndex((candidate) => candidate.id === line.id);
-        if (index >= 0) list[index] = line;
-        else list.push(line);
-        look.quoteLinesByQuote.set(quoteId, list);
-        look.quoteLineById.set(line.id, line);
       } else if ('sales' in k) {
         look.sales.set(String(r.id), {
           business_date: String(r.business_date),

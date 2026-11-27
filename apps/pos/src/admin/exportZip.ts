@@ -1,5 +1,11 @@
 import { APP_VERSION } from '@bikri/core';
-import { type ShopExportManifest, tableCsv } from '../data/shopExport.ts';
+import {
+  ExportStream,
+  exportCsvHeader,
+  exportCsvRows,
+  JsonStream,
+  type ShopExportManifest,
+} from '../data/shopExport.ts';
 import { type ExportStart, exportPage, exportStart } from './api.ts';
 import { EXPORT_PAGE, exportFilename } from './format.ts';
 import { ZipStoreWriter } from './zip.ts';
@@ -20,28 +26,21 @@ class ExportStuck extends Error {
   }
 }
 
-async function readTable(
+async function eachPage(
   tenantId: string,
   tbl: string,
   total: number,
-  onProgress: (progress: ExportProgress) => void,
   before: number,
-): Promise<Record<string, unknown>[]> {
-  if (total === 0) {
-    onProgress({ tbl, done: 0, total: 0 });
-    return [];
-  }
-  const rows: Record<string, unknown>[] = [];
+  onPage: (rows: Record<string, unknown>[], done: number) => void,
+): Promise<number> {
   let after = '';
-  let complete = false;
+  let done = 0;
+  let complete = total === 0;
   for (let guard = 0; guard < 100_000; guard += 1) {
+    if (complete) break;
     const page = await exportPage(tenantId, tbl, after, EXPORT_PAGE, before);
-    rows.push(...page.rows);
-    onProgress({
-      tbl,
-      done: rows.length,
-      total: Math.max(total, rows.length),
-    });
+    done += page.rows.length;
+    onPage(page.rows, done);
     if (!page.has_more) {
       complete = true;
       break;
@@ -53,7 +52,7 @@ async function readTable(
     after = page.next_after;
   }
   if (!complete) throw new ExportStuck();
-  return rows;
+  return done;
 }
 
 /** Pages the operator export and builds the browser zip (screens/19). */
@@ -70,16 +69,45 @@ export async function buildTenantExport(
   const tables: { tbl: string; rows: number }[] = [];
   for (const table of start.tables) {
     onProgress({ tbl: table.tbl, done: 0, total: table.rows });
-    const rows = await readTable(
+    // First pass: learn the CSV column union without retaining a whole table.
+    const fields = new Set<string>();
+    let count = 0;
+    await eachPage(
       tenantId,
       table.tbl,
       table.rows,
-      onProgress,
       exportedAt,
+      (rows, done) => {
+        for (const row of rows) {
+          for (const field of Object.keys(row)) fields.add(field);
+        }
+        count += rows.length;
+        onProgress({
+          tbl: table.tbl,
+          done,
+          total: Math.max(table.rows, done),
+        });
+      },
     );
-    writer.add(`json/${table.tbl}.json`, encoder.encode(JSON.stringify(rows)));
-    writer.add(`csv/${table.tbl}.csv`, encoder.encode(tableCsv(rows)));
-    tables.push({ tbl: table.tbl, rows: rows.length });
+    const columns = [...fields];
+    // Second pass: stream JSON and CSV into per-page Blobs, so a 200k-row table
+    // never exists as one JS array plus one JSON string plus one CSV string.
+    const json = new JsonStream();
+    const csv = new ExportStream();
+    let csvStarted = false;
+    await eachPage(tenantId, table.tbl, table.rows, exportedAt, (rows) => {
+      json.push(rows);
+      if (rows.length === 0) return;
+      if (!csvStarted) {
+        csv.push(exportCsvHeader(columns));
+        csvStarted = true;
+      }
+      csv.push(exportCsvRows(rows, columns, 'Asia/Karachi'));
+    });
+    if (table.rows === 0 && count === 0) csv.push('\uFEFF');
+    json.addTo(writer, `json/${table.tbl}.json`);
+    csv.addTo(writer, `csv/${table.tbl}.csv`);
+    tables.push({ tbl: table.tbl, rows: count });
   }
   const manifest: ShopExportManifest = {
     format: 'bikri-export',

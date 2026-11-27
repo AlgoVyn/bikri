@@ -44,7 +44,7 @@ describe('ids', () => {
     const draw = (value: number) => {
       vi.stubGlobal('crypto', {
         getRandomValues: (bytes: Uint8Array) => {
-          bytes[0] = value;
+          bytes.fill(value);
           return bytes;
         },
       });

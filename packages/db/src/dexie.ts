@@ -242,7 +242,29 @@ export const DEXIE_SCHEMA_V17 = {
   quotation_lines: 'id, quote_id',
 } as const;
 
-export type DexieTableName = keyof typeof DEXIE_SCHEMA_V17;
+/**
+ * V18 is the 27 Nov performance-review cleanup (D-308). It drops indexes with no
+ * `.where` caller, adds the conflict lookup used by bill detail, and backfills the
+ * supplier last-delivery date onto `party_balances` so the supplier list never scans
+ * lifetime purchases. Local schema/cache only: no server or wire change.
+ */
+export const DEXIE_SCHEMA_V18 = {
+  ...DEXIE_SCHEMA_V17,
+  product_barcodes: 'id, barcode, product_id',
+  bundle_items: 'id, bundle_id, component_product_id',
+  payments: 'id, business_date, sale_id, [device_id+created_at], created_at',
+  supplier_returns: 'id, purchase_id, business_date, created_at',
+  file_queue: '++id, status, [status+created_at]',
+  // Bill detail resolves conflicts from the document/line ids it already loaded. For a
+  // bill, the server writes the conflicted refund/refund-line/void id to `row_id`, never
+  // the sale id; `[tbl+row_id]` keeps those lookups bounded and collision-safe.
+  sync_conflicts: 'id, resolution, [tbl+row_id]',
+} as const;
+
+/** Latest local schema, for diagnostics and tests (D-308). */
+export const DEXIE_SCHEMA_VERSION = 18;
+
+export type DexieTableName = keyof typeof DEXIE_SCHEMA_V18;
 
 export const LOCAL_ONLY_TABLES = [
   'outbox',
@@ -318,6 +340,8 @@ export type PartyBalance = {
   oldest_unpaid_at: number | null;
   /** When the party last made a customer/supplier payment (local cache, V11). */
   last_payment_at?: number | null;
+  /** Latest supplier delivery business date (local cache, V18; supplier rows only). */
+  last_delivery_date?: string | null;
 };
 
 export type CartLine = {
@@ -485,6 +509,60 @@ async function backfillRefundLineDates(tx: Transaction): Promise<void> {
     });
 }
 
+/**
+ * Backfills the V18 supplier last-delivery cache from the stored purchases. The supplier
+ * list used to scan every purchase on a cache miss; keeping the latest business date on
+ * `party_balances` makes that a single indexed read of the cache it already loads.
+ * A supplier whose purchases are all free (no ledger row) still gets a zero-balance row so
+ * the list keeps showing its latest delivery.
+ */
+async function backfillSupplierDeliveryDates(tx: Transaction): Promise<void> {
+  const latest = new Map<string, string>();
+  await (tx.table('purchases') as Table<Record<string, unknown>, string>).each(
+    (purchase) => {
+      const supplierId = purchase.supplier_id;
+      const date = purchase.business_date;
+      if (
+        typeof supplierId !== 'string' ||
+        supplierId === '' ||
+        typeof date !== 'string' ||
+        date === ''
+      )
+        return;
+      if (date > (latest.get(supplierId) ?? '')) latest.set(supplierId, date);
+    },
+  );
+  if (latest.size === 0) return;
+  const balances = tx.table('party_balances') as Table<
+    Record<string, unknown>,
+    [string, string]
+  >;
+  const seen = new Set<string>();
+  await balances.toCollection().modify((row) => {
+    if (row.party_type !== 'supplier') return;
+    const supplierId = String(row.party_id);
+    const date = latest.get(supplierId);
+    if (date === undefined) return;
+    seen.add(supplierId);
+    const current =
+      typeof row.last_delivery_date === 'string' ? row.last_delivery_date : '';
+    if (current < date) row.last_delivery_date = date;
+  });
+  const missing = [...latest].filter(([supplierId]) => !seen.has(supplierId));
+  if (missing.length === 0) return;
+  await balances.bulkPut(
+    missing.map(([party_id, last_delivery_date]) => ({
+      party_type: 'supplier',
+      party_id,
+      balance: 0,
+      last_activity_at: 0,
+      oldest_unpaid_at: null,
+      last_payment_at: null,
+      last_delivery_date,
+    })),
+  );
+}
+
 export class BikriDb extends Dexie {
   readonly tenantId: string;
   shop!: Rows<MasterRow>;
@@ -634,6 +712,11 @@ export class BikriDb extends Dexie {
     this.version(16).stores(DEXIE_SCHEMA_V16);
     // V17 adds `[device_id+quote_seq]` and drops two unqueried quote indexes (CORE-L1).
     this.version(17).stores(DEXIE_SCHEMA_V17);
+    // V18 drops unqueried indexes, adds the bill-conflict lookup and backfills supplier
+    // last-delivery dates (D-308).
+    this.version(DEXIE_SCHEMA_VERSION)
+      .stores(DEXIE_SCHEMA_V18)
+      .upgrade((tx) => backfillSupplierDeliveryDates(tx));
   }
 }
 

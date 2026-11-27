@@ -77,7 +77,7 @@ describe('assertTenantScoped', () => {
     ).not.toThrow();
   });
 
-  it('keeps the scope cache bounded (FIFO eviction, API-L7)', () => {
+  it('keeps the scope cache bounded (LRU eviction, API-L7/M16)', () => {
     resetScopeCache();
     const sql = (n: number) =>
       `SELECT id FROM products WHERE tenant_id = ?1 AND id <> 'row-${n}'`;
@@ -93,6 +93,25 @@ describe('assertTenantScoped', () => {
     expect(() => assertTenantScoped('SELECT * FROM products')).toThrow(
       TenantScopeError,
     );
+  });
+
+  it('collapses variable-length IN placeholder runs to one cache entry', () => {
+    resetScopeCache();
+    for (let n = 1; n <= 90; n += 1) {
+      const params = Array.from({ length: n }, (_, i) => `?${i + 2}`).join(
+        ', ',
+      );
+      assertTenantScoped(
+        `SELECT id FROM products WHERE tenant_id = ?1 AND id IN (${params})`,
+      );
+    }
+    expect(scopeCacheSize()).toBe(1);
+    // A different placeholder count shares the same key, but an unscoped statement with
+    // a different shape is still refused.
+    expect(() =>
+      assertTenantScoped('SELECT id FROM products WHERE id IN (?1, ?2)'),
+    ).toThrow(TenantScopeError);
+    expect(scopeCacheSize()).toBe(1);
   });
 });
 

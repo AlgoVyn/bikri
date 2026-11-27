@@ -26,9 +26,9 @@ import {
 } from '../data/suppliers.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { downloadText } from '../lib/download.ts';
+import { plainKey, useHotkey } from '../lib/hotkeys.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
-import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import {

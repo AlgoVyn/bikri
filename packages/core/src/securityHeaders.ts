@@ -7,7 +7,7 @@ import { BASE_PATH } from './paths.ts';
 export const SECURITY_HEADERS = {
   'Strict-Transport-Security': 'max-age=31536000',
   'Content-Security-Policy':
-    "default-src 'self'; script-src 'self' 'sha256-nLz+WGEFrckBx6NbiOb1M+4DmyupJVxjEprI4MF42kI=' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'",
+    "default-src 'self'; script-src 'self' 'sha256-otYVaSyuELZvCuxfvnu8vTn4jjPwJCLHPAOSr+LOSZk=' 'wasm-unsafe-eval'; img-src 'self' blob: data:; style-src 'self' 'unsafe-inline'; font-src 'self'; connect-src 'self' http://127.0.0.1:17890 http://localhost:17890; worker-src 'self'; form-action 'self'; object-src 'none'; frame-ancestors 'none'; base-uri 'self'",
   'X-Content-Type-Options': 'nosniff',
   'Referrer-Policy': 'same-origin',
   'Permissions-Policy': 'camera=(self), usb=(self), serial=(self)',
@@ -46,6 +46,8 @@ export const STABLE_ASSET_PATHS = [
   `${BASE_PATH}/fonts/*`,
   `${BASE_PATH}/icons/*`,
   `${BASE_PATH}/brand/*`,
+  `${BASE_PATH}/favicon.ico`,
+  `${BASE_PATH}/favicon.svg`,
 ] as const;
 
 /**

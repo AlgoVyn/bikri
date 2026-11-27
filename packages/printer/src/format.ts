@@ -52,10 +52,22 @@ export function formatTaxRate(bp: number): string {
 
 /** `DD-MM-YYYY HH:mm` in the shop time zone (default Asia/Karachi). */
 const DATE_FORMATTERS = new Map<string, Intl.DateTimeFormat>();
+/**
+ * A till holds one shop time zone, but exported/statement data and imports can
+ * carry others. Capping the cache keeps a long-lived tab from retaining one
+ * `Intl.DateTimeFormat` per bogus zone (L9).
+ */
+export const DATE_FORMATTER_LIMIT = 100;
 
 function dateFormatter(timeZone: string): Intl.DateTimeFormat {
   let formatter = DATE_FORMATTERS.get(timeZone);
   if (formatter === undefined) {
+    if (DATE_FORMATTERS.size >= DATE_FORMATTER_LIMIT) {
+      const oldest = DATE_FORMATTERS.keys().next().value;
+      if (oldest !== undefined) {
+        DATE_FORMATTERS.delete(oldest);
+      }
+    }
     formatter = new Intl.DateTimeFormat('en-GB', {
       timeZone,
       day: '2-digit',
@@ -68,6 +80,11 @@ function dateFormatter(timeZone: string): Intl.DateTimeFormat {
     DATE_FORMATTERS.set(timeZone, formatter);
   }
   return formatter;
+}
+
+/** Exposed for the cache-cap test; not part of the package barrel. */
+export function dateFormatterCacheSize(): number {
+  return DATE_FORMATTERS.size;
 }
 
 export function formatReceiptDate(

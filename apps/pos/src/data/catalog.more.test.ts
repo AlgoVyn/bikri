@@ -327,4 +327,40 @@ describe('top-bar search', () => {
       ).length,
     ).toBe(2);
   });
+
+  it('checks only active outbox ops for a product reference', async () => {
+    const db = await readyDb();
+    const ctx = await ledgerContext(db, 'st-1');
+    const product = await saveNewProduct(
+      db,
+      { name_en: 'Ref target', price: 1000, opening_milli: 1000 },
+      ctx,
+      { now: NOW },
+    );
+    // Its own create/barcode/opening ops do not block a delete.
+    expect(await referencedByUnsyncedOp(db, product.id)).toBe(false);
+
+    const op = (op_id: string, status: 'pending' | 'failed') => ({
+      op_id,
+      tx_id: `tx-${op_id}`,
+      tbl: 'sale_lines' as const,
+      kind: 'insert' as const,
+      row_id: `line-${op_id}`,
+      row: { id: `line-${op_id}`, product_id: product.id },
+      created_at: NOW,
+      status,
+      attempts: 0,
+    });
+    await db.outbox.add(op('ref-failed', 'failed'));
+    // A failed op is not going to the server until Retry; it must not block a delete.
+    expect(await referencedByUnsyncedOp(db, product.id)).toBe(false);
+
+    await db.outbox.add(op('ref-pending', 'pending'));
+    expect(await referencedByUnsyncedOp(db, product.id)).toBe(true);
+    await db.outbox
+      .where('op_id')
+      .equals('ref-pending')
+      .modify({ status: 'sending' });
+    expect(await referencedByUnsyncedOp(db, product.id)).toBe(true);
+  });
 });

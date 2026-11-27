@@ -1,10 +1,6 @@
 import { describe, expect, it } from 'vitest';
-import {
-  encodeEscPos,
-  PAPER_PRESETS,
-  packageName,
-  saleBasicInput,
-} from './index.ts';
+import { encodeEscPos, PAPER_PRESETS, packageName } from './index.ts';
+import { saleBasicInput } from './templates/saleBasicFixture.ts';
 
 describe('@bikri/printer', () => {
   it('exposes its package name', () => {

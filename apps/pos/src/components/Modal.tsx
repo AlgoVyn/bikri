@@ -1,7 +1,7 @@
 import * as Dialog from '@radix-ui/react-dialog';
 import { type ReactNode, useRef } from 'react';
 import { useTranslation } from 'react-i18next';
-import { CloseIcon } from '../components/icons.tsx';
+import { CloseIcon } from './icons.tsx';
 
 const overlayClass = 'bikri-overlay fixed inset-0 z-40 bg-scrim';
 const base =

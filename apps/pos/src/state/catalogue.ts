@@ -28,9 +28,66 @@ export type CatalogueMaster = {
   bundleItems: MasterRow[];
 };
 
+/** Bumped by every catalogue write/pull; caches below are valid only for one revision. */
+let catalogueRevision = 0;
+/** Stock-only writes (a sale) bump this, so the master rows are not rebuilt. */
+let stockRevision = 0;
+let masterCache: {
+  tenant: string;
+  revision: number;
+  value: CatalogueMaster;
+} | null = null;
+let levelsCache: {
+  tenant: string;
+  revision: number;
+  value: Map<string, number>;
+} | null = null;
+const HOOKED_DBS = new WeakSet<BikriDb>();
+
+/**
+ * Direct Dexie writes (the dev/e2e seeders, pull pages, operator restores) do not go
+ * through `writeAction`, so `onLocalWrite` alone would leave the revision caches stale.
+ * Table hooks fire for every write path and are cheap enough for a 1,000-product seed.
+ */
+function installCatalogueHooks(db: BikriDb): void {
+  if (HOOKED_DBS.has(db)) return;
+  HOOKED_DBS.add(db);
+  const structure = () => {
+    catalogueRevision += 1;
+    masterCache = null;
+    warmCatalogue = null;
+  };
+  for (const table of [
+    'products',
+    'categories',
+    'product_barcodes',
+    'bundle_items',
+    'shop',
+  ]) {
+    const t = db.table(table);
+    t.hook('creating', structure);
+    t.hook('updating', structure);
+    t.hook('deleting', structure);
+  }
+  const stock = () => {
+    stockRevision += 1;
+    levelsCache = null;
+  };
+  const levels = db.table('stock_levels');
+  levels.hook('creating', stock);
+  levels.hook('updating', stock);
+  levels.hook('deleting', stock);
+}
+
 export async function loadCatalogueMaster(
   db: BikriDb,
 ): Promise<CatalogueMaster> {
+  installCatalogueHooks(db);
+  if (
+    masterCache?.tenant === db.tenantId &&
+    masterCache.revision === catalogueRevision
+  )
+    return masterCache.value;
   const [products, categories, barcodeRows, bundleItems] = await Promise.all([
     db.products.toArray(),
     db.categories.toArray(),
@@ -46,14 +103,18 @@ export async function loadCatalogueMaster(
   for (const row of barcodeRows) {
     if (row.deleted_at) continue;
     const id = String(row.product_id);
-    barcodes.set(id, [...(barcodes.get(id) ?? []), String(row.barcode)]);
+    const list = barcodes.get(id);
+    if (list === undefined) barcodes.set(id, [String(row.barcode)]);
+    else list.push(String(row.barcode));
   }
-  return {
+  const value: CatalogueMaster = {
     products: products.filter((product) => !product.deleted_at),
     categories: categoryMap,
     barcodes,
     bundleItems: bundleItems.filter((row) => !row.deleted_at),
   };
+  masterCache = { tenant: db.tenantId, revision: catalogueRevision, value };
+  return value;
 }
 
 export function useCatalogueMaster(): CatalogueMaster | undefined {
@@ -64,12 +125,20 @@ export function useCatalogueMaster(): CatalogueMaster | undefined {
 export async function loadStockLevels(
   db: BikriDb,
 ): Promise<Map<string, number>> {
-  return new Map(
+  installCatalogueHooks(db);
+  if (
+    levelsCache?.tenant === db.tenantId &&
+    levelsCache.revision === stockRevision
+  )
+    return levelsCache.value;
+  const value = new Map(
     (await db.stock_levels.toArray()).map((level) => [
       level.product_id,
       level.on_hand_milli,
     ]),
   );
+  levelsCache = { tenant: db.tenantId, revision: stockRevision, value };
+  return value;
 }
 
 export function useStockLevels(): Map<string, number> | undefined {
@@ -85,7 +154,10 @@ type WarmCatalogue = {
   master: CatalogueMaster;
   levels: Map<string, number>;
   sold: Map<string, number>;
+  index: CatalogueIndex;
   rows: ProductListRow[];
+  costMethod: 'avg' | 'last';
+  revision: number;
 };
 let warmCatalogue: WarmCatalogue | null = null;
 let warmInFlight: { tenant: string; promise: Promise<WarmCatalogue> } | null =
@@ -106,6 +178,7 @@ export function prewarmSellCatalogue(
   // start a new read instead of returning the old tenant's promise.
   if (warmInFlight?.tenant === db.tenantId) return warmInFlight.promise;
   const tenant = db.tenantId;
+  const startedAtRevision = catalogueRevision;
   let promise!: Promise<WarmCatalogue>;
   promise = (async () => {
     const [master, levels, sold] = await Promise.all([
@@ -120,10 +193,18 @@ export function prewarmSellCatalogue(
       master,
       levels,
       sold,
+      index,
       rows: index.rows,
+      costMethod,
+      revision: startedAtRevision,
     };
-    // A later tenant's warm-up may have replaced this one while it was reading.
-    if (warmInFlight?.promise === promise) warmCatalogue = result;
+    // A write or a later tenant's warm-up may have replaced this one while it was
+    // reading; never publish a snapshot from an older catalogue revision.
+    if (
+      warmInFlight?.promise === promise &&
+      startedAtRevision === catalogueRevision
+    )
+      warmCatalogue = result;
     return result;
   })().finally(() => {
     if (warmInFlight?.promise === promise) warmInFlight = null;
@@ -146,6 +227,16 @@ export function getWarmCatalogue(
 export function clearWarmCatalogue(): void {
   warmCatalogue = null;
   warmInFlight = null;
+  catalogueRevision += 1;
+  stockRevision += 1;
+  masterCache = null;
+  levelsCache = null;
+}
+
+/** A stock-level write only invalidates the levels cache, not the whole catalogue. */
+export function clearStockLevelsCache(): void {
+  stockRevision += 1;
+  levelsCache = null;
 }
 
 const SOLD_TTL_MS = 5 * 60_000;
@@ -185,7 +276,6 @@ const WARM_TABLES = new Set([
   'product_barcodes',
   'bundle_items',
   'categories',
-  'stock_levels',
   'shop',
 ]);
 
@@ -195,6 +285,7 @@ const WARM_TABLES = new Set([
 onLocalWrite((_count, tables) => {
   if (tables.some((table) => SOLD_TABLES.has(table))) clearSoldCache();
   if (tables.some((table) => WARM_TABLES.has(table))) clearWarmCatalogue();
+  else if (tables.includes('stock_levels')) clearStockLevelsCache();
 });
 
 export function useSold30(): Map<string, number> | undefined {
@@ -285,6 +376,7 @@ type CatalogueCache = CatalogueIndex & {
   sold: ReadonlyMap<string, number>;
   levels: ReadonlyMap<string, number>;
   costMethod: 'avg' | 'last';
+  revision: number;
 };
 
 /** Build the cached rows and the lookup structures the stock patch needs. */
@@ -397,13 +489,25 @@ export function useCatalogueRows(
 ): ProductListRow[] | undefined {
   const master = useCatalogueMaster();
   const levels = useStockLevels();
-  const cache = useRef<CatalogueCache | null>(null);
+  const warm = getWarmCatalogue(getDb().tenantId);
+  const cache = useRef<CatalogueCache | null>(
+    warm === null
+      ? null
+      : {
+          ...warm.index,
+          master: warm.master,
+          sold: warm.sold,
+          levels: warm.levels,
+          costMethod: warm.costMethod,
+          revision: warm.revision,
+        },
+  );
   return useMemo(() => {
     if (master === undefined || levels === undefined) return undefined;
     const prev = cache.current;
     if (
       prev !== null &&
-      prev.master === master &&
+      prev.revision === catalogueRevision &&
       prev.sold === sold &&
       prev.costMethod === costMethod
     ) {
@@ -414,7 +518,13 @@ export function useCatalogueRows(
       }
     }
     const index = buildCatalogueIndex(master, levels, sold, costMethod);
-    cache.current = { master, sold, costMethod, ...index };
+    cache.current = {
+      master,
+      sold,
+      costMethod,
+      revision: catalogueRevision,
+      ...index,
+    };
     return index.rows;
   }, [master, levels, sold, costMethod]);
 }

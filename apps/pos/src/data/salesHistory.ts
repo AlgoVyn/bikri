@@ -293,23 +293,21 @@ export async function loadSalesHistory(
     }
   }
 
+  // Refunds count on the date they happen, so one range read serves both the bill rows
+  // (money given back to this sale) and the summary. The old code read every refund from
+  // the range start and then read the same range again for the summary.
+  const rangeRefunds = await (src.table('refunds') as Table<SyncedRow>)
+    .where('business_date')
+    .between(range.from, range.to, true, true)
+    .toArray();
   const refundsById = new Map<string, SyncedRow[]>();
   if (ids.length > 0) {
-    // A sale in this range cannot be refunded before the range starts; the date index
-    // bounds the read instead of probing every sale id or scanning lifetime refunds.
-    const refunds = (
-      await (src.table('refunds') as Table<SyncedRow>)
-        .where('business_date')
-        .aboveOrEqual(range.from)
-        .toArray()
-    ).filter(
-      (refund) =>
-        refund.sale_id !== null && saleIdSet.has(String(refund.sale_id)),
-    );
-    for (const r of refunds) {
-      const key = String(r.sale_id);
+    for (const refund of rangeRefunds) {
+      if (refund.sale_id === null || !saleIdSet.has(String(refund.sale_id)))
+        continue;
+      const key = String(refund.sale_id);
       const list = refundsById.get(key) ?? [];
-      list.push(r);
+      list.push(refund);
       refundsById.set(key, list);
     }
   }
@@ -441,10 +439,6 @@ export async function loadSalesHistory(
   }
 
   // Match reports: refunds count on the date they happen, not the original sale date.
-  const rangeRefunds = await (src.table('refunds') as Table<SyncedRow>)
-    .where('business_date')
-    .between(range.from, range.to, true, true)
-    .toArray();
   return { rows, rangeRefunds };
 }
 
@@ -829,18 +823,25 @@ export async function billDetail(
     ? await sales.get(String(sale.replaces_sale_id))
     : undefined;
 
-  const conflicts = (
-    await (src.table('sync_conflicts') as Table<SyncedRow>).toArray()
-  ).filter((row) => {
-    try {
-      const fields = JSON.parse(String(row.fields_json ?? '{}')) as {
-        sale_id?: unknown;
-      };
-      return fields.sale_id === saleId;
-    } catch {
-      return false;
-    }
-  });
+  // Conflicts store the conflicted document/line id in `row_id` (a refund, refund line
+  // or void), never the sale id. Resolve them from the rows this bill already loaded with
+  // the V18 `[tbl+row_id]` index; parsing every historical `fields_json` on bill open was
+  // the cost this lookup removes.
+  const conflictKeys: [string, string][] = [
+    ['sales', saleId],
+    ...refunds.map(
+      (refund) => ['refunds', String(refund.id)] as [string, string],
+    ),
+    ...refundLines.map(
+      (line) => ['refund_lines', String(line.id)] as [string, string],
+    ),
+    ...lines.map((line) => ['sale_lines', String(line.id)] as [string, string]),
+  ];
+  if (voidRow) conflictKeys.push(['sale_voids', String(voidRow.id)]);
+  const conflicts = await (src.table('sync_conflicts') as Table<SyncedRow>)
+    .where('[tbl+row_id]')
+    .anyOf(conflictKeys)
+    .toArray();
   const auditTable = src.table('audit_log') as Table<SyncedRow>;
   const auditKeys: [string, string][] = [
     ['sales', saleId],

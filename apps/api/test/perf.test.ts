@@ -1,8 +1,9 @@
 import { env } from 'cloudflare:workers';
 import { businessDate, newId } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
-import { IDS, seedShop } from './helpers/fixtures.ts';
-import { op, productRow, pushOk } from './helpers/ops.ts';
+import { tenantDeleteChunkSql } from '../src/db/tenantDelete.ts';
+import { IDS, json, seedShop } from './helpers/fixtures.ts';
+import { op, productRow, push, pushOk, quoteOps } from './helpers/ops.ts';
 
 // T-062: two large tenants, the documented write budget and the hot-query plans.
 
@@ -11,6 +12,10 @@ const HOT_QUERIES: Array<{
   sql: string;
   args: unknown[];
   index: string;
+  /** The token lookup is globally unique and legally has no tenant-leading key. */
+  tenantLeading?: boolean;
+  /** Assert the plan has no sort step (for the H8 pagination statements). */
+  noTempBTree?: boolean;
 }> = [
   {
     name: 'change_log pull',
@@ -140,15 +145,154 @@ const HOT_QUERIES: Array<{
   },
   {
     name: 'purge replacement sales',
-    sql: 'SELECT rowid FROM sales WHERE tenant_id = ? AND replaces_sale_id IS NOT NULL LIMIT ?',
+    sql: 'DELETE FROM sales WHERE tenant_id = ?1 AND replaces_sale_id IS NOT NULL AND id IN (SELECT id FROM sales WHERE tenant_id = ?1 AND replaces_sale_id IS NOT NULL ORDER BY id DESC LIMIT ?2)',
     args: ['t', 2000],
     index: 'sales_replaces',
+    noTempBTree: true,
   },
   {
     name: 'last close per device',
-    sql: 'SELECT id FROM day_closes WHERE tenant_id = ? AND device_id = ? ORDER BY period_end DESC LIMIT 1',
+    sql: 'SELECT device_id AS id, id AS close_id, period_end, counted_cash FROM day_closes WHERE tenant_id = ? AND device_id = ? ORDER BY period_end DESC LIMIT 1',
     args: ['t', 'd'],
     index: 'day_closes_device',
+    noTempBTree: true,
+  },
+  {
+    name: 'device by token hash',
+    sql: 'SELECT d.*, t.slug, u.pushes FROM devices d JOIN tenants t ON t.id = d.tenant_id LEFT JOIN tenant_usage u ON u.tenant_id = t.id AND u.day = ?2 WHERE d.token_hash = ?1',
+    args: ['h', '2026-01-01'],
+    index: 'sqlite_autoindex_devices_1',
+    tenantLeading: false,
+  },
+  {
+    name: 'already applied ops',
+    sql: 'SELECT op_id, result, error_code FROM applied_ops WHERE tenant_id = ?1 AND op_id IN (?)',
+    args: ['t', 'o'],
+    index: 'sqlite_autoindex_applied_ops_1',
+    noTempBTree: true,
+  },
+  {
+    name: 'latest change seq',
+    sql: 'SELECT MAX(seq) AS seq FROM change_log WHERE tenant_id = ?1',
+    args: ['t'],
+    index: 'change_log_tenant_seq',
+    noTempBTree: true,
+  },
+  {
+    name: 'sale lines by sale',
+    sql: 'SELECT id, sale_id FROM sale_lines WHERE tenant_id = ?1 AND sale_id IN (?)',
+    args: ['t', 's'],
+    index: 'sqlite_autoindex_sale_lines_1',
+    noTempBTree: true,
+  },
+  {
+    name: 'sale void by sale',
+    sql: 'SELECT sale_id AS id FROM sale_voids WHERE tenant_id = ?1 AND sale_id IN (?)',
+    args: ['t', 's'],
+    index: 'sqlite_autoindex_sale_voids_1',
+    noTempBTree: true,
+  },
+  {
+    name: 'void payments by sale',
+    sql: "SELECT sale_id AS id, direction, purpose, method, amount FROM payments WHERE tenant_id = ?1 AND purpose = 'void' AND sale_id IN (?)",
+    args: ['t', 's'],
+    index: 'payments_sale',
+    noTempBTree: true,
+  },
+  {
+    name: 'quotation by id',
+    sql: 'SELECT id FROM quotations WHERE tenant_id = ?1 AND id IN (?)',
+    args: ['t', 'q'],
+    index: 'sqlite_autoindex_quotations_2',
+    noTempBTree: true,
+  },
+  {
+    name: 'purchase lines by id',
+    sql: 'SELECT pl.id AS id, pu.supplier_id AS supplier_id FROM purchase_lines pl JOIN purchases pu ON pu.tenant_id = ?1 AND pu.id = pl.purchase_id WHERE pl.tenant_id = ?1 AND pl.id IN (?)',
+    args: ['t', 'p'],
+    index: 'sqlite_autoindex_purchase_lines_2',
+    noTempBTree: true,
+  },
+  {
+    name: 'sale status update',
+    sql: 'UPDATE sales SET status = ?2 WHERE tenant_id = ?1 AND id = ?3',
+    args: ['t', 'refunded', 's'],
+    index: 'sqlite_autoindex_sales_2',
+    noTempBTree: true,
+  },
+  {
+    name: 'prune watermark today',
+    sql: `INSERT INTO change_log_watermarks (tenant_id, day, max_seq)
+      SELECT ?1, ?2, COALESCE((SELECT MAX(seq) FROM change_log WHERE tenant_id = ?1), 0)
+      WHERE COALESCE((SELECT MAX(seq) FROM change_log WHERE tenant_id = ?1), 0) >
+        COALESCE((SELECT max_seq FROM change_log_watermarks WHERE tenant_id = ?1 ORDER BY day DESC LIMIT 1), -1)
+      ON CONFLICT(tenant_id, day) DO UPDATE SET max_seq = excluded.max_seq`,
+    args: ['t', '2026-01-01'],
+    index: 'change_log_tenant_seq',
+  },
+  {
+    name: 'prune cutoff watermark',
+    sql: 'SELECT max_seq FROM change_log_watermarks WHERE tenant_id = ?1 AND day <= ?2 ORDER BY day DESC LIMIT 1',
+    args: ['t', '2026-01-01'],
+    index: 'sqlite_autoindex_change_log_watermarks_1',
+    noTempBTree: true,
+  },
+  {
+    name: 'prune expired enrolment codes',
+    sql: 'DELETE FROM enrolment_codes WHERE expires_at < ?1',
+    args: [0],
+    index: 'enrolment_codes_expiry',
+    tenantLeading: false,
+    noTempBTree: true,
+  },
+  {
+    name: 'prune expired owner codes',
+    sql: 'DELETE FROM owner_email_codes WHERE expires_at < ?1',
+    args: [0],
+    index: 'owner_email_codes_expiry',
+    tenantLeading: false,
+    noTempBTree: true,
+  },
+  {
+    name: 'prune old watermarks',
+    sql: 'DELETE FROM change_log_watermarks WHERE day < ?1',
+    args: ['2026-01-01'],
+    index: 'change_log_watermarks_day',
+    tenantLeading: false,
+    noTempBTree: true,
+  },
+  {
+    name: 'owner email codes by time',
+    sql: 'SELECT device_id, created_at, attempts, used_at, expires_at FROM owner_email_codes WHERE tenant_id = ?1 AND created_at > ?2 ORDER BY created_at DESC',
+    args: ['t', 0],
+    index: 'owner_email_codes_time',
+    noTempBTree: true,
+  },
+  {
+    name: 'open enrolment codes',
+    sql: "SELECT code_hash, device_name, grants_admin, expires_at, created_at FROM enrolment_codes WHERE tenant_id = ?1 AND used_at IS NULL AND expires_at > ?2 AND kind = 'till' ORDER BY created_at",
+    args: ['t', 0],
+    index: 'enrolment_codes_tenant',
+  },
+  {
+    name: 'public shop requests',
+    sql: 'SELECT id FROM shop_requests WHERE status = ?1 ORDER BY created_at DESC LIMIT 50',
+    args: ['pending'],
+    index: 'shop_requests_status',
+    tenantLeading: false,
+  },
+  {
+    name: 'tenant devices',
+    sql: 'SELECT * FROM devices WHERE tenant_id = ?1 ORDER BY revoked_at IS NOT NULL, enrolled_at',
+    args: ['t'],
+    index: 'sqlite_autoindex_devices_3',
+  },
+  {
+    name: 'open sync conflicts',
+    sql: "SELECT id FROM sync_conflicts WHERE tenant_id = ?1 AND resolution = 'needs_owner'",
+    args: ['t'],
+    index: 'sync_conflicts_open',
+    noTempBTree: true,
   },
   {
     name: 'bundle rows by bundle',
@@ -320,7 +464,67 @@ describe('T-062 performance', () => {
         .all<{ detail: string }>();
       const details = plan.results.map((row) => row.detail).join('\n');
       expect(details, query.name).toContain(query.index);
-      expect(details, query.name).toContain('tenant_id');
+      if (query.tenantLeading !== false)
+        expect(details, query.name).toContain('tenant_id');
+      if (query.noTempBTree)
+        expect(details, query.name).not.toContain('TEMP B-TREE');
+    }
+  });
+
+  it('pages purge and tenant deletes by the tenant-leading key', async () => {
+    const cases: Array<{
+      tbl: string;
+      where: string;
+      index: string;
+      tenantEquality?: string;
+    }> = [
+      {
+        tbl: 'sales',
+        where: 'replaces_sale_id IS NOT NULL',
+        index: 'sqlite_autoindex_sales_2',
+      },
+      {
+        tbl: 'change_log',
+        where: '1 = 1',
+        index: 'change_log_tenant_seq',
+        tenantEquality: '(tenant_id=? AND seq=?)',
+      },
+      {
+        tbl: 'applied_ops',
+        where: '1 = 1',
+        index: 'sqlite_autoindex_applied_ops_1',
+        tenantEquality: '(tenant_id=? AND op_id=?)',
+      },
+      {
+        tbl: 'change_log_watermarks',
+        where: '1 = 1',
+        index: 'sqlite_autoindex_change_log_watermarks_1',
+        tenantEquality: '(tenant_id=? AND day=?)',
+      },
+      {
+        tbl: 'branch_device_codes',
+        where: '1 = 1',
+        index: 'sqlite_autoindex_branch_device_codes_1',
+        tenantEquality: '(tenant_id=? AND branch_id=? AND device_code=?)',
+      },
+      {
+        tbl: 'enrolment_codes',
+        where: '1 = 1',
+        index: 'enrolment_codes_tenant',
+        tenantEquality: '(tenant_id=? AND expires_at=?)',
+      },
+    ];
+    for (const testCase of cases) {
+      const plan = await env.DB.prepare(
+        `EXPLAIN QUERY PLAN ${tenantDeleteChunkSql(testCase.tbl, testCase.where)}`,
+      )
+        .bind('t', 2_000)
+        .all<{ detail: string }>();
+      const details = plan.results.map((row) => row.detail).join('\n');
+      expect(details, testCase.tbl).toContain(testCase.index);
+      expect(details, testCase.tbl).not.toContain('TEMP B-TREE');
+      if (testCase.tenantEquality)
+        expect(details, testCase.tbl).toContain(testCase.tenantEquality);
     }
   });
 
@@ -483,6 +687,92 @@ describe('T-062 performance', () => {
     expect(Number(usage?.rows_read ?? 0)).toBeLessThan(400);
   }, 60_000);
 
+  it('validates a 60-line quotation in one call budget and memoised totals', async () => {
+    const shop = await seedShop('Perf quote 60', { budget: 100_000 });
+    const now = Date.now();
+    const today = new Date(now).toISOString().slice(0, 10);
+    const unit = 50_000;
+    const lineCount = 60;
+    const total = unit * lineCount;
+    const base = quoteOps(shop, shop.till, 1);
+    const tx = newId(now);
+    const header = {
+      ...base.row,
+      line_count: lineCount,
+      items_qty_milli: lineCount * 1000,
+      gross_total: total,
+      subtotal: total,
+      total,
+    };
+    const line = {
+      ...base.line,
+      unit_price: unit,
+      gross: unit,
+      net: unit,
+    };
+    const ops = [
+      op('quotations', 'upsert', header, { tx_id: tx, base_rev: 0 }),
+      ...Array.from({ length: lineCount }, (_, index) =>
+        op(
+          'quotation_lines',
+          'upsert',
+          {
+            ...line,
+            id: newId(now + index + 1),
+            line_no: index + 1,
+            name_snapshot: `Line ${index + 1}`,
+          },
+          { tx_id: tx, base_rev: 0 },
+        ),
+      ),
+    ];
+    // Measure only this push, not the fixture writes.
+    await env.DB.prepare(
+      'DELETE FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
+    )
+      .bind(shop.tenantId, today)
+      .run();
+    const res = await push(shop.till, ops);
+    expect(res.status).toBe(200);
+    const body = await json<{
+      results: Array<{ result: string; error_code?: string }>;
+    }>(res);
+    expect(body.results).toHaveLength(ops.length);
+    expect(body.results.filter((row) => row.result === 'applied')).toHaveLength(
+      ops.length,
+    );
+    // The route's test-only headers expose the D1 call budget and planning/apply CPU.
+    // 3 (token/closing/spare) + alreadyApplied + the quote-line preload + the lookup
+    // batch + the apply batch. The preload is counted, unlike the old sequential loops.
+    expect(Number(res.headers.get('x-bikri-d1-calls'))).toBe(7);
+    expect(Number(res.headers.get('x-bikri-apply-ms'))).toBeLessThan(2_000);
+    // A header-only edit re-reads and validates all 60 stored lines without writing new
+    // ones, so its read count is the lookup path: one page by quote id, the header and
+    // the catalogue rows. Before H9 this also paid two more full-column line reads.
+    await env.DB.prepare(
+      'DELETE FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
+    )
+      .bind(shop.tenantId, today)
+      .run();
+    const edit = await push(shop.till, [
+      op(
+        'quotations',
+        'upsert',
+        { ...header, note: 'Updated terms' },
+        { base_rev: 1, changed_fields: ['note'] },
+      ),
+    ]);
+    expect(edit.status).toBe(200);
+    const edited = await json<{ results: Array<{ result: string }> }>(edit);
+    expect(edited.results[0]?.result).toBe('applied');
+    const usage = await env.DB.prepare(
+      'SELECT rows_read FROM tenant_usage WHERE tenant_id = ?1 AND day = ?2',
+    )
+      .bind(shop.tenantId, today)
+      .first<{ rows_read: number }>();
+    expect(Number(usage?.rows_read ?? 0)).toBeLessThan(140);
+  }, 60_000);
+
   it('deletes reissued bills through the sales_replaces index', async () => {
     const shop = await seedShop('Perf purge', { budget: 100_000 });
     const now = Date.now();
@@ -533,18 +823,18 @@ describe('T-062 performance', () => {
       .bind(shop.tenantId, now)
       .run();
 
-    const deleteSql = `DELETE FROM sales
-      WHERE tenant_id = ?1 AND replaces_sale_id IS NOT NULL
-        AND rowid IN (
-          SELECT rowid FROM sales
-          WHERE tenant_id = ?1 AND replaces_sale_id IS NOT NULL LIMIT ?2
-        )`;
+    const deleteSql = tenantDeleteChunkSql(
+      'sales',
+      'replaces_sale_id IS NOT NULL',
+    );
     const plan = await env.DB.prepare(`EXPLAIN QUERY PLAN ${deleteSql}`)
       .bind(shop.tenantId, 2_000)
       .all<{ detail: string }>();
-    expect(plan.results.map((row) => row.detail).join('\n')).toContain(
-      'sales_replaces',
-    );
+    const details = plan.results.map((row) => row.detail).join('\n');
+    expect(details).toContain('sales_replaces');
+    // The new page is a reverse tenant-leading PK scan, not a sort of every remaining
+    // bill (H8). The outer delete is an index probe per page row.
+    expect(details).not.toContain('TEMP B-TREE');
 
     const started = Date.now();
     const deleted = await env.DB.prepare(deleteSql)

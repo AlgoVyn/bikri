@@ -3,9 +3,9 @@ import { renderReceiptText } from '@bikri/printer';
 import { router } from '../app.tsx';
 import { getDb } from '../data/db.ts';
 import { setKv } from '../data/kv.ts';
+import { beepCount } from '../lib/beep.ts';
 import { jobReceipt } from '../print/receiptFiles.ts';
 import { printHtmlViaSystem } from '../print/systemPrint.ts';
-import { beepCount } from '../sell/beep.ts';
 import {
   finishSetupHere,
   resetDevDb,

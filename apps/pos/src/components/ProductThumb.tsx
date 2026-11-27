@@ -1,8 +1,8 @@
 import { useEffect, useState } from 'react';
 import { getDb } from '../data/db.ts';
 import { fileUrlFor, getFile } from '../data/fileCache.ts';
+import { TILE_BG, tileBg } from '../lib/tiles.ts';
 import { fetchRemoteFile } from '../sync/files.ts';
-import { TILE_BG, tileBg } from './tiles.ts';
 
 /** Object URL of a cached photo for the active shop, or null (works offline, 01 §PWA). */
 export function useFileUrl(key: string | null | undefined): string | null {

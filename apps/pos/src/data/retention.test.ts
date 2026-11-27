@@ -52,11 +52,38 @@ describe('local history retention', () => {
         { tbl: 'sales', id: 'new', at: NOW - 5 * DAY },
       ],
     });
+    await db.sync_conflicts.bulkAdd([
+      {
+        id: 'conflict-old',
+        tbl: 'refunds',
+        row_id: 'r1',
+        resolution: 'acknowledged',
+        fields_json: '{}',
+        at: NOW - 100 * DAY,
+      },
+      {
+        id: 'conflict-new',
+        tbl: 'refunds',
+        row_id: 'r2',
+        resolution: 'merged',
+        fields_json: '{}',
+        at: NOW - 5 * DAY,
+      },
+      {
+        id: 'conflict-open',
+        tbl: 'refunds',
+        row_id: 'r3',
+        resolution: 'needs_owner',
+        fields_json: '{}',
+        at: NOW - 100 * DAY,
+      },
+    ]);
 
     expect(await pruneLocalHistory(db, NOW)).toEqual({
       printJobs: 2,
       failedUploads: 1,
       pullErrors: 1,
+      resolvedConflicts: 1,
     });
     expect(await db.print_jobs.get('done-old')).toBeUndefined();
     expect(await db.print_jobs.get('done-new')).toBeDefined();
@@ -69,6 +96,9 @@ describe('local history retention', () => {
     expect((await db.kv.get('pull_errors'))?.value).toEqual([
       { tbl: 'sales', id: 'new', at: NOW - 5 * DAY },
     ]);
+    expect(await db.sync_conflicts.get('conflict-old')).toBeUndefined();
+    expect(await db.sync_conflicts.get('conflict-new')).toBeDefined();
+    expect(await db.sync_conflicts.get('conflict-open')).toBeDefined();
   });
 
   it('runs at most once a day', async () => {

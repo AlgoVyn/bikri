@@ -2,6 +2,7 @@ import { BASE_PATH } from '@bikri/core';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import {
   clearFileUrls,
+  deleteFile,
   FILE_URL_CACHE_MAX,
   fileCacheUrl,
   fileUrlFor,
@@ -17,6 +18,22 @@ describe('file cache keys', () => {
     expect(() => fileCacheUrl('t1', '../t2/products/p1/photo.webp')).toThrow(
       'invalid file key',
     );
+  });
+
+  it('does not list the cache on the first put of a session', async () => {
+    let keyCalls = 0;
+    const store = {
+      put: async () => undefined,
+      match: async () => undefined,
+      delete: async () => true,
+      keys: async () => {
+        keyCalls += 1;
+        return [];
+      },
+    };
+    vi.stubGlobal('caches', { open: async () => store });
+    await putFile('t-first', 'k', new Blob(['x']));
+    expect(keyCalls).toBe(0);
   });
 
   it('retries caches.open after a rejection instead of caching it (SYNC-L4)', async () => {
@@ -100,5 +117,77 @@ describe('file URL cache', () => {
     } finally {
       clearFileUrls('t2');
     }
+  });
+
+  it('does not drop a newer in-flight request when an older one misses', async () => {
+    const create = vi.fn((blob: Blob) => `blob:${blob.size}`);
+    class FakeURL extends URL {
+      static createObjectURL = create;
+      static revokeObjectURL = vi.fn();
+    }
+    vi.stubGlobal('URL', FakeURL);
+
+    let resolveFirst: (blob: Blob | null) => void = () => undefined;
+    const first = fileUrlFor(
+      't4',
+      'race',
+      () =>
+        new Promise<Blob | null>((resolve) => {
+          resolveFirst = resolve;
+        }),
+    );
+    clearFileUrls('t4');
+    let resolveSecond: (blob: Blob | null) => void = () => undefined;
+    const second = fileUrlFor(
+      't4',
+      'race',
+      () =>
+        new Promise<Blob | null>((resolve) => {
+          resolveSecond = resolve;
+        }),
+    );
+    resolveFirst(null);
+    await expect(first).resolves.toBeNull();
+    // The miss of the removed request must not delete the newer promise.
+    let loads = 0;
+    const third = fileUrlFor('t4', 'race', async () => {
+      loads += 1;
+      return new Blob(['zzz']);
+    });
+    expect(third).toBe(second);
+    resolveSecond(new Blob(['ab']));
+    await expect(second).resolves.toBe('blob:2');
+    expect(loads).toBe(0);
+    clearFileUrls('t4');
+  });
+
+  it('revokes the cached URL when a file is deleted', async () => {
+    const create = vi.fn((blob: Blob) => `blob:${blob.size}`);
+    const revoke = vi.fn();
+    class FakeURL extends URL {
+      static createObjectURL = create;
+      static revokeObjectURL = revoke;
+    }
+    vi.stubGlobal('URL', FakeURL);
+    const deletes: string[] = [];
+    vi.stubGlobal('caches', {
+      open: async () => ({
+        put: async () => undefined,
+        match: async () => undefined,
+        delete: async (request: string) => {
+          deletes.push(request);
+          return true;
+        },
+        keys: async () => [],
+      }),
+    });
+    await expect(
+      fileUrlFor('t5', 'photo', async () => new Blob(['abc'])),
+    ).resolves.toBe('blob:3');
+    await deleteFile('t5', 'photo');
+    await new Promise((resolve) => setTimeout(resolve, 0));
+    expect(revoke).toHaveBeenCalledWith('blob:3');
+    expect(deletes).toHaveLength(1);
+    expect(deletes[0]).toContain('/__files/t5/photo');
   });
 });

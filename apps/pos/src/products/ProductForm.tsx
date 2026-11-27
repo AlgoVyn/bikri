@@ -28,6 +28,7 @@ import { CloseIcon, ProductsIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading.tsx';
+import { useFileUrl } from '../components/ProductThumb.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { SubpageHeader } from '../components/SubpageHeader.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -54,13 +55,12 @@ import {
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
 import { categoryName } from '../lib/category.ts';
-import { composing, useHotkey } from '../shell/hotkeys.ts';
+import { composing, useHotkey } from '../lib/hotkeys.ts';
+import { qtyWithUnit } from '../lib/productFormat.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { bundleComponentsFromProducts } from './bundlePrice.ts';
 import { bundleQtyValid, clampBundleQty } from './bundleQty.ts';
-import { qtyWithUnit } from './format.ts';
-import { useFileUrl } from './ProductThumb.tsx';
 import { type Photo, PhotoError, processPhoto } from './photo.ts';
 
 const WARRANTY_PRESETS = ['0', '7', '30', '90', '180', '365'] as const;

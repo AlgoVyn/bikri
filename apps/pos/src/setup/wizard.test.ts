@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { previewBlocks } from './ReceiptPreview.tsx';
+import { previewBlocks } from '../components/ReceiptPreview.tsx';
 import { parseTaxPercent, resumeStep } from './SetupWizard.tsx';
 
 describe('setup draft resume (UI-C1)', () => {

@@ -13,7 +13,7 @@ import type { AppEnv } from '../types.ts';
 export async function me(c: Context<AppEnv>): Promise<Response> {
   const { tenant, device, db, usage } = c.var;
   const now = Date.now();
-  await endExpiredSupport(db, tenant, now);
+  await endExpiredSupport(c.env, db, tenant, now);
 
   // Every device request starts here. Read the setup flag and the latest change seq
   // in one D1 batch; today's usage was joined into the device-token lookup.

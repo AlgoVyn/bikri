@@ -33,6 +33,7 @@ type Response = {
   id: number;
   bundle?: ReportBundle;
   previous?: ReportBundle['summary'];
+  slowMovers?: SlowMover[];
   error?: string;
 };
 
@@ -112,16 +113,21 @@ async function compute(request: Request): Promise<Response> {
       cached = { key, base, previous, slow: undefined };
       reportCache = cached;
     }
-    if (options.slowMovers === true) {
-      cached.slow ??= await slowMoversReport(
+    let slow = cached.slow;
+    if (options.slowMovers === true || options.slowMoversOnly === true) {
+      slow ??= await slowMoversReport(
         db,
         options.today ?? businessDate(Date.now(), options.timeZone),
       );
+      cached.slow = slow;
+    }
+    if (options.slowMoversOnly === true) return { id, slowMovers: slow ?? [] };
+    if (options.slowMovers === true) {
       return {
         id,
         bundle: {
           ...cached.base,
-          products: { ...cached.base.products, slowMovers: cached.slow },
+          products: { ...cached.base.products, slowMovers: slow ?? [] },
         },
         previous: cached.previous,
       };

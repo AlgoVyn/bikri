@@ -28,12 +28,12 @@ import {
   startCount,
   updateCount,
 } from '../data/stock.ts';
+import { beep } from '../lib/beep.ts';
 import { categoryName } from '../lib/category.ts';
-import { beep } from '../sell/beep.ts';
+import { isLatinName } from '../lib/productFormat.ts';
 import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { isLatinName } from './format.ts';
 
 const ROW_PX_WIDE = 72;
 const ROW_PX_PHONE = 136;

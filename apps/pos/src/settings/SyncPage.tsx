@@ -18,7 +18,7 @@ import { getDb } from '../data/db.ts';
 import { getKv } from '../data/kv.ts';
 import { deviceInfo } from '../data/localTenant.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
-import { writeAction } from '../data/write.ts';
+import { writeAction, writeScope } from '../data/write.ts';
 import { formatTimestamp } from '../lib/date.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -150,7 +150,11 @@ export function SyncPage() {
           staff_id: staffId,
           created_at: w.now,
         }),
-      { actor: staffId, allowReadOnly: true },
+      {
+        actor: staffId,
+        allowReadOnly: true,
+        tables: writeScope('audit_log'),
+      },
     ).catch(() => setError(t('errors.generic')));
   };
 

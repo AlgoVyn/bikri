@@ -25,23 +25,18 @@ func validImageSize(width, height int) bool {
 	return int64(width)*int64(height) <= maxImagePixels
 }
 
-// ValidatePNG checks a driver-mode payload before any backend decodes it. The
-// job manager calls this centrally so CUPS and GDI share one limit (14 §5.2):
-// handing an unvalidated PNG (or a decompression bomb) to the OS print path is
-// not acceptable just because CUPS would decode it in a filter.
+// ValidatePNG is the dimensions-free form of ImageConfig, kept for callers
+// that only need a yes/no answer before handing the payload to the OS.
 func ValidatePNG(data []byte) error {
-	config, err := png.DecodeConfig(bytes.NewReader(data))
-	if err != nil {
-		return &Error{Code: "SPOOL_ERROR", Message: "invalid PNG: " + err.Error()}
-	}
-	if !validImageSize(config.Width, config.Height) {
-		return &Error{Code: "SPOOL_ERROR", Message: "image dimensions are too large"}
-	}
-	return nil
+	_, _, err := ImageConfig(data)
+	return err
 }
 
-// ImageConfig returns the PNG header dimensions for a payload that passed
-// ValidatePNG. Driver mode uses the height to derive the custom media length.
+// ImageConfig checks a driver-mode payload before any backend decodes it and
+// returns the IHDR dimensions. The job manager calls this centrally so CUPS and
+// GDI share one limit (14 §5.2) and the backend does not decode the header a
+// second time: handing an unvalidated PNG (or a decompression bomb) to the OS
+// print path is not acceptable just because CUPS would decode it in a filter.
 func ImageConfig(data []byte) (width, height int, err error) {
 	config, err := png.DecodeConfig(bytes.NewReader(data))
 	if err != nil {

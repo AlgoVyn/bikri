@@ -75,6 +75,7 @@ function balanceOf(
   type: PartyType,
   id: string,
   entries: readonly SyncedRow[],
+  lastDeliveryDate?: string | null,
 ): PartyBalance {
   const amounts = entries.map((e) => ({
     amount: Number(e.amount),
@@ -94,7 +95,61 @@ function balanceOf(
     last_activity_at: amounts.reduce((m, a) => Math.max(m, a.created_at), 0),
     oldest_unpaid_at: oldestUnpaidAt(amounts),
     last_payment_at: lastPayment > 0 ? lastPayment : null,
+    ...(lastDeliveryDate ? { last_delivery_date: lastDeliveryDate } : {}),
   };
+}
+
+/**
+ * Updates the supplier last-delivery cache (Dexie V18) from freshly stored purchases.
+ * A delivery does not always write a ledger row (a free delivery writes none), so the
+ * party cache row may not exist yet; create a zero-balance row in that case. Only a later
+ * business date replaces the stored one, so pulled pages in any order converge.
+ */
+export async function applyPurchaseDates(
+  src: TableSource,
+  rows: readonly SyncedRow[],
+): Promise<void> {
+  const latest = new Map<string, string>();
+  for (const row of rows) {
+    const supplierId = String(row.supplier_id ?? '');
+    const date = String(row.business_date ?? '');
+    if (supplierId === '' || date === '') continue;
+    if (date > (latest.get(supplierId) ?? '')) latest.set(supplierId, date);
+  }
+  if (latest.size === 0) return;
+  const ids = [...latest.keys()];
+  const current = await partyBalances(src).bulkGet(
+    ids.map((id) => ['supplier', id] as [PartyType, string]),
+  );
+  const changed: PartyBalance[] = [];
+  ids.forEach((id, index) => {
+    const date = latest.get(id) as string;
+    const existing = current[index];
+    if (existing === undefined) {
+      changed.push({
+        party_type: 'supplier',
+        party_id: id,
+        balance: 0,
+        last_activity_at: 0,
+        oldest_unpaid_at: null,
+        last_payment_at: null,
+        last_delivery_date: date,
+      });
+      return;
+    }
+    if ((existing.last_delivery_date ?? '') < date)
+      changed.push({ ...existing, last_delivery_date: date });
+  });
+  if (changed.length > 0) await partyBalances(src).bulkPut(changed);
+}
+
+/** Preserve the supplier delivery cache field when a balance row is rebuilt. */
+function withDeliveryDate(
+  row: PartyBalance,
+  existing: PartyBalance | undefined,
+): PartyBalance {
+  const date = existing?.last_delivery_date;
+  return date ? { ...row, last_delivery_date: date } : row;
 }
 
 /**
@@ -120,17 +175,23 @@ export async function applyLedgerEntry(
       (Number.isFinite(at) && at >= Number(current.last_activity_at)))
   ) {
     const balance = (current?.balance ?? 0) + amount;
-    await partyBalances(src).put({
-      party_type: type,
-      party_id: id,
-      balance,
-      last_activity_at: Math.max(current?.last_activity_at ?? 0, at),
-      oldest_unpaid_at: balance > 0 ? (current?.oldest_unpaid_at ?? at) : null,
-      last_payment_at:
-        row.source_type === 'payment'
-          ? Math.max(Number(current?.last_payment_at ?? 0), at)
-          : (current?.last_payment_at ?? null),
-    });
+    await partyBalances(src).put(
+      withDeliveryDate(
+        {
+          party_type: type,
+          party_id: id,
+          balance,
+          last_activity_at: Math.max(current?.last_activity_at ?? 0, at),
+          oldest_unpaid_at:
+            balance > 0 ? (current?.oldest_unpaid_at ?? at) : null,
+          last_payment_at:
+            row.source_type === 'payment'
+              ? Math.max(Number(current?.last_payment_at ?? 0), at)
+              : (current?.last_payment_at ?? null),
+        },
+        current,
+      ),
+    );
     return;
   }
   // A credit that clears the account leaves no open debit, so the exact
@@ -138,21 +199,31 @@ export async function applyLedgerEntry(
   // rescan. A partial credit still takes the exact path below (a payment can
   // clear the oldest debit and part of the next).
   if (amount < 0 && current !== undefined && current.balance + amount <= 0) {
-    await partyBalances(src).put({
-      party_type: type,
-      party_id: id,
-      balance: current.balance + amount,
-      last_activity_at: Math.max(current.last_activity_at, at),
-      oldest_unpaid_at: null,
-      last_payment_at:
-        row.source_type === 'payment'
-          ? Math.max(Number(current.last_payment_at ?? 0), at)
-          : (current.last_payment_at ?? null),
-    });
+    await partyBalances(src).put(
+      withDeliveryDate(
+        {
+          party_type: type,
+          party_id: id,
+          balance: current.balance + amount,
+          last_activity_at: Math.max(current.last_activity_at, at),
+          oldest_unpaid_at: null,
+          last_payment_at:
+            row.source_type === 'payment'
+              ? Math.max(Number(current.last_payment_at ?? 0), at)
+              : (current.last_payment_at ?? null),
+        },
+        current,
+      ),
+    );
     return;
   }
   await partyBalances(src).put(
-    balanceOf(type, id, await partyEntries(src, type, id)),
+    balanceOf(
+      type,
+      id,
+      await partyEntries(src, type, id),
+      current?.last_delivery_date,
+    ),
   );
 }
 
@@ -163,8 +234,14 @@ export async function recomputePartyBalance(
 ): Promise<void> {
   const type = row.party_type as PartyType;
   const id = String(row.party_id);
+  const current = await partyBalances(src).get([type, id]);
   await partyBalances(src).put(
-    balanceOf(type, id, await partyEntries(src, type, id)),
+    balanceOf(
+      type,
+      id,
+      await partyEntries(src, type, id),
+      current?.last_delivery_date,
+    ),
   );
 }
 
@@ -220,8 +297,18 @@ export async function rebuildCaches(db: BikriDb): Promise<void> {
   await new Promise((resolve) => setTimeout(resolve, 0));
   await db.transaction(
     'rw',
-    [db.party_balances, db.ledger_entries],
+    [db.party_balances, db.ledger_entries, db.purchases],
     async () => {
+      // Supplier last-delivery dates live on the party cache (V18); rebuild them from
+      // purchases rather than scanning that table on every supplier-list open.
+      const deliveries = new Map<string, string>();
+      await db.purchases.each((purchase) => {
+        const supplierId = String(purchase.supplier_id ?? '');
+        const date = String(purchase.business_date ?? '');
+        if (supplierId === '' || date === '') return;
+        if (date > (deliveries.get(supplierId) ?? ''))
+          deliveries.set(supplierId, date);
+      });
       await db.party_balances.clear();
       // The index is ordered by party then time, so a party's entries are contiguous.
       // Flush one party at a time instead of retaining every ledger row in a Map.
@@ -231,7 +318,16 @@ export async function rebuildCaches(db: BikriDb): Promise<void> {
       let current: SyncedRow[] = [];
       const flush = () => {
         if (currentType !== null && current.length > 0)
-          balances.push(balanceOf(currentType, currentId, current));
+          balances.push(
+            balanceOf(
+              currentType,
+              currentId,
+              current,
+              currentType === 'supplier'
+                ? deliveries.get(currentId)
+                : undefined,
+            ),
+          );
       };
       await db.ledger_entries
         .orderBy('[party_type+party_id+created_at]')
@@ -247,6 +343,24 @@ export async function rebuildCaches(db: BikriDb): Promise<void> {
           current.push(entry);
         });
       flush();
+      // A supplier with only free deliveries has no ledger row; keep its date visible.
+      const seen = new Set(
+        balances
+          .filter((row) => row.party_type === 'supplier')
+          .map((row) => row.party_id),
+      );
+      for (const [supplierId, date] of deliveries) {
+        if (seen.has(supplierId)) continue;
+        balances.push({
+          party_type: 'supplier',
+          party_id: supplierId,
+          balance: 0,
+          last_activity_at: 0,
+          oldest_unpaid_at: null,
+          last_payment_at: null,
+          last_delivery_date: date,
+        });
+      }
       await db.party_balances.bulkPut(balances);
     },
   );

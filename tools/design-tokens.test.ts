@@ -15,7 +15,7 @@ const ALLOW = new Set([
   'lib/palette.ts',
   'print/canvasRaster.ts',
   'print/receiptImage.ts',
-  'setup/logo.ts',
+  'lib/logo.ts',
   'styles/tokens.css',
 ]);
 

@@ -3,8 +3,8 @@ import { canvasFont, prepareCanvasFonts } from '../lib/canvasFont.ts';
 import { formatTimestamp } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
 import { CANVAS } from '../lib/palette.ts';
+import { shortDate } from '../lib/reportFormat.ts';
 import { canvasBlob, jpegToPdf } from '../print/receiptImage.ts';
-import { shortDate } from './format.ts';
 
 export type ReportFileLabels = {
   title: string;

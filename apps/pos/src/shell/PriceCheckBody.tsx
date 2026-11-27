@@ -6,6 +6,7 @@ import { useEffect, useId, useRef, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { ProductThumb } from '../components/ProductThumb.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { CartFullError, EmptyBundleError } from '../data/cart.ts';
 import { componentCost, loadBundleRecipe } from '../data/catalog.ts';
@@ -15,13 +16,12 @@ import {
   priceCard,
   priceCheck,
 } from '../data/priceCheck.ts';
-import { isLatinName, marginText, qtyWithUnit } from '../products/format.ts';
-import { ProductThumb } from '../products/ProductThumb.tsx';
+import { composing } from '../lib/hotkeys.ts';
+import { isLatinName, marginText, qtyWithUnit } from '../lib/productFormat.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { addProductToCart, useShopMoney } from '../sell/useSell.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { composing } from './hotkeys.ts';
 
 export function PriceCheckBody({ onClose }: { onClose: () => void }) {
   const { t } = useTranslation();

@@ -31,11 +31,11 @@ import {
 import { KeyBadge } from '../components/KeyBadge.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
+import { composing, dialogOpen, ignoresHotkey } from '../lib/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { useSession } from '../state/session.ts';
 import { loadDevicePrefs, togglePrivacyMode } from './devicePrefs.ts';
-import { composing, dialogOpen, ignoresHotkey } from './hotkeys.ts';
 
 const RECENT_KEY = 'bikri.recent_commands';
 

@@ -30,6 +30,16 @@ import {
   statementCsv,
 } from '../data/udhaar.ts';
 import { downloadText } from '../lib/download.ts';
+import { plainKey, useHotkey } from '../lib/hotkeys.ts';
+import {
+  ageLabel,
+  balanceTone,
+  dateText,
+  entryDescription,
+  entryDescriptionShort,
+  limitPercent,
+  shortDateText,
+} from '../lib/udhaarFormat.ts';
 import { useRecordBack } from '../peek/recordBack.ts';
 import { useOpenPeek } from '../peek/usePeekNavigation.ts';
 import { errorCode } from '../print/printService.ts';
@@ -40,22 +50,12 @@ import {
   openShareWindow,
 } from '../print/shareWindow.ts';
 import { useSellStore } from '../sell/sellStore.ts';
-import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { billVisible } from '../state/reportScope.ts';
 import { CustomerDialog } from './CustomerDialog.tsx';
 import { printCustomerStatement } from './creditPrint.ts';
-import {
-  ageLabel,
-  balanceTone,
-  dateText,
-  entryDescription,
-  entryDescriptionShort,
-  limitPercent,
-  shortDateText,
-} from './format.ts';
 import { PromiseDialog } from './PromiseDialog.tsx';
 import { ReceivePaymentDialog } from './ReceivePaymentDialog.tsx';
 

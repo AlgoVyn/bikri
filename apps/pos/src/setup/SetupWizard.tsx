@@ -24,6 +24,7 @@ import {
 import { CheckIcon } from '../components/icons.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
+import { ReceiptPreview } from '../components/ReceiptPreview.tsx';
 import { ShopIllustration } from '../components/ShopIllustration.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
@@ -42,11 +43,10 @@ import {
   saveSetupDraft,
 } from '../data/setup.ts';
 import { isLocale, setLanguage } from '../i18n/i18n.ts';
-import { composing } from '../shell/hotkeys.ts';
+import { composing } from '../lib/hotkeys.ts';
+import { type ProcessedLogo, processLogo } from '../lib/logo.ts';
 import { useSession } from '../state/session.ts';
-import { type ProcessedLogo, processLogo } from './logo.ts';
 import { PinBoxes } from './PinBoxes.tsx';
-import { ReceiptPreview } from './ReceiptPreview.tsx';
 
 type Step = 0 | 1 | 2 | 3 | 4;
 type Errors = Record<string, string>;

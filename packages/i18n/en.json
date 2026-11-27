@@ -249,16 +249,6 @@
     "cost_tracked_hint": "Cost is updated by deliveries and stock movements. To edit it, turn off stock tracking first.",
     "unit_stock_fractional": "Adjust the fractional stock with a stock count before switching to this unit."
   },
-  "glossary": {
-    "baqaya": "Balance",
-    "bill": "Bill",
-    "kharcha": "Expense",
-    "khata": "Ledger",
-    "rozana_hisaab": "Day close",
-    "supplier": "Supplier",
-    "udhaar": "Credit",
-    "wapsi": "Refund"
-  },
   "home": {
     "steps_progress": "{{done}} of {{total}} done",
     "add_product": "Add product",

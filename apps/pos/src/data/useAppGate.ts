@@ -1,6 +1,6 @@
 import type { BikriDb } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { getDb, NoActiveTenantError } from './db.ts';
 import { ensureLocalTenant } from './localTenant.ts';
 import { isSetupDone } from './setup.ts';
@@ -43,23 +43,41 @@ export type GateInfo = {
 };
 
 export function useAppGate(): GateInfo {
-  const [db, setDb] = useState<BikriDb | null>(null);
-  const [noTenant, setNoTenant] = useState(false);
-  useEffect(() => {
+  // Open the cached tenant database during the first render, not after an effect tick:
+  // the gate can start its setup/status reads immediately and the app does not flash a
+  // loading screen while the event loop delivers an already-available Dexie handle.
+  const [initial] = useState<{ db: BikriDb | null; noTenant: boolean }>(() => {
     try {
-      const opened = getDb();
-      void ensureLocalTenant(opened).then(() => setDb(opened));
+      return { db: getDb(), noTenant: false };
     } catch (error) {
       if (!(error instanceof NoActiveTenantError)) throw error;
-      setNoTenant(true);
+      return { db: null, noTenant: true };
     }
-  }, []);
+  });
+  const { db, noTenant } = initial;
+  // The dev shop's stand-in rows are still created asynchronously on first launch; every
+  // enrolled shop is ready as soon as getDb() returns.
+  const [ready, setReady] = useState(
+    () => db === null || db.tenantId !== DEV_TENANT_ID,
+  );
+  useEffect(() => {
+    if (!db || db.tenantId !== DEV_TENANT_ID) return;
+    let live = true;
+    void ensureLocalTenant(db)
+      .catch(() => undefined)
+      .finally(() => {
+        if (live) setReady(true);
+      });
+    return () => {
+      live = false;
+    };
+  }, [db]);
   const done = useLiveQuery(
-    async () => (db ? isSetupDone(db) : undefined),
-    [db],
+    async () => (db && ready ? isSetupDone(db) : undefined),
+    [db, ready],
   );
   const device = useLiveQuery(async () => {
-    if (!db) return undefined;
+    if (!db || !ready) return undefined;
     const [token, revoked, tenant, setup, pending] = await Promise.all([
       db.kv.get('device_token'),
       db.kv.get('revoked'),
@@ -76,26 +94,34 @@ export function useAppGate(): GateInfo {
         (tenant?.value as { display_name?: string } | undefined)
           ?.display_name ?? null,
     };
-  }, [db]);
-  const none = {
-    revoked: false,
-    enrolled: false,
-    setupCompleted: false,
-    initialSyncPending: false,
-    shopName: null,
-  };
-  if (noTenant) return { gate: 'enrol', db: null, ...none };
-  if (!db || done === undefined || device === undefined)
-    return { gate: 'loading', db, ...none };
-  return {
-    gate: appGate({
-      done,
-      enrolled: device.enrolled,
-      devTenant: db.tenantId === DEV_TENANT_ID,
-      setupCompleted: device.setupCompleted,
-      initialSyncPending: device.initialSyncPending,
+  }, [db, ready]);
+  const gate: AppGate = noTenant
+    ? 'enrol'
+    : !db || !ready || done === undefined || device === undefined
+      ? 'loading'
+      : appGate({
+          done,
+          enrolled: device.enrolled,
+          devTenant: db.tenantId === DEV_TENANT_ID,
+          setupCompleted: device.setupCompleted,
+          initialSyncPending: device.initialSyncPending,
+        });
+  const revoked = !noTenant && device?.revoked === true;
+  const enrolled = !noTenant && device?.enrolled === true;
+  const initialSyncPending = !noTenant && device?.initialSyncPending === true;
+  const shopName = noTenant ? null : (device?.shopName ?? null);
+  // `db.kv` emits a fresh object on every write (sync timestamps, invoice counters).
+  // Keep the gate value stable unless one of its fields actually changed, so a kv
+  // write does not invalidate every consumer of this hook.
+  return useMemo(
+    () => ({
+      gate,
+      db: noTenant ? null : db,
+      revoked,
+      enrolled,
+      initialSyncPending,
+      shopName,
     }),
-    db,
-    ...device,
-  };
+    [gate, db, noTenant, revoked, enrolled, initialSyncPending, shopName],
+  );
 }

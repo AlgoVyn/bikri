@@ -63,14 +63,8 @@ import {
 } from '../data/useShopTimeZone.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
+import { useHotkey } from '../lib/hotkeys.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
-import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
-import { useSellStore } from '../sell/sellStore.ts';
-import { useHotkey } from '../shell/hotkeys.ts';
-import { useCurrentStaff } from '../state/currentStaff.ts';
-import { useReadOnly } from '../state/readOnly.ts';
-import { cashierTodayOnly, quoteVisible } from '../state/reportScope.ts';
-import { BackdateDialog } from './BackdateDialog.tsx';
 import {
   dayHeading,
   methodLabel,
@@ -78,10 +72,57 @@ import {
   statusLabel,
   statusTone,
   timeText,
-} from './format.ts';
-import type { SalesWorkerResponse } from './salesWorker.ts';
+} from '../lib/salesFormat.ts';
+import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
+import { useSellStore } from '../sell/sellStore.ts';
+import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
+import { cashierTodayOnly, quoteVisible } from '../state/reportScope.ts';
+import { BackdateDialog } from './BackdateDialog.tsx';
+import type { SalesWorkerRequest, SalesWorkerResponse } from './salesWorker.ts';
 
 const PAGE = 50;
+
+/** Build the CSV in the history worker; a 50k-bill export must not freeze the till. */
+function exportCsvInWorker(
+  request: Omit<SalesWorkerRequest, 'page' | 'pageSize' | 'csv'>,
+): Promise<string> {
+  return new Promise((resolve, reject) => {
+    let worker: Worker;
+    try {
+      worker = new Worker(new URL('./salesWorker.ts', import.meta.url), {
+        type: 'module',
+      });
+    } catch (error) {
+      reject(error);
+      return;
+    }
+    const timer = window.setTimeout(() => {
+      worker.terminate();
+      reject(new Error('sales export worker timed out'));
+    }, 60_000);
+    const finish = () => {
+      window.clearTimeout(timer);
+      worker.terminate();
+    };
+    worker.onmessage = (event: MessageEvent<SalesWorkerResponse>) => {
+      if (event.data.id !== request.id) return;
+      finish();
+      if (event.data.csv !== undefined) resolve(event.data.csv);
+      else reject(new Error(event.data.error ?? 'empty sales export'));
+    };
+    worker.onerror = (event) => {
+      finish();
+      reject(new Error(event.message || 'sales export worker failed'));
+    };
+    worker.postMessage({
+      ...request,
+      page: 0,
+      pageSize: 1,
+      csv: true,
+    } satisfies SalesWorkerRequest);
+  });
+}
 const SALES_PRESETS: SalesPreset[] = [
   'today',
   'yesterday',
@@ -238,7 +279,7 @@ function SalesListContent({
         db.customers.toCollection().first(),
         db.staff.toCollection().first(),
         db.devices.toCollection().first(),
-        db.kv.toCollection().first(),
+        db.kv.get('device'),
       ]);
       // A clock can return the same millisecond twice; a counter is strictly increasing.
       dataVersionRef.current += 1;
@@ -309,6 +350,7 @@ function SalesListContent({
   } | null>(null);
   const workerRef = useRef<Worker | null>(null);
   const requestId = useRef(0);
+  const exportId = useRef(0);
   const [workerFailed, setWorkerFailed] = useState(false);
 
   useEffect(() => {
@@ -483,8 +525,21 @@ function SalesListContent({
         sort,
         direction,
       };
-      const full = await salesHistory(getDb(), filter);
-      downloadText('bikri-sales.csv', salesCsv(full.rows, timeZone));
+      try {
+        const csv = await exportCsvInWorker({
+          id: ++exportId.current,
+          tenantId: getDb().tenantId,
+          range: { from: range.from, to: range.to },
+          filter,
+          version: dataVersion,
+          timeZone,
+        });
+        downloadText('bikri-sales.csv', csv);
+      } catch {
+        // A browser without module workers keeps the main-thread export.
+        const full = await salesHistory(getDb(), filter);
+        downloadText('bikri-sales.csv', salesCsv(full.rows, timeZone));
+      }
     } catch {
       toast.push(t('errors.generic'), 'error');
     }
@@ -499,6 +554,7 @@ function SalesListContent({
     branchId,
     sort,
     direction,
+    dataVersion,
     timeZone,
     toast,
     t,

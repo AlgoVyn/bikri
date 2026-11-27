@@ -1,7 +1,8 @@
 // CI contrast check (docs/08-ux-guidelines.md §2): every documented token pair must meet its
 // WCAG 2.2 AA threshold. Run with `pnpm contrast:check` (Node 24 strips the types).
 import { readFileSync } from 'node:fs';
-import { contrastRatio, tokenPairs } from '@bikri/core';
+import { contrastRatio } from '@bikri/core';
+import { tokenPairs } from '../packages/core/src/tokenPairs.ts';
 
 const tokensCss = readFileSync(
   new URL('../apps/pos/src/styles/tokens.css', import.meta.url),

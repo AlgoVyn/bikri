@@ -12,5 +12,6 @@ export function registerAppUpdate(): void {
       });
     },
   });
-  startUpdateChecks();
+  // The registration itself fetches sw.js; do not immediately fetch it a second time.
+  startUpdateChecks({ skipStartupCheck: true });
 }

@@ -1,4 +1,5 @@
-import { createFakeRasterRenderer, paperRuler } from '@bikri/printer';
+import { paperRuler } from '@bikri/printer';
+import { createFakeRasterRenderer } from '@bikri/printer/testing';
 import { afterEach, describe, expect, it } from 'vitest';
 import {
   logDrawerOpen,
@@ -216,6 +217,25 @@ describe('transports (06 §10)', () => {
     await printTestPage(db, usbPrinter(), { usb, serial: null, renderer });
     expect(usb.device.sent.length).toBeGreaterThan(1);
     expect(usb.device.sent.every((c) => c.length <= 4096)).toBe(true);
+  });
+
+  it('chunks serial writes at 4096 bytes with the same deadline', async () => {
+    const serial = fakeSerial();
+    const big = new Uint8Array(10_000).fill(7);
+    await sendSerial(
+      serial.port,
+      big,
+      { baudRate: 115200, flowControl: 'none' },
+      5000,
+    );
+    expect(serial.port.sent.map((chunk) => chunk.length)).toEqual([
+      4096, 4096, 1808,
+    ]);
+    expect(joined(serial.port.sent)).toEqual(big);
+    // A successful chunked send still leaves the port open and unlocked.
+    expect(serial.port.locked).toBe(false);
+    expect(serial.port.events).not.toContain('abort');
+    expect(serial.port.events).not.toContain('close');
   });
 
   it('serializes concurrent sends to one USB device', async () => {

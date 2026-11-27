@@ -249,16 +249,6 @@
     "cost_tracked_hint": "Laagat delivery aur stock movements se update hoti hai. Ise edit karne ke liye pehle stock tracking band karein.",
     "unit_stock_fractional": "Is unit par jane se pehle fractional stock ko stock count se adjust karein."
   },
-  "glossary": {
-    "baqaya": "Baqaya",
-    "bill": "Bill",
-    "kharcha": "Kharcha",
-    "khata": "Khata",
-    "rozana_hisaab": "Rozana hisaab",
-    "supplier": "Supplier",
-    "udhaar": "Udhaar",
-    "wapsi": "Wapsi"
-  },
   "home": {
     "steps_progress": "{{done}} / {{total}} mukammal",
     "add_product": "Product shamil karein",

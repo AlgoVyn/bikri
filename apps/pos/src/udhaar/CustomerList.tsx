@@ -23,25 +23,26 @@ import {
   customersCsv,
   defaultCustomerSortDirection,
   filterCustomerList,
-  loadCustomerListData,
+  loadCustomerMonthPayments,
+  loadCustomerRows,
   refreshPromises,
 } from '../data/udhaar.ts';
 import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { downloadText } from '../lib/download.ts';
+import { plainKey, useHotkey } from '../lib/hotkeys.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { type SortDirection, toggleSortDirection } from '../lib/sort.ts';
-import { plainKey, useHotkey } from '../shell/hotkeys.ts';
-import { useCurrentStaff } from '../state/currentStaff.ts';
-import { useReadOnly } from '../state/readOnly.ts';
-import { CustomerDialog } from './CustomerDialog.tsx';
 import {
   ageLabel,
   balanceLabel,
   balanceTone,
   dateText,
   limitPercent,
-} from './format.ts';
+} from '../lib/udhaarFormat.ts';
+import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
+import { CustomerDialog } from './CustomerDialog.tsx';
 
 const selectClass =
   'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
@@ -88,23 +89,28 @@ export function UdhaarList({
     }).catch(() => undefined);
   }, [canEditPromises, staff?.id, today]);
 
-  // Load the directory once per change; a keystroke only filters/sorts in memory.
-  const directory = useLiveQuery(
-    () => loadCustomerListData(getDb(), today),
+  // The directory and the month's payments are separate live queries: a cash sale
+  // must not make the customer list re-read every balance.
+  const rows = useLiveQuery(() => loadCustomerRows(getDb()), []);
+  const payments = useLiveQuery(
+    () => loadCustomerMonthPayments(getDb(), today),
     [today],
   );
   const data = useMemo(
     () =>
-      directory
-        ? filterCustomerList(directory, {
-            query: deferredQuery,
-            filter,
-            sort,
-            direction,
-            today,
-          })
+      rows && payments
+        ? filterCustomerList(
+            { rows, payments },
+            {
+              query: deferredQuery,
+              filter,
+              sort,
+              direction,
+              today,
+            },
+          )
         : undefined,
-    [directory, deferredQuery, filter, sort, direction, today],
+    [rows, payments, deferredQuery, filter, sort, direction, today],
   );
 
   const [page, setPage] = useState(0);

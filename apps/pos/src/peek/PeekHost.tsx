@@ -17,7 +17,7 @@ import { getDb } from '../data/db.ts';
 import { useAreaStrings } from '../i18n/areas.tsx';
 import { categoryName } from '../lib/category.ts';
 import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
-import { isLatinName } from '../products/format.ts';
+import { isLatinName } from '../lib/productFormat.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { billVisible, quoteVisible } from '../state/reportScope.ts';
 import {

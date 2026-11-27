@@ -1,7 +1,7 @@
 import { formatQtyFromMilli } from '@bikri/core';
 import type { TFunction } from 'i18next';
 import type { SaleMethod, SaleStatus } from '../data/salesHistory.ts';
-import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
+import { formatBusinessDate, formatTimestamp } from './date.ts';
 
 export const METHOD_KEYS: Record<SaleMethod, string> = {
   cash: 'payment.cash',

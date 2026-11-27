@@ -15,7 +15,9 @@ import {
   waLink,
 } from '../data/receipt.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { saleChime } from '../lib/beep.ts';
 import { formatBusinessDate } from '../lib/date.ts';
+import { ignoresHotkey } from '../lib/hotkeys.ts';
 import { formatShopMoney } from '../lib/money';
 import {
   closeShareWindow,
@@ -23,9 +25,7 @@ import {
   openShareWindow,
 } from '../print/shareWindow.ts';
 import { loadDevicePrefs } from '../shell/devicePrefs.ts';
-import { ignoresHotkey } from '../shell/hotkeys.ts';
 import { useShopName } from '../shell/TopBarParts.tsx';
-import { saleChime } from './beep.ts';
 import type { Done } from './PayDialog.tsx';
 
 /** Keys closer together than this are a barcode scanner, not a person (05-sell scanner rule). */

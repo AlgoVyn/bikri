@@ -10,6 +10,8 @@ import {
   DEXIE_SCHEMA_V10,
   DEXIE_SCHEMA_V12,
   DEXIE_SCHEMA_V17,
+  DEXIE_SCHEMA_V18,
+  DEXIE_SCHEMA_VERSION,
   deleteTenantDb,
   LOCAL_ONLY_TABLES,
   openTenantDb,
@@ -41,7 +43,7 @@ describe('Dexie schema (02 §3)', () => {
   });
 
   it('has every synced table plus devices, sync_conflicts and the local-only tables', () => {
-    const tables = Object.keys(DEXIE_SCHEMA_V17).sort();
+    const tables = Object.keys(DEXIE_SCHEMA_V18).sort();
     expect(tables).toEqual(
       [
         ...MASTER_TABLES,
@@ -130,6 +132,48 @@ describe('Dexie schema (02 §3)', () => {
     db.close();
   });
 
+  it('V18 drops unqueried indexes, adds the conflict lookup and backfills supplier delivery dates', async () => {
+    const old = new Dexie(tenantDbName('upgrade-v18'));
+    old.version(17).stores(DEXIE_SCHEMA_V17);
+    await old.open();
+    await old.table('purchases').bulkAdd([
+      { id: 'p1', supplier_id: 's1', business_date: '2026-10-01' },
+      { id: 'p2', supplier_id: 's1', business_date: '2026-10-05' },
+      { id: 'p3', supplier_id: 's2', business_date: '2026-10-02' },
+    ]);
+    await old.table('party_balances').add({
+      party_type: 'supplier',
+      party_id: 's1',
+      balance: 100,
+      last_activity_at: 1,
+      oldest_unpaid_at: 1,
+    });
+    old.close();
+
+    const db = open('upgrade-v18');
+    await db.open();
+    expect(await db.party_balances.get(['supplier', 's1'])).toMatchObject({
+      balance: 100,
+      last_delivery_date: '2026-10-05',
+    });
+    // A supplier with only free deliveries has no ledger row; the cache still names it.
+    expect(await db.party_balances.get(['supplier', 's2'])).toMatchObject({
+      balance: 0,
+      last_delivery_date: '2026-10-02',
+    });
+    const names = (table: string) =>
+      db.table(table).schema.indexes.map((index) => index.name);
+    expect(names('payments')).not.toContain('[party_type+party_id]');
+    expect(names('supplier_returns')).not.toContain('[supplier_id+created_at]');
+    expect(names('product_barcodes')).not.toContain('deleted_at');
+    expect(names('bundle_items')).not.toContain('deleted_at');
+    expect(names('file_queue')).not.toContain('created_at');
+    expect(names('file_queue')).toContain('[status+created_at]');
+    expect(names('sync_conflicts')).toContain('[tbl+row_id]');
+    expect(names('sync_conflicts')).toContain('resolution');
+    expect(db.verno).toBe(DEXIE_SCHEMA_VERSION);
+  });
+
   it('upgrades a V12 database: repairs refund lines pulled without a date', async () => {
     const old = new Dexie(tenantDbName('upgrade-v12'));
     old.version(12).stores(DEXIE_SCHEMA_V12);
@@ -148,7 +192,7 @@ describe('Dexie schema (02 §3)', () => {
     const db = open('upgrade-v12');
     await db.open();
     expect((await db.refund_lines.get('l1'))?.business_date).toBe('2026-10-27');
-    expect(db.verno).toBe(17);
+    expect(db.verno).toBe(DEXIE_SCHEMA_VERSION);
   });
 
   it('upgrades a V9 database: backfills refund line dates from their refunds', async () => {

@@ -17,6 +17,7 @@ import {
 } from '../components/classes.ts';
 import { ChevronLeftIcon, ChevronRightIcon } from '../components/icons.tsx';
 import { useMasterDetailWide } from '../components/MasterDetail.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading';
@@ -39,6 +40,15 @@ import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { VoidNotAllowedError, voidBlocker, voidSale } from '../data/voids.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { formatBusinessDate, formatTimestamp } from '../lib/date';
+import { plainKey, useHotkey } from '../lib/hotkeys.ts';
+import { isLatinName } from '../lib/productFormat.ts';
+import {
+  METHOD_KEYS,
+  type ReasonKey,
+  statusLabel,
+  statusTone,
+  VOID_REASONS,
+} from '../lib/salesFormat.ts';
 import { useRecordBack } from '../peek/recordBack.ts';
 import { useOpenPeek } from '../peek/usePeekNavigation.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
@@ -47,21 +57,11 @@ import {
   navigateShareWindow,
   openShareWindow,
 } from '../print/shareWindow.ts';
-import { isLatinName } from '../products/format.ts';
-import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
-import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { billVisible } from '../state/reportScope.ts';
 import { ApprovalDialog } from './ApprovalDialog.tsx';
-import {
-  METHOD_KEYS,
-  type ReasonKey,
-  statusLabel,
-  statusTone,
-  VOID_REASONS,
-} from './format.ts';
 
 /** One entry of the bill's "More" menu; the component supplies the label and action. */
 export type BillAction = { kind: 'refund' | 'void' | 'reissue' };
@@ -105,6 +105,7 @@ export function BillDetail({
   const [voidOpen, setVoidOpen] = useState(false);
   const [reissueOpen, setReissueOpen] = useState(false);
   const [auditOpen, setAuditOpen] = useState(false);
+  const [busy, setBusy] = useState(false);
   const [approving, setApproving] = useState<'void' | 'reissue' | null>(null);
   const [pendingApproval, setPendingApproval] = useState<{
     mode: 'void' | 'reissue';
@@ -145,7 +146,8 @@ export function BillDetail({
   };
 
   const share = async () => {
-    if (!data) return;
+    if (!data || busy) return;
+    setBusy(true);
     const shareWindow = openShareWindow();
     try {
       const { saleReceipt, receiptPng, downloadBlob } = await import(
@@ -187,11 +189,14 @@ export function BillDetail({
       closeShareWindow(shareWindow);
       if ((err as Error).name !== 'AbortError')
         toast.push(t('done.share_failed'), 'error');
+    } finally {
+      setBusy(false);
     }
   };
 
   const pdf = async () => {
-    if (!data) return;
+    if (!data || busy) return;
+    setBusy(true);
     try {
       const { saleReceipt, receiptPdf, downloadBlob } = await import(
         '../print/receiptFiles.ts'
@@ -200,6 +205,8 @@ export function BillDetail({
       if (r) downloadBlob(await receiptPdf(r), `${r.input.sale.invoiceNo}.pdf`);
     } catch {
       toast.push(t('done.share_failed'), 'error');
+    } finally {
+      setBusy(false);
     }
   };
 

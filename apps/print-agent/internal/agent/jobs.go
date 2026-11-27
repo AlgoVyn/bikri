@@ -16,6 +16,10 @@ import (
 const (
 	maxJobs  = 100
 	maxJobID = 80
+	// statusPollTTL coalesces the till's 100 ms status polls. A CUPS poll runs
+	// one or two `lpstat` subprocesses; five polls per second per job was pure
+	// process churn for a state the spooler updates far more slowly (L11).
+	statusPollTTL = 200 * time.Millisecond
 )
 
 var jobIDPattern = regexp.MustCompile(`^[A-Za-z0-9._-]{1,80}$`)
@@ -47,6 +51,10 @@ type JobStatus struct {
 type jobRecord struct {
 	JobStatus
 	spoolID string
+	// polledAt is the last completed backend status poll; polling is the
+	// in-flight poll shared by every concurrent Get for this job (L11).
+	polledAt time.Time
+	polling  chan struct{}
 }
 
 // Manager keeps recent jobs in memory and delegates the OS work to a Backend.
@@ -150,13 +158,18 @@ func (m *Manager) Submit(ctx context.Context, req *JobRequest) (*JobStatus, erro
 	}
 	// Driver mode sends a PNG to the OS driver. Check the IHDR centrally before
 	// any backend decodes it: CUPS hands the file to a filter, so validating only
-	// in the Windows path left Linux/macOS open to decompression bombs.
+	// in the Windows path left Linux/macOS open to decompression bombs. The
+	// validated dimensions travel with the job so the backend does not decode
+	// the header a second time (L11).
+	imageWidth, imageHeight := 0, 0
 	if req.Mode == "driver" {
-		if err := backend.ValidatePNG(data); err != nil {
+		width, height, err := backend.ImageConfig(data)
+		if err != nil {
 			code, detail := backendError(err)
 			m.update(rec, "failed", code, detail)
 			return m.copy(rec), nil
 		}
+		imageWidth, imageHeight = width, height
 	}
 	unlock, err := m.lockPrinter(ctx, req.Printer)
 	if err != nil {
@@ -177,16 +190,23 @@ func (m *Manager) Submit(ctx context.Context, req *JobRequest) (*JobStatus, erro
 	if copies < 1 {
 		copies = 1
 	}
-	spoolID, printErr := m.backend.Print(ctx, backend.Job{
-		ID:        req.JobID,
-		Printer:   req.Printer,
-		Mode:      req.Mode,
-		PaperMM:   req.PaperMM,
-		WidthDots: req.WidthDots,
-		Copies:    copies,
-		Encoding:  req.Encoding,
-		Data:      data,
-	})
+	printJob := &backend.Job{
+		ID:          req.JobID,
+		Printer:     req.Printer,
+		Mode:        req.Mode,
+		PaperMM:     req.PaperMM,
+		WidthDots:   req.WidthDots,
+		Copies:      copies,
+		Encoding:    req.Encoding,
+		Data:        data,
+		ImageWidth:  imageWidth,
+		ImageHeight: imageHeight,
+	}
+	// The backend owns the payload now. Dropping this reference means a driver
+	// backend can nil its own copy after decoding and let the encoded PNG be
+	// collected while the spooler runs (M17.3).
+	data = nil
+	spoolID, printErr := m.backend.Print(ctx, printJob)
 	if printErr != nil {
 		code, detail := backendError(printErr)
 		m.update(rec, "failed", code, detail)
@@ -225,6 +245,8 @@ func (m *Manager) Submit(ctx context.Context, req *JobRequest) (*JobStatus, erro
 }
 
 // Get refreshes and returns a job's status. Terminal jobs are not polled again.
+// Concurrent polls for one job share a single backend call, and a short cache
+// absorbs the till's 100 ms polling cadence (L11).
 func (m *Manager) Get(ctx context.Context, id string) (*JobStatus, bool) {
 	m.mu.Lock()
 	rec := m.jobs[id]
@@ -237,17 +259,50 @@ func (m *Manager) Get(ctx context.Context, id string) (*JobStatus, bool) {
 		m.mu.Unlock()
 		return &copy, true
 	}
+	if rec.polling != nil {
+		// Another request is already asking the OS. Wait for its answer instead
+		// of spawning a second `lpstat`/GetJob for the same job.
+		done := rec.polling
+		m.mu.Unlock()
+		select {
+		case <-done:
+		case <-ctx.Done():
+		}
+		return m.GetNoPoll(id)
+	}
 	printer, spoolID := rec.Printer, rec.spoolID
 	if spoolID == "" && (rec.Status == "received" || rec.Status == "queued") {
 		copy := rec.JobStatus
 		m.mu.Unlock()
 		return &copy, true
 	}
+	if !rec.polledAt.IsZero() &&
+		m.now().Sub(rec.polledAt) < statusPollTTL {
+		copy := rec.JobStatus
+		m.mu.Unlock()
+		return &copy, true
+	}
+	done := make(chan struct{})
+	rec.polling = done
 	m.mu.Unlock()
 
-	status, err := m.backend.Status(ctx, printer, spoolID)
-	if err != nil {
+	var status backend.Status
+	var err error
+	defer func() {
+		// Always release every waiter, even if a backend panics; otherwise the
+		// record would stay "polling" and later Get calls would block forever.
 		m.mu.Lock()
+		rec.polledAt = m.now()
+		if rec.polling == done {
+			rec.polling = nil
+		}
+		m.mu.Unlock()
+		close(done)
+	}()
+
+	status, err = m.backend.Status(ctx, printer, spoolID)
+	m.mu.Lock()
+	if err != nil {
 		// A retry may have replaced the record while the spooler was polled, and
 		// a cancel may have made this attempt terminal. Neither may receive the
 		// stale poll's error detail.
@@ -258,7 +313,6 @@ func (m *Manager) Get(ctx context.Context, id string) (*JobStatus, bool) {
 		m.mu.Unlock()
 		return m.GetNoPoll(id)
 	}
-	m.mu.Lock()
 	// A cancel that landed while the spooler was polled is terminal: do not
 	// overwrite "canceled" with a spooler snapshot ("printing"/"done"). The
 	// pointer check also keeps a retry's new attempt untouched.
@@ -455,18 +509,27 @@ func installedPrinter(printers []backend.Printer, name string) bool {
 }
 
 func decodeData(text string) ([]byte, error) {
-	encodings := []*base64.Encoding{
-		base64.StdEncoding,
-		base64.RawStdEncoding,
-		base64.URLEncoding,
-		base64.RawURLEncoding,
+	// Pick the alphabet and padding from the text instead of running four
+	// decoders and allocating an error on each failure (L11). The std and URL
+	// alphabets only differ in +/ vs -_, so the choice is unambiguous.
+	urlSafe := strings.ContainsAny(text, "-_")
+	padded := strings.Contains(text, "=")
+	var encoding *base64.Encoding
+	switch {
+	case urlSafe && padded:
+		encoding = base64.URLEncoding
+	case urlSafe:
+		encoding = base64.RawURLEncoding
+	case padded:
+		encoding = base64.StdEncoding
+	default:
+		encoding = base64.RawStdEncoding
 	}
-	for _, enc := range encodings {
-		if data, err := enc.DecodeString(text); err == nil {
-			return data, nil
-		}
+	data, err := encoding.DecodeString(text)
+	if err != nil {
+		return nil, errors.New("data is not valid base64")
 	}
-	return nil, errors.New("data is not valid base64")
+	return data, nil
 }
 
 func backendError(err error) (code, detail string) {

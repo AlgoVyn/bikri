@@ -8,6 +8,7 @@ import {
 import { Hono, type MiddlewareHandler } from 'hono';
 import { z } from 'zod';
 import { type TenantDb, tenantDb } from '../db/tenantDb.ts';
+import { tenantDeleteChunkSql } from '../db/tenantDelete.ts';
 import { ApiError } from '../errors.ts';
 import type { OperatorVars } from '../middleware/accessAuth.ts';
 import { readJsonBody, readOptionalJsonBody } from '../middleware/body.ts';
@@ -32,7 +33,7 @@ import {
   type ShopRequestStatus,
 } from '../platform/shopRequests.ts';
 import {
-  accountOverview,
+  endSupportStatement,
   listTenants,
   maskEmail,
   patchTenantStatement,
@@ -42,7 +43,7 @@ import {
   supportStatement,
   tenantById,
   tenantBySlug,
-  usageHistory,
+  usagePage,
 } from '../platform/tenantAdmin.ts';
 import { auditStatements } from '../sync/audit.ts';
 import { changeLogStatement } from '../sync/changeLog.ts';
@@ -117,9 +118,8 @@ export async function listBackupObjects(
 
 admin.get('/usage', async (c) => {
   const now = Date.now();
-  const [overview, list, backups] = await Promise.all([
-    accountOverview(c.env, now),
-    listTenants(c.env, now),
+  const [page, backups] = await Promise.all([
+    usagePage(c.env, now),
     listBackupObjects(c.env.BACKUPS, 'd1/'),
   ]);
   const last = backups.sort(
@@ -127,8 +127,12 @@ admin.get('/usage', async (c) => {
   )[0];
   return c.json({
     email: c.var.operator,
-    ...overview,
-    open_conflicts: list.tenants
+    db_size_bytes: page.db_size_bytes,
+    today: page.today,
+    tenants_by_status: page.tenants_by_status,
+    budget_total: page.budget_total,
+    budget_alert: page.budget_alert,
+    open_conflicts: page.tenants
       .filter((tenant) => tenant.conflicts > 0)
       .map((tenant) => ({
         tenant_id: tenant.id,
@@ -137,7 +141,7 @@ admin.get('/usage', async (c) => {
     last_backup: last
       ? { key: last.key, size: last.size, uploaded: last.uploaded.getTime() }
       : null,
-    over_80: list.tenants
+    over_80: page.tenants
       .filter(
         (t) =>
           t.daily_write_budget > 0 &&
@@ -315,7 +319,7 @@ async function fresh(env: Env, id: string): Promise<TenantRow> {
 admin.get('/tenants/:id', async (c) => {
   const { tenant, db } = c.var;
   const now = Date.now();
-  const [shop, history, counts] = await db.batch([
+  const [shop, history, counts, usageRows] = await db.batch([
     db.prepare(
       'SELECT name, setup_completed_at FROM shop WHERE tenant_id = ?1',
     ),
@@ -324,6 +328,10 @@ admin.get('/tenants/:id', async (c) => {
     ),
     db.prepare(
       "SELECT (SELECT COUNT(*) FROM devices WHERE tenant_id = ?1 AND revoked_at IS NULL) AS devices, (SELECT COUNT(*) FROM sync_conflicts WHERE tenant_id = ?1 AND resolution = 'needs_owner') AS conflicts",
+    ),
+    db.prepare(
+      'SELECT day, pushes, rows_written, rows_read FROM tenant_usage WHERE tenant_id = ?1 ORDER BY day DESC LIMIT ?2',
+      7,
     ),
   ]);
   const s = shop?.results?.[0] as
@@ -339,7 +347,14 @@ admin.get('/tenants/:id', async (c) => {
     setup_completed_at: s?.setup_completed_at ?? null,
     devices: n.devices ?? 0,
     open_conflicts: n.conflicts ?? 0,
-    usage: await usageHistory(c.env, tenant.id, 7),
+    usage: (
+      (usageRows?.results ?? []) as Array<{
+        day: string;
+        pushes: number;
+        rows_written: number;
+        rows_read: number;
+      }>
+    ).reverse(),
     status_history: (
       (history?.results ?? []) as { after_json: string; created_at: number }[]
     ).flatMap((r) => {
@@ -573,7 +588,7 @@ admin.post('/tenants/:id/support-access/end', async (c) => {
   if (tenant.support_until === null || tenant.support_until <= now)
     return c.json({ ended: false });
   await db.batch([
-    supportStatement(c.env, tenant.id, now, tenant.support_reason, now, 'set'),
+    endSupportStatement(c.env, tenant.id, now),
     db.prepare(
       "DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND kind = 'support' AND used_at IS NULL",
     ),
@@ -943,13 +958,11 @@ admin.post('/tenants/:id/purge', async (c) => {
     for (const where of passesFor(t)) {
       while (left > 0) {
         const limit = Math.min(left, PURGE_CHUNK);
-        // Descending rowid: a chained reissue (C replaces B replaces A) is created after
-        // the row it points at, so deleting children first avoids an immediate FK failure
-        // that would wedge the purge (API-M4).
-        const r = await db.run(
-          `DELETE FROM ${t} WHERE tenant_id = ?1 AND ${where} AND rowid IN (SELECT rowid FROM ${t} WHERE tenant_id = ?1 AND ${where} ORDER BY rowid DESC LIMIT ?2)`,
-          limit,
-        );
+        // Descending tenant-leading key: a chained reissue (C replaces B replaces A) is
+        // created after the row it points at, so deleting children first avoids an
+        // immediate FK failure that would wedge the purge (API-M4). The key page uses
+        // the tenant-leading index and never sorts the tenant's remaining rows (H8).
+        const r = await db.run(tenantDeleteChunkSql(t, where), limit);
         const changed = r.meta.changes ?? 0;
         left -= changed;
         deleted += changed;
