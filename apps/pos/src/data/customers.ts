@@ -47,6 +47,8 @@ export async function customerBalance(
 export type CustomerDirectory = {
   customers: MasterRow[];
   balances: Map<string, PartyBalance>;
+  /** Lowercased name and phone digits, built once per load rather than per keystroke. */
+  search: Map<string, { name: string; digits: string }>;
 };
 
 /** Every live customer and their cached balance, loaded once for a picker. */
@@ -60,9 +62,19 @@ export async function loadCustomerDirectory(
       .between(['customer', ''], ['customer', '\uffff'])
       .toArray(),
   ]);
+  const live = customers.filter((customer) => !customer.deleted_at);
   return {
-    customers: customers.filter((customer) => !customer.deleted_at),
+    customers: live,
     balances: new Map(balances.map((balance) => [balance.party_id, balance])),
+    search: new Map(
+      live.map((customer) => [
+        customer.id,
+        {
+          name: String(customer.name ?? '').toLowerCase(),
+          digits: String(customer.phone ?? '').replace(/\D/gu, ''),
+        },
+      ]),
+    ),
   };
 }
 
@@ -76,8 +88,9 @@ export function filterCustomers(
   const digits = q.replace(/\D/gu, '').replace(/^0+/u, '');
   const hits: CustomerHit[] = [];
   for (const customer of directory.customers) {
-    const name = String(customer.name ?? '').toLowerCase();
-    const phone = String(customer.phone ?? '').replace(/\D/gu, '');
+    const cached = directory.search.get(customer.id);
+    const name = cached?.name ?? '';
+    const phone = cached?.digits ?? '';
     const byName = q !== '' && q.split(/\s+/u).every((w) => name.includes(w));
     const byPhone = digits.length >= 3 && phone.includes(digits);
     if (q === '' || byName || byPhone)

@@ -1,4 +1,5 @@
 import type { TenantDb } from '../db/tenantDb.ts';
+import { endSupportStatement } from '../platform/tenantAdmin.ts';
 import type { DeviceRow, TenantRow } from '../types.ts';
 import { auditStatements } from './audit.ts';
 import { rowJsonExpr } from './tables.ts';
@@ -79,14 +80,18 @@ export function revokeSupportDeviceStatements(
  * `support_access_end` (ended_by 'expiry'), once (13 §7.5). Returns true when it ended access.
  */
 export async function endExpiredSupport(
+  env: Env,
   db: TenantDb,
   tenant: TenantRow,
   now: number,
 ): Promise<boolean> {
   if (tenant.support_until === null || tenant.support_until > now) return false;
-  const [revoked] = await db.batch(
-    revokeSupportDeviceStatements(db, now, true),
-  );
+  const [revoked] = await db.batch([
+    ...revokeSupportDeviceStatements(db, now, true),
+    // Clear the deadline in the same batch: leaving `support_until <= now` made every
+    // later `/api/me` rerun the revoke batch even after the devices were gone (M14).
+    endSupportStatement(env, tenant.id, now, true),
+  ]);
   if ((revoked?.meta.changes ?? 0) === 0) return false;
   await db.batch(
     auditStatements(db, {

@@ -12,6 +12,7 @@ import {
 import { DialogFooter } from '../components/DialogFooter.tsx';
 import { ChevronLeftIcon, ChevronRightIcon } from '../components/icons.tsx';
 import { useMasterDetailWide } from '../components/MasterDetail.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { OverrideDialog } from '../components/OverrideDialog.tsx';
 import {
@@ -36,6 +37,7 @@ import { useBusinessDates } from '../data/useBusinessDates.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { formatBusinessDate } from '../lib/date.ts';
+import { plainKey, useHotkey } from '../lib/hotkeys.ts';
 import { useRecordBack } from '../peek/recordBack.ts';
 import { useOpenPeek } from '../peek/usePeekNavigation.ts';
 import {
@@ -43,9 +45,7 @@ import {
   navigateShareWindow,
   openShareWindow,
 } from '../print/shareWindow.ts';
-import { Modal } from '../sell/Modal.tsx';
 import { useSellStore } from '../sell/sellStore.ts';
-import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useIsDesktop } from '../shell/useIsDesktop.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
@@ -244,6 +244,8 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
   };
 
   const doShare = async () => {
+    if (busy) return;
+    setBusy(true);
     const shareWindow = openShareWindow();
     try {
       const { quotationReceipt, receiptPng, downloadBlob } = await import(
@@ -288,10 +290,14 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
       closeShareWindow(shareWindow);
       if (err instanceof DOMException && err.name === 'AbortError') return;
       toast.push(t('office.quotations.share_failed'), 'error');
+    } finally {
+      setBusy(false);
     }
   };
 
   const doPdf = async () => {
+    if (busy) return;
+    setBusy(true);
     try {
       const { quotationReceipt, receiptPdf, downloadBlob } = await import(
         '../print/receiptFiles.ts'
@@ -301,6 +307,8 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
       downloadBlob(await receiptPdf(receipt), `${String(quote.quote_no)}.pdf`);
     } catch {
       toast.push(t('office.quotations.pdf_failed'), 'error');
+    } finally {
+      setBusy(false);
     }
   };
 

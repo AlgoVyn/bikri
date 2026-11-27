@@ -2,7 +2,6 @@
 export const packageName = '@bikri/printer';
 
 export { type EncodeOptions, encodeEscPos, qrModuleSizeFor } from './escpos.ts';
-export { createFakeRasterRenderer } from './fakeRaster.ts';
 export {
   calendarDaysBetween,
   fill,
@@ -87,7 +86,6 @@ export {
 } from './templates/quotation.ts';
 export { buildRefundReceipt } from './templates/refund.ts';
 export { buildSaleReceipt, type SaleReceiptInput } from './templates/sale.ts';
-export { saleBasicInput } from './templates/saleBasicFixture.ts';
 export { buildSupplierReturn } from './templates/supplierReturn.ts';
 export { buildTestPrint, type TestPrintInput } from './templates/testPrint.ts';
 export type {

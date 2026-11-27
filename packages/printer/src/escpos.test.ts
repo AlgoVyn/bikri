@@ -2,20 +2,22 @@ import { existsSync, readFileSync, writeFileSync } from 'node:fs';
 import { dirname, join } from 'node:path';
 import { fileURLToPath } from 'node:url';
 import { describe, expect, it } from 'vitest';
+import { createFakeRasterRenderer } from './fakeRaster.ts';
 import { toHexLines } from './golden.ts';
 import {
   type Block,
   buildRefundReceipt,
   buildSaleReceipt,
   buildTestPrint,
-  createFakeRasterRenderer,
   type EncodeOptions,
   encodeEscPos,
+  encodeGsV0,
+  packMono,
   type RasterSource,
   renderReceiptText,
   resolvePaper,
-  saleBasicInput,
 } from './index.ts';
+import { saleBasicInput } from './templates/saleBasicFixture.ts';
 
 // 06 §10: byte-exact goldens for sale-basic at 80 and 58 mm, plus an Urdu (all-raster) receipt.
 // Regenerate deliberately with UPDATE_GOLDEN=1 and review the diff.
@@ -305,6 +307,25 @@ describe('ESC/POS commands (06 §3)', () => {
     expect(
       indexOf(encodeSale(58), [0x1d, 0x76, 0x30, 0x00, 48, 0]),
     ).toBeGreaterThan(0);
+  });
+
+  it('writes multi-band images directly with the encodeGsV0 bytes (M17.1)', () => {
+    const source: RasterSource = {
+      width: 8,
+      height: 600,
+      data: Uint8Array.from({ length: 8 * 600 }, (_, i) =>
+        Math.floor(i / 8) % 2 === 0 ? 0 : 255,
+      ),
+      format: 'gray',
+    };
+    const bytes = encodeEscPos([{ t: 'image', source }], {
+      charsPerLine: 48,
+      dots: 8,
+    });
+    // 13 bytes of init/code-page/margin/width precede the raster.
+    expect([...bytes.subarray(13)]).toEqual([
+      ...encodeGsV0(packMono(source, 'threshold')),
+    ]);
   });
 
   it('honours drawer pin 5, full cut and no cut', () => {

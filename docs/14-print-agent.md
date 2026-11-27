@@ -210,6 +210,7 @@ Base URL: `http://127.0.0.1:17890/v1`. JSON is UTF-8; binary payloads are base64
 States: `received → queued → spooled → printing → done | failed | canceled`.
 
 - Cancelling a job while the backend is still spooling marks it `canceled` (the backend cannot be cancelled yet because no spool id exists). When `Print` returns the spool id, the agent cancels that OS job immediately, so a receipt the till dropped is not printed. A cancel never overwrites a retry attempt that replaced the job record, and a status poll or backend error never resurrects a terminal state.
+- A repeated `GET /v1/jobs/{id}` poll is coalesced: concurrent requests for one job share a single backend status call, and a completed poll is served from a 200 ms cache. This keeps the till's 100 ms polling cadence from spawning an `lpstat` subprocess per request; terminal states are still read from memory and never polled again.
 - Windows: poll `GetJob`/`EnumJobs` and map `JOB_STATUS_PRINTED`, `JOB_STATUS_ERROR`, `JOB_STATUS_OFFLINE`, `JOB_STATUS_PAPEROUT`, `JOB_STATUS_USER_INTERVENTION`.
 - CUPS: parse `lpstat -W not-completed`; a job that is no longer in that list is treated as done (a failed job stays active with a reason). Polling `-W completed` was removed because its answer was ignored.
 - Direct TCP: `done` after the write; `failed` on a socket error; no physical confirmation.
@@ -261,13 +262,14 @@ States: `received → queued → spooled → printing → done | failed | cancel
 
 - Go `golang.org/x/sys/windows` + `syscall.NewLazyDLL("winspool.drv")` for `OpenPrinter`, `StartDocPrinter`, `WritePrinter`, `EndDocPrinter`, `EnumPrinters`, `GetJob`, `SetJob`.
 - GDI (`gdi32.dll`) for image mode: `CreateDC`, `StartDoc`, `StartPage`, `StretchDIBits`, `EndPage`, `EndDoc`, `DeleteDC`.
+- Blocking Win32 calls cannot be interrupted by a Go context, but the agent checks the deadline before and after `OpenPrinterW`, `WritePrinter`, `CreateDCW`, `StretchDIBits` and `EndDoc`. When a call returns after the deadline it aborts the spool page/document and returns the context error instead of continuing; a successful `EndDoc` is never rolled back because that would make the till print the receipt twice. Printer locks are released on every path. The driver-image path drops the decoded image and the encoded PNG as soon as the RGBA composite exists, so only that one buffer stays live during spooling.
 - Installer: per-user Inno Setup or MSI; Start Menu shortcut; optional `HKCU\Software\Microsoft\Windows\CurrentVersion\Run` autostart. A Windows service (`x/sys/windows/svc`) is a later option for unattended/multi-user tills.
 - Code signing: Authenticode (OV/EV) to avoid SmartScreen warnings.
 - Ports: loopback only; no firewall rule.
 
 ### 8.2 Linux
 
-- CUPS: `lpstat -e` for queues, `lpstat -p -d` for default, `lpoptions -p <queue> -l` for media/options.
+- CUPS: `lpstat -e` for queues, `lpstat -p -d` for default, `lpoptions -p <queue> -l` for media/options. Enumeration runs `lpstat -d` (default queue) and `lpstat -v` (device URI) concurrently after `-e`; both remain optional, and a failed enumeration keeps the last known list.
 - Raw: `lp -d <queue> -o raw -t "Bikri <jobId>" <tempfile>`; parse the request id.
 - Image: `lp -d <queue> -o media=Custom.<w>x<h>mm <png>`.
 - Status: `lpstat -W not-completed -o <queue>`; no longer active ⇒ done (or IPP `Get-Job-Attributes`).
@@ -401,7 +403,7 @@ No changes to `apps/api`, D1, sync, auth or tenancy. The agent is per-till infra
 
 - **Config:** `%APPDATA%\bikri-print-agent\config.json` (per-user Windows; `os.UserConfigDir()` = `%APPDATA%`), `~/.config/bikri-print-agent/config.json` (Linux), `~/Library/Application Support/bikri-print-agent/config.json` (macOS). Token stored as a hash; file permissions restricted. Development origins passed with `--allow-origin` exist only for that run and are never written. `port` must be 1–65535; a hand-edited value fails startup instead of binding an ephemeral or invalid port. A config with `paired: true` and no `tokenHash` loads as unpaired, so the page offers a new pairing code instead of locking the till out. The log is opened before the config is loaded and every startup failure (unreadable/corrupt config, invalid or busy port, backend init) is written to it, so a Windows GUI build with no stderr cannot exit silently.
 - **Logs:** Windows `%LOCALAPPDATA%\Bikri\PrintAgent\logs\agent.log` (plus `crash.log` for fatal panics, appended across restarts), Linux `~/.local/state/bikri-print-agent/logs/agent.log`, macOS `~/Library/Logs/BikriPrintAgent/agent.log`; JSON lines, rotated at 5 MB while running with one previous file; no receipt payloads. Logs go to the rotating file even when the process has no usable stderr (Windows GUI builds) or a log write fails.
-- **Health:** `/health` and `/diagnostics` (token required). Bikri's "Copy printer info" combines agent version, platform, queues and last error.
+- **Health:** `/health` and `/diagnostics` (token required). Bikri's "Copy printer info" combines agent version, platform, queues and last error. A slow enumeration does not make health report zero printers: if the 300 ms health probe expires while a background refresh is still running (or its own first refresh is slow), `/health` and `/printers` return the last known queue list. The refresh itself keeps running for the next caller.
 - **Update:** signed `latest.json` with version, SHA-256 and minimum protocol; v1 notifies and links to the installer; auto-update only after signature verification is implemented.
 - **Uninstall:** removes the app, autostart, shortcuts, logs and the per-user config (`%APPDATA%\bikri-print-agent`, `~/.config/bikri-print-agent` with its state under `~/.local/state/bikri-print-agent`, `~/Library/Application Support/bikri-print-agent`), so a reinstall starts unpaired rather than "already paired" with a token the till no longer has; leaves OS queues and drivers untouched.
 - **Support bundle:** metadata only; explicitly excludes receipt data, tokens and customer information.
@@ -496,6 +498,8 @@ Implemented in this repository (Phase 1):
   - Windows spooler `RAW` printing, printer enumeration, `GetJob` status and cancel;
   - Windows GDI image printing for compatibility mode, paginated as contiguous per-page DIB bands (correct page order, every source row once) with transparent PNGs composited over white;
   - CUPS `lp`/`lpstat`/`cancel` backend for Linux and macOS; the cancel id is validated and passed without the unsupported `--` terminator;
+  - health/printers keep the last known queue list when a slow enumeration outlives the 300 ms health probe, CUPS runs `lpstat -d` and `lpstat -v` concurrently, and repeated job-status polls share one backend call with a 200 ms cache;
+  - the Windows raw/GDI paths check the request deadline around blocking spooler calls (a syscall cannot be cancelled, but it is not followed by more work after it returns), and the GDI path releases the decoded image and encoded PNG before spooling;
   - Go unit tests and cross-builds for Windows, Linux and macOS; the uninstallers remove the per-user config, and startup errors are logged before exit.
 - **Bikri PWA**:
   - `transport: 'agent'` in `PrinterKv` (local-only `kv`, no sync/D1 change);

@@ -22,11 +22,18 @@ export const FAILED_PRINT_JOB_RETENTION_MS = 90 * DAY;
 export const FAILED_UPLOAD_RETENTION_MS = 30 * DAY;
 /** Quarantined pull rows are diagnostics, not data. */
 export const PULL_ERROR_RETENTION_MS = 30 * DAY;
+/**
+ * A resolved conflict (`merged`/`acknowledged`) is history: the bill detail reads the
+ * conflicted rows from their documents and Sync only lists `needs_owner`. Keep a quarter
+ * for diagnosis, then trim.
+ */
+export const RESOLVED_CONFLICT_RETENTION_MS = 90 * DAY;
 
 export type RetentionResult = {
   printJobs: number;
   failedUploads: number;
   pullErrors: number;
+  resolvedConflicts: number;
 };
 
 /**
@@ -39,7 +46,7 @@ export async function pruneLocalHistory(
 ): Promise<RetentionResult> {
   return db.transaction(
     'rw',
-    [db.print_jobs, db.file_queue, db.kv],
+    [db.print_jobs, db.file_queue, db.kv, db.sync_conflicts],
     async () => {
       const oldJobs = await db.print_jobs
         .where('[status+created_at]')
@@ -76,6 +83,20 @@ export async function pruneLocalHistory(
         .primaryKeys();
       if (oldUploads.length > 0) await db.file_queue.bulkDelete(oldUploads);
 
+      // `needs_owner` stays until the owner acknowledges it on Sync. A merged field
+      // conflict or an acknowledged one is only diagnostic after the window.
+      const oldConflicts = await db.sync_conflicts
+        .where('resolution')
+        .notEqual('needs_owner')
+        .filter(
+          (row) =>
+            typeof row.at === 'number' &&
+            row.at < now - RESOLVED_CONFLICT_RETENTION_MS,
+        )
+        .primaryKeys();
+      if (oldConflicts.length > 0)
+        await db.sync_conflicts.bulkDelete(oldConflicts);
+
       let removedErrors = 0;
       const stored = (await db.kv.get('pull_errors')) as
         | {
@@ -97,6 +118,7 @@ export async function pruneLocalHistory(
         printJobs: allOldJobs.length,
         failedUploads: oldUploads.length,
         pullErrors: removedErrors,
+        resolvedConflicts: oldConflicts.length,
       };
     },
   );

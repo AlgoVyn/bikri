@@ -8,14 +8,18 @@ import { BASE_PATH } from '@bikri/core';
 export const FILE_CACHE = 'bikri-files';
 export const FILE_CACHE_MAX = 2000;
 
-/** `cache.keys()` walks every entry; prune once per session and then every 50 puts. */
+/**
+ * `cache.keys()` walks every entry. Start at zero and prune on the 50th put of a session,
+ * then every 50: the first import no longer lists the whole cache for its first image.
+ */
 let putsSincePrune = 0;
 const PRUNE_EVERY = 50;
 
 async function pruneFileCache(cache: Cache): Promise<void> {
   const keys = await cache.keys();
-  for (const old of keys.slice(0, Math.max(0, keys.length - FILE_CACHE_MAX)))
-    await cache.delete(old);
+  const drop = Math.max(0, keys.length - FILE_CACHE_MAX);
+  if (drop === 0) return;
+  await Promise.all(keys.slice(0, drop).map((old) => cache.delete(old)));
 }
 
 /** Synthetic request URL for a tenant's relative key (never fetched from the network). */
@@ -104,18 +108,21 @@ export function fileUrlFor(
     FILE_URLS.set(cacheKey, cached);
     return cached;
   }
-  const pending = load()
+  let pending: Promise<string | null> | undefined;
+  pending = load()
     .then((blob) => {
       if (!blob) {
-        // A missing file may be uploaded or pulled later; do not cache the miss.
-        FILE_URLS.delete(cacheKey);
+        // A missing file may be uploaded or pulled later; do not cache the miss. Only
+        // remove our own promise: a remount may already have stored a newer request.
+        if (FILE_URLS.get(cacheKey) === pending) FILE_URLS.delete(cacheKey);
         return null;
       }
       return URL.createObjectURL(blob);
     })
     .catch((error: unknown) => {
-      // A transient CacheStorage/network failure must not poison later mounts.
-      FILE_URLS.delete(cacheKey);
+      // A transient CacheStorage/network failure must not poison later mounts, but a
+      // newer in-flight request for the same key owns the slot now.
+      if (FILE_URLS.get(cacheKey) === pending) FILE_URLS.delete(cacheKey);
       throw error;
     });
   FILE_URLS.set(cacheKey, pending);
@@ -141,14 +148,18 @@ export async function putFile(
   if (!cache) return;
   await cache.put(
     fileCacheUrl(tenantId, key),
-    new Response(await blob.arrayBuffer(), {
+    // A Blob is already a BodyInit; `arrayBuffer()` copied every photo for no reason.
+    new Response(blob, {
       headers: { 'content-type': blob.type || 'application/octet-stream' },
     }),
   );
   // Listing the cache on every image put is O(n) per image; at 2,000 entries a
-  // 1,000-photo import walked the whole cache 1,000 times. Prune periodically.
-  if (putsSincePrune % PRUNE_EVERY === 0) await pruneFileCache(cache);
+  // 1,000-photo import walked the whole cache 1,000 times. Prune after 50 puts.
   putsSincePrune += 1;
+  if (putsSincePrune >= PRUNE_EVERY) {
+    putsSincePrune = 0;
+    await pruneFileCache(cache);
+  }
 }
 
 export async function getFile(
@@ -162,6 +173,12 @@ export async function getFile(
 }
 
 export async function deleteFile(tenantId: string, key: string): Promise<void> {
+  const cacheKey = `${tenantId}\u0000${key}`;
+  const pending = FILE_URLS.get(cacheKey);
+  if (pending !== undefined) {
+    FILE_URLS.delete(cacheKey);
+    revokeWhenReady(pending);
+  }
   const cache = await fileCacheStore();
   if (!cache) return;
   await cache.delete(fileCacheUrl(tenantId, key));

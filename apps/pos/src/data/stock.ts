@@ -227,6 +227,8 @@ export type CountScope =
   | { kind: 'low' };
 
 export type CountDraft = {
+  /** Stable id for the draft's applied-id key (V18); old drafts fall back to started_at. */
+  id?: string;
   scope: CountScope;
   started_at: number;
   /** product id → on hand when the count started (display only). */
@@ -244,6 +246,15 @@ export const DRAFT_KEY = 'stock_count_draft';
  * save/discard/start is noticed (SYNC-L7).
  */
 export const DRAFT_STAMP_KEY = 'stock_count_draft_stamp';
+/** Per-draft applied ids: Finish writes this small key per chunk, never the full draft. */
+export const APPLIED_KEY_PREFIX = 'stock_count_applied:';
+
+export function countAppliedKey(draft: {
+  id?: string;
+  started_at: number;
+}): string {
+  return `${APPLIED_KEY_PREFIX}${draft.id ?? String(draft.started_at)}`;
+}
 
 let stampSeq = 0;
 function newDraftStamp(): string {
@@ -304,6 +315,7 @@ export async function startCount(
   const expected: Record<string, number> = {};
   for (const p of products) expected[p.id] = levels.get(p.id) ?? 0;
   const draft: CountDraft = {
+    id: newId(now),
     scope,
     started_at: now,
     expected,
@@ -452,6 +464,13 @@ export async function discardCount(db: BikriDb): Promise<void> {
     db.transaction('rw', db.kv, async () => {
       await db.kv.delete(DRAFT_KEY);
       await db.kv.delete(DRAFT_STAMP_KEY);
+      // Finish stores per-chunk applied ids in a small key; discard removes it too (and
+      // any stale key left by a crashed finish).
+      const appliedKeys = await db.kv
+        .where('key')
+        .startsWith(APPLIED_KEY_PREFIX)
+        .primaryKeys();
+      if (appliedKeys.length > 0) await db.kv.bulkDelete(appliedKeys);
     }),
   );
   saveChain = run.catch(() => undefined);
@@ -486,14 +505,20 @@ export async function finishCount(
   // The timer is cancelled, but a debounced write already running on saveChain must
   // finish before the first chunk commits (POS-M4).
   await saveChain.catch(() => undefined);
+  const storedApplied = (await db.kv.get(countAppliedKey(draft)))?.value;
   const source = {
     ...draft,
     expected: { ...draft.expected, ...(stored?.expected ?? {}) },
     counted: { ...(stored?.counted ?? {}), ...draft.counted },
     applied: [
-      ...new Set([...(draft.applied ?? []), ...(stored?.applied ?? [])]),
+      ...new Set([
+        ...(draft.applied ?? []),
+        ...(stored?.applied ?? []),
+        ...(Array.isArray(storedApplied) ? (storedApplied as string[]) : []),
+      ]),
     ],
   };
+  const appliedKey = countAppliedKey(source);
   const applied = new Set(source.applied);
   const ids = Object.keys(source.expected).filter((id) => !applied.has(id));
   const result: CountResult = { movements: 0, counted: 0, valueDiff: 0 };
@@ -558,11 +583,12 @@ export async function finishCount(
           await w.insertMany('stock_movements', movementRows);
         // Persist the applied ids in the same transaction as the movements. If the tab
         // dies after this commit, the retry skips the chunk instead of re-applying the
-        // count over sales that happened in between.
+        // count over sales that happened in between. Keep this in its own small key:
+        // rewriting the ~250 KB draft every 90 items was megabytes of write amplification.
         const nextApplied = [...new Set([...applied, ...slice])];
         chunkStamp = newDraftStamp();
         await w.table<{ key: string; value: unknown }>('kv').bulkPut([
-          { key: DRAFT_KEY, value: { ...source, applied: nextApplied } },
+          { key: appliedKey, value: nextApplied },
           { key: DRAFT_STAMP_KEY, value: chunkStamp },
         ]);
         return { movements, counted, valueDiff };
@@ -577,8 +603,8 @@ export async function finishCount(
     result.valueDiff += part.valueDiff;
     if (chunkStamp !== '') draftStamps.set(db, chunkStamp);
     for (const id of slice) applied.add(id);
-    // writeAction already persisted DRAFT_KEY/DRAFT_STAMP_KEY; update the in-memory
-    // cache without queuing a second draft write (POS-M4).
+    // writeAction already persisted the applied key/stamp; update the in-memory cache
+    // without queuing a second draft write (POS-M4).
     draftCache.set(db, { ...source, applied: [...applied] });
   }
   await writeAction(

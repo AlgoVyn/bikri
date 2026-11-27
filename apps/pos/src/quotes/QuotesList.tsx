@@ -1,6 +1,13 @@
 import { Link, useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useDeferredValue, useEffect, useMemo, useRef, useState } from 'react';
+import {
+  memo,
+  useDeferredValue,
+  useEffect,
+  useMemo,
+  useRef,
+  useState,
+} from 'react';
 import { useTranslation } from 'react-i18next';
 import {
   buttonPrimary,
@@ -10,6 +17,7 @@ import {
 import { DateField } from '../components/DateField.tsx';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { QuoteIcon, SearchIcon } from '../components/icons.tsx';
+import { ListPager } from '../components/ListPager.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
@@ -21,6 +29,7 @@ import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
 import { useToast } from '../components/Toast.tsx';
 import { addDays } from '../data/backdate.ts';
+import { rowsAnyOfTable } from '../data/bulk.ts';
 import { CART_IDS, isEmptyCart } from '../data/cart.ts';
 import { getDb } from '../data/db.ts';
 import {
@@ -38,9 +47,9 @@ import {
 import { formatBusinessDate } from '../lib/date.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
+import { interactiveTarget, plainKey, useHotkey } from '../lib/hotkeys.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
 import { useSellStore } from '../sell/sellStore.ts';
-import { interactiveTarget, plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { quoteVisible, seesAllDates } from '../state/reportScope.ts';
@@ -66,6 +75,8 @@ const SORT_OPTIONS = ['date', 'total', 'validity'] as const;
 type QuoteSort = (typeof SORT_OPTIONS)[number];
 
 const PRESET_IDS = PRESETS.map((option) => option.id);
+const QUOTE_COLLATOR = new Intl.Collator(undefined, { numeric: true });
+const PAGE = 50;
 
 const selectClass =
   'h-11 min-w-0 rounded-control border border-border-strong bg-surface px-2 text-text';
@@ -101,6 +112,88 @@ function statusTone(display: QuoteDisplayStatus): string {
   return 'bg-danger-subtle text-danger-subtle-ink';
 }
 
+const QuoteListItem = memo(function QuoteListItem({
+  quote,
+  display,
+  current,
+  embedded,
+  onFocus,
+}: {
+  quote: QuoteRow;
+  display: QuoteDisplayStatus;
+  current: boolean;
+  embedded: boolean;
+  onFocus: (id: string) => void;
+}) {
+  const { t, i18n } = useTranslation();
+  return (
+    <li className="relative border-b border-border last:border-b-0">
+      <Link
+        to="/quotations/$id"
+        params={{ id: quote.id }}
+        resetScroll={false}
+        data-testid="quote-row"
+        aria-current={current ? 'page' : undefined}
+        onClick={rememberListScroll}
+        onFocus={() => onFocus(quote.id)}
+        className={`${embedded ? QUOTE_GRID_EMBEDDED : QUOTE_GRID_FULL} min-h-11 transition-colors duration-150 hover:bg-surface-2 ${
+          current
+            ? 'border-s-2 border-s-primary bg-primary-subtle'
+            : 'border-s-2 border-s-transparent'
+        }`}
+      >
+        <span className="min-w-0">
+          <span className="flex min-w-0 items-center gap-1.5">
+            <span className="truncate font-mono text-small font-semibold">
+              {quote.quote_no}
+            </span>
+            <span
+              className={`shrink-0 rounded-full px-1.5 text-caption font-medium lg:hidden ${statusTone(display)}`}
+            >
+              {t(`office.quotations.status_${display}`)}
+            </span>
+          </span>
+          <span className="block truncate text-small text-text-muted lg:hidden">
+            {quote.customer_name || t('sell.walk_in')}
+          </span>
+        </span>
+        <span className="hidden min-w-0 lg:block">
+          <span className="block truncate">
+            {quote.customer_name || t('sell.walk_in')}
+          </span>
+          {quote.customer_phone ? (
+            <span className="block truncate text-small text-text-muted">
+              {quote.customer_phone}
+            </span>
+          ) : null}
+        </span>
+        {embedded ? null : (
+          <>
+            <span className="hidden whitespace-nowrap text-small text-text-muted lg:block">
+              <bdi dir="ltr">
+                {formatBusinessDate(quote.valid_until, i18n.language)}
+              </bdi>
+            </span>
+            <span className="hidden text-small text-text-muted lg:block">
+              {t('office.quotations.items', {
+                count: quote.items_qty_milli / 1000,
+              })}
+            </span>
+          </>
+        )}
+        <span className="text-start font-medium">
+          <MoneyText paisa={quote.total} />
+        </span>
+        <span
+          className={`hidden whitespace-nowrap justify-self-start rounded-full px-2 text-small font-medium lg:block ${statusTone(display)}`}
+        >
+          {t(`office.quotations.status_${display}`)}
+        </span>
+      </Link>
+    </li>
+  );
+});
+
 export function QuotesList(props: {
   embedded?: boolean;
   detailOpen?: boolean;
@@ -119,7 +212,7 @@ function QuotesListContent({
   detailOpen?: boolean;
   selectedId?: string;
 }) {
-  const { t, i18n } = useTranslation();
+  const { t } = useTranslation();
   const navigate = useNavigate();
   const toast = useToast();
   const { can, role, support, branchId } = useCurrentStaff();
@@ -146,6 +239,7 @@ function QuotesListContent({
     to: stored.to,
   });
   const [selected, setSelected] = useState<string | null>(null);
+  const [page, setPage] = useState(0);
   const selectedId = routeSelectedId ?? selected;
   const limited = !seesAllDates(role, support, can('report.view'));
   const activeFilters =
@@ -164,13 +258,13 @@ function QuotesListContent({
     if (next !== 'custom') setCustom({ from: today, to: today });
   };
 
+  const searchActive = deferredQuery.trim() !== '';
   const data = useLiveQuery(async () => {
     const empty = {
       quotes: [] as QuoteRow[],
       names: new Map<string, string[]>(),
       staff: new Map<string, string>(),
       devices: new Map<string, string>(),
-      billCount: 0,
     };
     if (rangeError) return empty;
     const db = getDb();
@@ -209,18 +303,6 @@ function QuotesListContent({
         .between(range.from, range.to, true, true)
         .toArray()) as unknown as QuoteRow[];
     }
-    const billCount = limited
-      ? await db.sales
-          .where('business_date')
-          .equals(today)
-          .filter(
-            (sale) => branchId === null || String(sale.branch_id) === branchId,
-          )
-          .count()
-      : await db.sales
-          .where('business_date')
-          .between(range.from, range.to, true, true)
-          .count();
     quotes = quotes.filter((quote) =>
       quoteVisible({
         role,
@@ -237,23 +319,23 @@ function QuotesListContent({
         cancelledAt: Number(quote.cancelled_at ?? 0) || null,
       }),
     );
-    const ids = quotes.map((quote) => quote.id);
     const names = new Map<string, string[]>();
-    if (ids.length > 0) {
-      const lines = await db.quotation_lines
-        .where('quote_id')
-        .anyOf(ids)
-        .toArray();
+    // Line snapshots are only a search aid; do not read them for an empty search.
+    if (searchActive && quotes.length > 0) {
+      const lines = await rowsAnyOfTable(
+        db.quotation_lines,
+        'quote_id',
+        quotes.map((quote) => quote.id),
+        (line) => String(line.quote_id),
+      );
       for (const line of lines) {
         if (line.deleted_at !== null && line.deleted_at !== undefined) continue;
         const quoteId = String(line.quote_id);
-        names.set(quoteId, [
-          ...(names.get(quoteId) ?? []),
-          String(line.name_snapshot ?? ''),
-          ...(typeof line.bundle_name === 'string' && line.bundle_name !== ''
-            ? [line.bundle_name]
-            : []),
-        ]);
+        const current = names.get(quoteId) ?? [];
+        current.push(String(line.name_snapshot ?? ''));
+        if (typeof line.bundle_name === 'string' && line.bundle_name !== '')
+          current.push(line.bundle_name);
+        names.set(quoteId, current);
       }
     }
     const staff = new Map(
@@ -265,7 +347,7 @@ function QuotesListContent({
         String(row.name ?? row.device_code ?? ''),
       ]),
     );
-    return { quotes, names, staff, devices, billCount };
+    return { quotes, names, staff, devices };
   }, [
     range.from,
     range.to,
@@ -277,7 +359,29 @@ function QuotesListContent({
     canQuote,
     timeZone,
     rangeError,
+    searchActive,
   ]);
+
+  // Counts are independent of the quotation rows: a completed bill must not reload
+  // every quote or its line snapshots.
+  const billCount =
+    useLiveQuery(async () => {
+      if (rangeError) return 0;
+      const db = getDb();
+      return limited
+        ? db.sales
+            .where('business_date')
+            .equals(today)
+            .filter(
+              (sale) =>
+                branchId === null || String(sale.branch_id) === branchId,
+            )
+            .count()
+        : db.sales
+            .where('business_date')
+            .between(range.from, range.to, true, true)
+            .count();
+    }, [range.from, range.to, rangeError, limited, today, branchId]) ?? 0;
 
   const rows = useMemo(() => {
     if (!data) return [];
@@ -297,13 +401,20 @@ function QuotesListContent({
       const dir = direction === 'asc' ? 1 : -1;
       if (sort === 'total') return (a.total - b.total) * dir;
       if (sort === 'validity')
-        return String(a.valid_until).localeCompare(String(b.valid_until)) * dir;
+        return QUOTE_COLLATOR.compare(a.valid_until, b.valid_until) * dir;
       return (
-        (String(a.business_date).localeCompare(String(b.business_date)) ||
-          a.quote_no.localeCompare(b.quote_no)) * dir
+        (QUOTE_COLLATOR.compare(a.business_date, b.business_date) ||
+          QUOTE_COLLATOR.compare(a.quote_no, b.quote_no)) * dir
       );
     });
   }, [data, deferredQuery, status, sort, direction, today]);
+
+  const pageCount = Math.max(1, Math.ceil(rows.length / PAGE));
+  // biome-ignore lint/correctness/useExhaustiveDependencies: reset on a new range/filter even when the row count is unchanged
+  useEffect(() => {
+    setPage(0);
+  }, [rows.length, range.from, range.to, status, sort, direction]);
+  const pageRows = rows.slice(page * PAGE, (page + 1) * PAGE);
 
   const summary = useMemo(() => {
     if (!data)
@@ -314,13 +425,14 @@ function QuotesListContent({
         converted: 0,
         convertedValue: 0,
       };
+    const expiringBy = addDays(today, 7);
     return data.quotes.reduce(
       (out, quote) => {
         const display = quoteStatus(quote, today);
         if (display === 'open') {
           out.open += 1;
           out.openValue += quote.total;
-          if (quote.valid_until <= addDays(today, 7)) out.expiring += 1;
+          if (quote.valid_until <= expiringBy) out.expiring += 1;
         }
         if (display === 'converted') {
           out.converted += 1;
@@ -460,7 +572,7 @@ function QuotesListContent({
 
       <SalesTabs
         active="quotations"
-        billCount={data.billCount}
+        billCount={billCount}
         quotationCount={data.quotes.length}
       />
 
@@ -720,84 +832,21 @@ function QuotesListContent({
               />
               <span>{t('office.quotations.status')}</span>
             </li>
-            {rows.map((quote) => {
-              const display = quoteStatus(quote, today);
-              const current = selectedId === quote.id;
-              return (
-                <li
-                  key={quote.id}
-                  className="relative border-b border-border last:border-b-0"
-                >
-                  <Link
-                    to="/quotations/$id"
-                    params={{ id: quote.id }}
-                    resetScroll={false}
-                    data-testid="quote-row"
-                    aria-current={current ? 'page' : undefined}
-                    onClick={rememberListScroll}
-                    onFocus={() => setSelected(quote.id)}
-                    className={`${embedded ? QUOTE_GRID_EMBEDDED : QUOTE_GRID_FULL} min-h-11 transition-colors duration-150 hover:bg-surface-2 ${
-                      current
-                        ? 'border-s-2 border-s-primary bg-primary-subtle'
-                        : 'border-s-2 border-s-transparent'
-                    }`}
-                  >
-                    <span className="min-w-0">
-                      <span className="flex min-w-0 items-center gap-1.5">
-                        <span className="truncate font-mono text-small font-semibold">
-                          {quote.quote_no}
-                        </span>
-                        <span
-                          className={`shrink-0 rounded-full px-1.5 text-caption font-medium lg:hidden ${statusTone(display)}`}
-                        >
-                          {t(`office.quotations.status_${display}`)}
-                        </span>
-                      </span>
-                      <span className="block truncate text-small text-text-muted lg:hidden">
-                        {quote.customer_name || t('sell.walk_in')}
-                      </span>
-                    </span>
-                    <span className="hidden min-w-0 lg:block">
-                      <span className="block truncate">
-                        {quote.customer_name || t('sell.walk_in')}
-                      </span>
-                      {quote.customer_phone ? (
-                        <span className="block truncate text-small text-text-muted">
-                          {quote.customer_phone}
-                        </span>
-                      ) : null}
-                    </span>
-                    {embedded ? null : (
-                      <>
-                        <span className="hidden whitespace-nowrap text-small text-text-muted lg:block">
-                          <bdi dir="ltr">
-                            {formatBusinessDate(
-                              quote.valid_until,
-                              i18n.language,
-                            )}
-                          </bdi>
-                        </span>
-                        <span className="hidden text-small text-text-muted lg:block">
-                          {t('office.quotations.items', {
-                            count: quote.items_qty_milli / 1000,
-                          })}
-                        </span>
-                      </>
-                    )}
-                    <span className="text-start font-medium">
-                      <MoneyText paisa={quote.total} />
-                    </span>
-                    <span
-                      className={`hidden whitespace-nowrap justify-self-start rounded-full px-2 text-small font-medium lg:block ${statusTone(display)}`}
-                    >
-                      {t(`office.quotations.status_${display}`)}
-                    </span>
-                  </Link>
-                </li>
-              );
-            })}
+            {pageRows.map((quote) => (
+              <QuoteListItem
+                key={quote.id}
+                quote={quote}
+                display={quoteStatus(quote, today)}
+                current={selectedId === quote.id}
+                embedded={embedded}
+                onFocus={setSelected}
+              />
+            ))}
           </ul>
         )}
+        {rows.length > PAGE ? (
+          <ListPager page={page} pageCount={pageCount} onPage={setPage} />
+        ) : null}
       </ListSurface>
     </div>
   );

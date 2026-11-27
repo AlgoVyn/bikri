@@ -74,6 +74,34 @@ describe('mergeRows', () => {
     );
   });
 
+  it('stores the latest supplier delivery date on a pulled purchase', async () => {
+    const db = await readyDb('merge-purchase-date');
+    await merge(
+      db,
+      [
+        {
+          tbl: 'purchases',
+          row: row('p1', {
+            supplier_id: 's1',
+            business_date: '2026-10-01',
+          }),
+        },
+        {
+          tbl: 'purchases',
+          row: row('p2', {
+            supplier_id: 's1',
+            business_date: '2026-10-05',
+          }),
+        },
+      ],
+      true,
+    );
+    expect(await db.party_balances.get(['supplier', 's1'])).toMatchObject({
+      balance: 0,
+      last_delivery_date: '2026-10-05',
+    });
+  });
+
   it('recomputes a party once when a page carries several ledger rows', async () => {
     const db = await readyDb('merge-ledger-batch');
     await db.ledger_entries.put(

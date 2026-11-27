@@ -105,26 +105,31 @@ export async function putFile(c: Context<AppEnv>): Promise<Response> {
   // A file belongs to the product/shop, so the upload needs the same permission as the
   // row that points at it: catalogue edits for photos, shop settings for the logo.
   const staffId = c.req.header('x-bikri-staff') ?? '';
-  const staff = await c.var.db.first<{
-    role: Role;
-    permissions_json: string;
-  }>(
+  const staffStatement = c.var.db.prepare(
     'SELECT role, permissions_json FROM staff WHERE tenant_id = ?1 AND id = ?2 AND active = 1 AND deleted_at IS NULL',
     staffId,
   );
+  const productStatement =
+    kind === 'product_image'
+      ? c.var.db.prepare(
+          'SELECT id FROM products WHERE tenant_id = ?1 AND id = ?2 AND deleted_at IS NULL',
+          id,
+        )
+      : null;
+  const [staffRow, productRow] = await c.var.db.batch(
+    productStatement ? [staffStatement, productStatement] : [staffStatement],
+  );
+  const staff = (staffRow?.results?.[0] ?? null) as {
+    role: Role;
+    permissions_json: string;
+  } | null;
   const permission =
     kind === 'product_image' ? 'catalog.edit' : 'settings.shop';
   if (!staff || !can(staff.role, staff.permissions_json, permission))
     throw new ApiError('FORBIDDEN', 403, 'You cannot upload this file');
   // Check the target row before reading up to 2 MB: an unknown/deleted product is a
   // 404 even when the upload is oversized or malformed.
-  if (kind === 'product_image') {
-    const product = await c.var.db.first<{ id: string }>(
-      'SELECT id FROM products WHERE tenant_id = ?1 AND id = ?2 AND deleted_at IS NULL',
-      id,
-    );
-    if (!product) throw notFound();
-  }
+  if (kind === 'product_image' && !productRow?.results?.[0]) throw notFound();
   const body = await readBodyBytes(c, MAX_IMAGE_BYTES);
   if (sniffImage(body) !== type)
     throw new ApiError(

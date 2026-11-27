@@ -14,7 +14,7 @@ import {
 import { type BillDetail, billDetail } from '../data/salesHistory.ts';
 import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { customerStatement, type Statement } from '../data/udhaar.ts';
-import { marginText } from '../products/format.ts';
+import { marginText } from '../lib/productFormat.ts';
 
 export type ProductPeekData = {
   product: MasterRow;

@@ -152,9 +152,16 @@ func (b *windowsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	}
 	if b.refreshing {
 		done := b.refreshDone
+		hasStale := b.printers != nil
+		stale := clonePrinters(b.printers)
 		b.printersMu.Unlock()
 		list, refreshErr, waitErr := b.wait(ctx, done)
 		if waitErr != nil {
+			// The 300 ms health probe can expire while EnumPrintersW is still
+			// running; serve the last known list rather than zero printers.
+			if hasStale {
+				return b.decorate(stale), nil
+			}
 			return nil, waitErr
 		}
 		if list == nil && refreshErr != nil {
@@ -179,6 +186,11 @@ func (b *windowsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 
 	list, refreshErr, waitErr := b.wait(ctx, done)
 	if waitErr != nil {
+		// The refresh keeps running for the next waiter; a previous list is a
+		// better health answer than a timeout with zero printers (M17.4).
+		if hasStale {
+			return b.decorate(stale), nil
+		}
 		return nil, waitErr
 	}
 	if refreshErr != nil && hasStale {
@@ -332,7 +344,10 @@ func errorNumberOf(err error) uint32 {
 	return 0
 }
 
-func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
+func (b *windowsBackend) Print(ctx context.Context, job *Job) (string, error) {
+	if job == nil {
+		return "", &Error{Code: "SPOOL_ERROR", Message: "no job"}
+	}
 	if !ValidPrinterName(job.Printer) {
 		return "", &Error{Code: "UNKNOWN_PRINTER", Message: "no valid printer name"}
 	}
@@ -349,7 +364,7 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 		return "", &Error{Code: "RAW_UNSUPPORTED", Message: "this queue rejected raw jobs before"}
 	}
 
-	handle, err := openPrinter(job.Printer)
+	handle, err := openPrinter(ctx, job.Printer)
 	if err != nil {
 		return "", err
 	}
@@ -372,6 +387,15 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 	runtime.KeepAlive(docName)
 	runtime.KeepAlive(dataType)
 	runtime.KeepAlive(doc)
+	// Do not learn "raw unsupported" from a request that expired while
+	// StartDocPrinterW was blocked; abort whatever it opened and report the
+	// cancellation.
+	if err := ctx.Err(); err != nil {
+		if jobID != 0 {
+			_, _, _ = procAbortPrinter.Call(uintptr(handle))
+		}
+		return "", err
+	}
 	if jobID == 0 {
 		if isRawUnsupported(callErr) {
 			b.mu.Lock()
@@ -388,6 +412,15 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 		_, _, _ = procAbortPrinter.Call(uintptr(handle))
 		return "", &Error{Code: "SPOOL_ERROR", Message: message}
 	}
+	abortCtx := func(err error) (string, error) {
+		_, _, _ = procAbortPrinter.Call(uintptr(handle))
+		return "", err
+	}
+	// StartDocPrinterW may have blocked past the caller's deadline. Abort the
+	// half-written document instead of printing a truncated receipt.
+	if err := ctx.Err(); err != nil {
+		return abortCtx(err)
+	}
 
 	r1, _, callErr := procStartPagePrinter.Call(uintptr(handle))
 	if r1 == 0 {
@@ -397,7 +430,7 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 	for copyIndex := 0; copyIndex < max(1, job.Copies); copyIndex++ {
 		for at := 0; at < len(job.Data); at += 4096 {
 			if err := ctx.Err(); err != nil {
-				return fail(err.Error())
+				return abortCtx(err)
 			}
 			end := min(at+4096, len(job.Data))
 			chunk := job.Data[at:end]
@@ -412,6 +445,12 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 					uintptr(unsafe.Pointer(&written)),
 				)
 				runtime.KeepAlive(chunk)
+				// WritePrinter cannot be interrupted by a context; detecting the
+				// cancelled caller as soon as it returns aborts the spool entry
+				// instead of writing the rest of a receipt nobody is waiting for.
+				if err := ctx.Err(); err != nil {
+					return abortCtx(err)
+				}
 				if r1 == 0 {
 					return fail(lastError(callErr))
 				}
@@ -422,13 +461,28 @@ func (b *windowsBackend) Print(ctx context.Context, job Job) (string, error) {
 			}
 		}
 	}
-	runtime.KeepAlive(job.Data)
+	// The spooler has every byte; release the encoded receipt while the
+	// document is finalised.
+	job.Data = nil
+	if err := ctx.Err(); err != nil {
+		return abortCtx(err)
+	}
 	r1, _, callErr = procEndPagePrinter.Call(uintptr(handle))
 	if r1 == 0 {
 		return fail(lastError(callErr))
 	}
+	// EndDocPrinter commits the document; a cancellation that arrives while it
+	// is blocked is detected before the call. After a successful EndDoc there
+	// is nothing left to abort, so a late deadline must not report a failure
+	// that would make the till print the receipt twice.
+	if err := ctx.Err(); err != nil {
+		return abortCtx(err)
+	}
 	r1, _, callErr = procEndDocPrinter.Call(uintptr(handle))
 	if r1 == 0 {
+		if err := ctx.Err(); err != nil {
+			return abortCtx(err)
+		}
 		return fail(lastError(callErr))
 	}
 	b.mu.Lock()
@@ -449,7 +503,7 @@ func (b *windowsBackend) Status(ctx context.Context, printer, spoolID string) (S
 	if err != nil {
 		return Status{State: "done"}, nil
 	}
-	handle, err := openPrinter(printer)
+	handle, err := openPrinter(ctx, printer)
 	if err != nil {
 		return Status{}, err
 	}
@@ -526,7 +580,7 @@ func (b *windowsBackend) Cancel(ctx context.Context, printer, spoolID string) er
 	if err != nil {
 		return &Error{Code: "CANCEL_FAILED", Message: "invalid job id"}
 	}
-	handle, err := openPrinter(printer)
+	handle, err := openPrinter(ctx, printer)
 	if err != nil {
 		return err
 	}
@@ -544,25 +598,37 @@ func (b *windowsBackend) Cancel(ctx context.Context, printer, spoolID string) er
 	return nil
 }
 
-func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
-	config, err := png.DecodeConfig(bytes.NewReader(job.Data))
-	if err != nil {
-		return &Error{Code: "SPOOL_ERROR", Message: "invalid PNG: " + err.Error()}
+func (b *windowsBackend) printImage(ctx context.Context, job *Job) error {
+	if err := ctx.Err(); err != nil {
+		return err
 	}
-	// Reject the header before Decode allocates the bitmap. A tiny PNG can
-	// describe a multi-gigabyte canvas; the agent must not OOM on it.
-	if !validImageSize(config.Width, config.Height) {
-		return &Error{Code: "SPOOL_ERROR", Message: "image dimensions are too large"}
+	// The manager already checked the IHDR centrally and passed the dimensions;
+	// only a direct backend caller pays for a second DecodeConfig (L11).
+	if !validImageSize(job.ImageWidth, job.ImageHeight) {
+		config, err := png.DecodeConfig(bytes.NewReader(job.Data))
+		if err != nil {
+			return &Error{Code: "SPOOL_ERROR", Message: "invalid PNG: " + err.Error()}
+		}
+		// Reject the header before Decode allocates the bitmap. A tiny PNG can
+		// describe a multi-gigabyte canvas; the agent must not OOM on it.
+		if !validImageSize(config.Width, config.Height) {
+			return &Error{Code: "SPOOL_ERROR", Message: "image dimensions are too large"}
+		}
 	}
 	img, err := png.Decode(bytes.NewReader(job.Data))
 	if err != nil {
 		return &Error{Code: "SPOOL_ERROR", Message: "invalid PNG: " + err.Error()}
 	}
+	// Once decoded, the encoded PNG is dead weight. Drop it (and the image)
+	// before the GDI loop so only the composited RGBA buffer stays live during
+	// spooling: up to ~64 MiB each at the 16M-pixel limit (M17.3).
+	job.Data = nil
 	// Composite over white: draw.Src kept transparent pixels at (0,0,0,0), so a
 	// logo or QR with an alpha channel printed a black box.
 	rgba := image.NewRGBA(img.Bounds())
 	draw.Draw(rgba, rgba.Bounds(), image.White, image.Point{}, draw.Src)
 	draw.Draw(rgba, rgba.Bounds(), img, img.Bounds().Min, draw.Over)
+	img = nil
 	width := rgba.Bounds().Dx()
 	height := rgba.Bounds().Dy()
 	// StretchDIBits reads 32-bit BGRA. Swap R and B in place and pass a top-down
@@ -580,6 +646,9 @@ func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 	if err != nil {
 		return &Error{Code: "SPOOL_ERROR", Message: err.Error()}
 	}
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	hdc, _, callErr := procCreateDCW.Call(
 		uintptr(unsafe.Pointer(driverName)),
 		uintptr(unsafe.Pointer(printerName)),
@@ -592,6 +661,11 @@ func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 		return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 	}
 	defer procDeleteDC.Call(hdc)
+	// CreateDCW cannot be cancelled; if it returned after the caller's deadline,
+	// stop before starting a document.
+	if err := ctx.Err(); err != nil {
+		return err
+	}
 	docName, err := syscall.UTF16PtrFromString("Bikri " + job.ID)
 	if err != nil {
 		return &Error{Code: "SPOOL_ERROR", Message: "invalid job id: " + err.Error()}
@@ -611,6 +685,12 @@ func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 	}
 	abort := func() {
 		_, _, _ = procAbortDoc.Call(hdc)
+	}
+	// StartDocW can block on a wedged driver too; abort the document it may
+	// have opened instead of drawing into a dead handle.
+	if err := ctx.Err(); err != nil {
+		abort()
+		return err
 	}
 	// MM_TEXT coordinates are printer pixels, so a 1:1 StretchDIBits draw was a
 	// 24 mm strip on a 600 dpi driver and clipped on a 180 dpi head. Ask the
@@ -634,12 +714,16 @@ func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 		for _, band := range bands {
 			if err := ctx.Err(); err != nil {
 				abort()
-				return &Error{Code: "SPOOL_ERROR", Message: err.Error()}
+				return err
 			}
 			r1, _, callErr = procStartPage.Call(hdc)
 			if !gdiSucceeded(r1) {
 				abort()
 				return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
+			}
+			if err := ctx.Err(); err != nil {
+				abort()
+				return err
 			}
 			_, _, _ = procSetMapMode.Call(hdc, gdiMMText)
 			// HALFTONE smooths the downscale/upscale instead of dropping rows.
@@ -676,15 +760,37 @@ func (b *windowsBackend) printImage(ctx context.Context, job Job) error {
 				abort()
 				return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 			}
+			// StretchDIBits cannot be cancelled while it is blocked. If the
+			// deadline passed during the call, abort the page before sending
+			// another band.
+			if err := ctx.Err(); err != nil {
+				abort()
+				return err
+			}
 			r1, _, callErr = procEndPage.Call(hdc)
 			if !gdiSucceeded(r1) {
 				abort()
 				return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 			}
+			if err := ctx.Err(); err != nil {
+				abort()
+				return err
+			}
 		}
+	}
+	// EndDoc commits the document. Check the deadline before it: an abort after
+	// a successful EndDoc cannot un-spool the receipt, so a late cancellation
+	// must not turn an accepted document into a retry.
+	if err := ctx.Err(); err != nil {
+		abort()
+		return err
 	}
 	r1, _, callErr = procEndDoc.Call(hdc)
 	if !gdiSucceeded(r1) {
+		if err := ctx.Err(); err != nil {
+			abort()
+			return err
+		}
 		return &Error{Code: "SPOOL_ERROR", Message: lastError(callErr)}
 	}
 	runtime.KeepAlive(bits)
@@ -698,7 +804,10 @@ func deviceCaps(hdc uintptr, index int32) int {
 	return int(int32(value))
 }
 
-func openPrinter(name string) (syscall.Handle, error) {
+func openPrinter(ctx context.Context, name string) (syscall.Handle, error) {
+	if err := ctx.Err(); err != nil {
+		return 0, err
+	}
 	ptr, err := syscall.UTF16PtrFromString(name)
 	if err != nil {
 		return 0, &Error{Code: "UNKNOWN_PRINTER", Message: err.Error()}
@@ -710,6 +819,14 @@ func openPrinter(name string) (syscall.Handle, error) {
 		0,
 	)
 	runtime.KeepAlive(ptr)
+	// OpenPrinterW has no cancellation; if it returned after the deadline, close
+	// the handle it opened and report the cancellation instead of spooling.
+	if err := ctx.Err(); err != nil {
+		if r1 != 0 {
+			_, _, _ = procClosePrinter.Call(uintptr(handle))
+		}
+		return 0, err
+	}
 	if r1 == 0 {
 		return 0, &Error{Code: "UNKNOWN_PRINTER", Message: lastError(callErr)}
 	}

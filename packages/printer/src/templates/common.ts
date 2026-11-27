@@ -1,7 +1,7 @@
 import { fill, formatReceiptPhone } from '../format.ts';
 import type { Block, TextSize } from '../types.ts';
 import { resolveLabels } from './labels.ts';
-import type { ReceiptLabels, ReceiptShop } from './types.ts';
+import type { ReceiptLabels, ReceiptLine, ReceiptShop } from './types.ts';
 
 export type TemplateSettings = {
   paperMm?: 44 | 58 | 76 | 80 | 112;
@@ -153,4 +153,26 @@ export function pushBundleComponent(
 
 export function labelsFrom(partial?: Partial<ReceiptLabels>): ReceiptLabels {
   return resolveLabels(partial);
+}
+
+/**
+ * Group bundle component lines once. A sale with N lines and B bundles used to
+ * scan all N lines for every bundle group (O(N×B)); the renderers now look the
+ * group up directly, preserving the original line order inside each group.
+ */
+export function bundleLinesByGroup(
+  lines: ReceiptLine[],
+): Map<string, ReceiptLine[]> {
+  const groups = new Map<string, ReceiptLine[]>();
+  for (const line of lines) {
+    const key = line.bundleGroup;
+    if (!key) continue;
+    const group = groups.get(key);
+    if (group === undefined) {
+      groups.set(key, [line]);
+    } else {
+      group.push(line);
+    }
+  }
+  return groups;
 }

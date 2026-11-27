@@ -6,6 +6,7 @@ import { ensureLocalTenant } from '../data/localTenant.ts';
 import { finishSetup } from '../data/setup.ts';
 import { createSupplier } from '../data/suppliers.ts';
 import { writeAction } from '../data/write.ts';
+import { clearSoldCache, clearWarmCatalogue } from '../state/catalogue.ts';
 import { useSession } from '../state/session.ts';
 import { seedSampleDay } from './sampleDay.ts';
 
@@ -370,6 +371,10 @@ export async function seedManyProducts(n: number): Promise<void> {
     rev: 1,
   }));
   await db.products.bulkAdd(rows);
+  // The seeder writes the table directly; production writes go through the repository
+  // and pull/restore already clear these caches.
+  clearWarmCatalogue();
+  clearSoldCache();
 }
 
 /** A customer with an optional credit limit and opening balance (paisa), e2e only. */

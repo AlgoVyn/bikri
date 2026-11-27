@@ -45,6 +45,11 @@ type Job struct {
 	Copies    int
 	Encoding  string // "escpos" or "png"
 	Data      []byte
+	// ImageWidth/ImageHeight are the PNG dimensions the agent already validated
+	// centrally. Driver backends use them instead of decoding the IHDR again
+	// (L11), and the backend may set Data to nil once it has read the document.
+	ImageWidth  int
+	ImageHeight int
 }
 
 // Status is the OS-reported state of a submitted job.
@@ -65,7 +70,9 @@ func (e *Error) Error() string { return e.Code + ": " + e.Message }
 // Backend is implemented per operating system.
 type Backend interface {
 	ListPrinters(ctx context.Context) ([]Printer, error)
-	Print(ctx context.Context, job Job) (spoolID string, err error)
+	// Print receives a pointer so a driver backend can release the encoded
+	// payload as soon as it has decoded it (M17.3).
+	Print(ctx context.Context, job *Job) (spoolID string, err error)
 	Status(ctx context.Context, printer, spoolID string) (Status, error)
 	Cancel(ctx context.Context, printer, spoolID string) error
 }

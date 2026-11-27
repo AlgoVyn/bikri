@@ -15,6 +15,7 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
 import { UsersIcon } from '../components/icons.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { getDb } from '../data/db.ts';
@@ -26,7 +27,6 @@ import {
   staffList,
 } from '../data/settings.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
-import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { SettingsGuard } from './Guard.tsx';

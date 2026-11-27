@@ -9,12 +9,27 @@ import { monotonicFactory } from 'ulidx';
  * reached exactly 1 and only the base-32 encoder's clamp kept it valid, so divide by
  * `0x100` instead.
  */
+let entropyPool: Uint8Array | null = null;
+let entropyOffset = 256;
+let entropySource: typeof globalThis.crypto | null = null;
+
 export function randomUnit(): number {
   const source = globalThis.crypto;
   if (typeof source?.getRandomValues === 'function') {
-    const byte = new Uint8Array(1);
-    source.getRandomValues(byte);
-    return (byte[0] ?? 0) / 0x100;
+    // A ULID asks for 16 draws per new millisecond; one 256-byte CSPRNG refill avoids
+    // 16 tiny Uint8Array allocations and getRandomValues calls in the hot path. A test
+    // or runtime that swaps the crypto object gets a fresh pool.
+    if (
+      entropyPool === null ||
+      entropySource !== source ||
+      entropyOffset >= entropyPool.length
+    ) {
+      entropyPool = new Uint8Array(256);
+      source.getRandomValues(entropyPool);
+      entropyOffset = 0;
+      entropySource = source;
+    }
+    return (entropyPool[entropyOffset++] ?? 0) / 0x100;
   }
   return Math.random();
 }

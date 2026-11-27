@@ -227,6 +227,8 @@ export type ReportOptions = {
   summaryOnly?: boolean;
   /** Defaults to true; the Reports tabs other than Products set false. */
   slowMovers?: boolean;
+  /** Return only the slow-mover rows, without cloning the whole report bundle. */
+  slowMoversOnly?: boolean;
 };
 
 export function addDays(date: string, days: number): string {
@@ -977,9 +979,9 @@ async function stockReport(
   db: BikriDb,
   range: ReportRange,
 ): Promise<StockReport> {
-  const products = (await db.products.toArray()).filter(
-    (product) => !product.deleted_at,
-  );
+  const products = (
+    await db.products.where('track_stock').equals(1).toArray()
+  ).filter((product) => !product.deleted_at);
   const levels = new Map(
     (
       await db.stock_levels.bulkGet(
@@ -1034,27 +1036,31 @@ async function stockReport(
     }, 0);
 
   const movementMap = new Map<string, MovementSummaryRow>();
-  const movements = (
-    await db.stock_movements
-      .where('business_date')
-      .between(range.from, range.to, true, true)
-      .toArray()
-  ).filter((movement) => inRange(movement, range));
-  for (const movement of movements) {
-    const reason = String(movement.reason_code);
-    const row = movementMap.get(reason) ?? {
-      reason,
-      count: 0,
-      inQty: 0,
-      outQty: 0,
-      netQty: 0,
-    };
-    const delta = n(movement.qty_delta_milli);
-    row.count += 1;
-    row.inQty += Math.max(delta, 0);
-    row.outQty += Math.max(-delta, 0);
-    row.netQty += delta;
-    movementMap.set(reason, row);
+  // Aggregate one calendar month at a time. A multi-year stock report must not hold
+  // hundreds of thousands of movement rows in memory just to sum five counters.
+  for (const chunk of monthChunks(range.from, range.to)) {
+    const movements = (
+      await db.stock_movements
+        .where('business_date')
+        .between(chunk.from, chunk.to, true, true)
+        .toArray()
+    ).filter((movement) => inRange(movement, range));
+    for (const movement of movements) {
+      const reason = String(movement.reason_code);
+      const row = movementMap.get(reason) ?? {
+        reason,
+        count: 0,
+        inQty: 0,
+        outQty: 0,
+        netQty: 0,
+      };
+      const delta = n(movement.qty_delta_milli);
+      row.count += 1;
+      row.inQty += Math.max(delta, 0);
+      row.outQty += Math.max(-delta, 0);
+      row.netQty += delta;
+      movementMap.set(reason, row);
+    }
   }
 
   const returns = (

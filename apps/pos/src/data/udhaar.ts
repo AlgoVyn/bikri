@@ -205,17 +205,16 @@ export type CustomerListData = {
   payments: SyncedRow[];
 };
 
-/** Loads the customer directory once; filtering/sorting stays in memory. */
-export async function loadCustomerListData(
+/** Customer rows only; payment history is a separate live query. */
+export async function loadCustomerRows(
   src: TableSource,
-  today: string,
-): Promise<CustomerListData> {
+): Promise<CustomerRow[]> {
   const balances = await balancesOf(src);
   const promises = await openPromises(src);
   const customers = (
     await (src.table('customers') as Table<MasterRow>).toArray()
   ).filter((c) => !c.deleted_at);
-  const rows: CustomerRow[] = customers.map((customer) => {
+  return customers.map((customer) => {
     const balance = balances.get(customer.id);
     const promise = promises.get(customer.id)?.[0] ?? null;
     return {
@@ -229,8 +228,15 @@ export async function loadCustomerListData(
       promise,
     };
   });
+}
+
+/** Customer payments in the current month, for the header card. */
+export async function loadCustomerMonthPayments(
+  src: TableSource,
+  today: string,
+): Promise<SyncedRow[]> {
   const month = today.slice(0, 7);
-  const payments = (
+  return (
     await (src.table('payments') as Table<SyncedRow>)
       .where('business_date')
       .between(`${month}-01`, `${month}-31`, true, true)
@@ -241,6 +247,17 @@ export async function loadCustomerListData(
       p.purpose === 'customer_payment' &&
       p.party_type === 'customer',
   );
+}
+
+/** Loads both parts for callers that do not already hold them. */
+export async function loadCustomerListData(
+  src: TableSource,
+  today: string,
+): Promise<CustomerListData> {
+  const [rows, payments] = await Promise.all([
+    loadCustomerRows(src),
+    loadCustomerMonthPayments(src, today),
+  ]);
   return { rows, payments };
 }
 
@@ -562,12 +579,23 @@ export async function customerStatement(
       .map((row) => [row.id, row]),
   );
 
-  const saleOf = async (id: string): Promise<SyncedRow | undefined> => {
-    if (sales.has(id)) return sales.get(id);
-    const row = await (src.table('sales') as Table<SyncedRow>).get(id);
-    if (row) sales.set(id, row);
-    return row;
-  };
+  // Refund/void statement rows link to the original sale; one bulkGet covers every
+  // related sale instead of a `get` inside the entry loop.
+  const relatedSaleIds = [
+    ...new Set(
+      [...refunds.values(), ...voids.values()]
+        .map((row) => (row.sale_id ? String(row.sale_id) : ''))
+        .filter((id) => id !== '' && !sales.has(id)),
+    ),
+  ];
+  if (relatedSaleIds.length > 0) {
+    for (const sale of await (src.table('sales') as Table<SyncedRow>).bulkGet(
+      relatedSaleIds,
+    ))
+      if (sale) sales.set(sale.id, sale);
+  }
+
+  const saleOf = (id: string): SyncedRow | undefined => sales.get(id);
 
   let openingBalance: number;
   let balances: number[];
@@ -610,7 +638,7 @@ export async function customerStatement(
     let method: string | null = null;
     let voided = false;
     if (entry.source_type === 'sale') {
-      const sale = sourceId ? await saleOf(sourceId) : undefined;
+      const sale = sourceId ? saleOf(sourceId) : undefined;
       kind = 'sale';
       invoiceNo = sale ? String(sale.invoice_no) : null;
       saleId = sale ? String(sale.id) : null;
@@ -627,16 +655,14 @@ export async function customerStatement(
     } else if (entry.source_type === 'refund') {
       kind = 'refund';
       const refund = refunds.get(sourceId);
-      const sale = refund?.sale_id
-        ? await saleOf(String(refund.sale_id))
-        : undefined;
+      const sale = refund?.sale_id ? saleOf(String(refund.sale_id)) : undefined;
       invoiceNo = sale ? String(sale.invoice_no) : null;
       saleId = sale ? String(sale.id) : null;
     } else if (entry.source_type === 'void') {
       kind = 'void';
       const voidRow = voids.get(sourceId);
       const sale = voidRow?.sale_id
-        ? await saleOf(String(voidRow.sale_id))
+        ? saleOf(String(voidRow.sale_id))
         : undefined;
       invoiceNo = sale ? String(sale.invoice_no) : null;
       saleId = sale ? String(sale.id) : null;

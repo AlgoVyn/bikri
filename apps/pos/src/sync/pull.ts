@@ -17,7 +17,6 @@ import {
   clearCatalogueSearchCache,
   clearInvoiceSearchCache,
 } from '../data/search.ts';
-import { clearSupplierDeliveryCache } from '../data/suppliers.ts';
 import { clearSoldCache, clearWarmCatalogue } from '../state/catalogue.ts';
 import { SyncHttpError, tillAuth, tillRequest } from './client.ts';
 import { withSyncLock } from './lock.ts';
@@ -153,26 +152,27 @@ function clearReaderCaches(tables: Iterable<string>): void {
   let catalogue = false;
   let warm = false;
   let invoice = false;
-  let purchases = false;
   let firstDay = false;
   for (const table of tables) {
     if (SOLD_SOURCE_TABLES.has(table)) sold = true;
     if (SEARCH_CATALOGUE_TABLES.has(table)) catalogue = true;
     if (WARM_TABLES.has(table) || SOLD_SOURCE_TABLES.has(table)) warm = true;
     if (SEARCH_INVOICE_TABLES.has(table)) invoice = true;
-    if (table === 'purchases') purchases = true;
     if (FIRST_DAY_TABLES.has(table)) firstDay = true;
   }
   if (sold) clearSoldCache();
   if (warm) clearWarmCatalogue();
   if (catalogue) clearCatalogueSearchCache();
   if (invoice) clearInvoiceSearchCache();
-  if (purchases) clearSupplierDeliveryCache();
   if (firstDay) clearFirstBusinessDayCache();
 }
 
 /** Pulled rows that advance the derived caches (`stock_levels`, `party_balances`). */
-const CACHE_TABLES = new Set(['stock_movements', 'ledger_entries']);
+const CACHE_TABLES = new Set([
+  'stock_movements',
+  'ledger_entries',
+  'purchases',
+]);
 
 /** Only a row-shaped error is quarantined; storage/abort errors must keep the cursor. */
 function isRowError(error: unknown): boolean {
@@ -266,8 +266,9 @@ async function applyPage(
   nextSince: number,
 ): Promise<void> {
   const tbls = new Set(rows.map((row) => row.tbl));
-  // Only movement/ledger rows touch the derived caches; a master-data page must not
-  // lock the cache stores for nothing.
+  // Movements/ledger rows update the stock/party caches and a purchase updates the
+  // supplier last-delivery cache; a master-data page must not lock the cache stores
+  // for nothing.
   const caches = rows.some((row) => CACHE_TABLES.has(row.tbl));
   try {
     await db.transaction('rw', mergeScope(tbls, caches), async (tx) => {

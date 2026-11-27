@@ -3,34 +3,12 @@
 const WORKER_TIMEOUT_MS = 30_000;
 let nextId = 1;
 
-/** The file itself is unreadable; retrying the same bytes on the main thread is useless. */
+/** The file itself is unreadable; retrying the same bytes is useless. */
 class SheetParseError extends Error {
   constructor(message: string) {
     super(message);
     this.name = 'SheetParseError';
   }
-}
-
-function readMainThread(file: File): Promise<string[][]> {
-  return (async () => {
-    const name = file.name.toLowerCase();
-    if (name.endsWith('.xlsx')) {
-      const { readSheet } = await import('read-excel-file/browser');
-      const data = await readSheet(file);
-      return data.map((row) =>
-        row.map((cell) => {
-          if (cell === null || cell === undefined) return '';
-          if (cell instanceof Date) return cell.toISOString().slice(0, 10);
-          if (typeof cell === 'boolean') return cell ? 'yes' : 'no';
-          return String(cell);
-        }),
-      );
-    }
-    const text = (await file.text()).replace(/^\uFEFF/u, '');
-    const { default: Papa } = await import('papaparse');
-    const parsed = Papa.parse<string[]>(text, { skipEmptyLines: 'greedy' });
-    return parsed.data.map((row) => row.map((cell) => String(cell ?? '')));
-  })();
 }
 
 function readInWorker(file: File): Promise<string[][]> {
@@ -78,13 +56,12 @@ function readInWorker(file: File): Promise<string[][]> {
 }
 
 export async function readSheetFile(file: File): Promise<string[][]> {
-  if (typeof Worker === 'undefined') return readMainThread(file);
-  try {
-    return await readInWorker(file);
-  } catch (error) {
-    // A corrupt file is corrupt in both places; only retry when the worker could not
-    // run (module workers refused, a parser that needs the DOM, a transport failure).
-    if (error instanceof SheetParseError) throw error;
-    return readMainThread(file);
-  }
+  // Parsing happens only in the module worker: a main-thread fallback duplicated both
+  // parser libraries in the offline precache (~23 KB gz) and blocked the counter on a
+  // 5,000-row file. Every browser that can run this PWA supports module workers.
+  if (typeof Worker === 'undefined')
+    throw new SheetParseError(
+      'This browser cannot read spreadsheets. Update it and try again.',
+    );
+  return readInWorker(file);
 }

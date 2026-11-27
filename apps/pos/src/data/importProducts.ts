@@ -369,7 +369,8 @@ export async function previewImport(
   const [headerRow, ...body] = grid;
   const headers = (headerRow ?? []).map((h) => String(h ?? ''));
   const kindIndex = headers.findIndex((h) => norm(h) === 'kind');
-  const products = (await db.products.toArray()).filter((p) => !p.deleted_at);
+  const allProducts = await db.products.toArray();
+  const products = allProducts.filter((p) => !p.deleted_at);
   const byId = new Map(products.map((p) => [p.id, p]));
   const levels = new Map(
     (await db.stock_levels.toArray()).map((level) => [
@@ -381,9 +382,7 @@ export async function previewImport(
   // A soft-deleted row still owns its SKU in D1. Do not silently invent another one
   // during the import; show the same taken-SKU error as the live collision (POS-L6).
   const deletedSkus = new Set(
-    (await db.products.toArray())
-      .filter((p) => p.deleted_at)
-      .map((p) => String(p.sku ?? '')),
+    allProducts.filter((p) => p.deleted_at).map((p) => String(p.sku ?? '')),
   );
   const byBarcode = new Map<string, string>();
   for (const b of await db.product_barcodes.toArray()) {
@@ -539,8 +538,9 @@ export async function runImport(
   } = {},
 ): Promise<ImportResult> {
   const valid = preview.rows.filter((r) => r.action !== 'error');
+  const categoryRows = await db.categories.toArray();
   const categories = new Map<string, string>();
-  for (const c of await db.categories.toArray()) {
+  for (const c of categoryRows) {
     if (!c.deleted_at)
       categories.set(
         String(c.name_en ?? '')
@@ -549,13 +549,12 @@ export async function runImport(
         c.id,
       );
   }
-  let sortOrder = (await db.categories.toArray()).reduce(
+  let sortOrder = categoryRows.reduce(
     (m, c) => Math.max(m, Number(c.sort_order ?? 0)),
     0,
   );
-  const usedSkus = new Set(
-    (await db.products.toArray()).map((p) => String(p.sku ?? '')),
-  );
+  const products = await db.products.toArray();
+  const usedSkus = new Set(products.map((p) => String(p.sku ?? '')));
   const result: ImportResult = {
     created: 0,
     updated: 0,

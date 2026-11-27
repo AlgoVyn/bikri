@@ -30,7 +30,7 @@ import {
 } from '../data/cart.ts';
 import { formatBusinessDate } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
-import { isLatinName, qtyWithUnit } from '../products/format.ts';
+import { isLatinName, qtyWithUnit } from '../lib/productFormat.ts';
 import type { CartOrder } from '../shell/devicePrefs.ts';
 import { cartItemCount } from './itemCount.ts';
 import { InlineDiscount, LineEditor } from './LineEditor.tsx';

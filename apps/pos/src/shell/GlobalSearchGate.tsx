@@ -1,5 +1,5 @@
 import { lazy, Suspense, useEffect } from 'react';
-import { composing, dialogOpen, ignoresHotkey } from './hotkeys.ts';
+import { composing, dialogOpen, ignoresHotkey } from '../lib/hotkeys.ts';
 import { useGlobalSearch } from './searchStore.ts';
 
 /**

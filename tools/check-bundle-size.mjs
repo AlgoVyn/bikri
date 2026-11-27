@@ -20,10 +20,15 @@ const CSS_BUDGET = 25 * 1024;
 const PRECACHE_BUDGET = 1.25 * 1024 * 1024;
 // Chunk fragmentation gate (D-272): the review target is <=60 chunks and <=8-10
 // initial requests. Keep a little headroom for a new route or vendor split.
-const MAX_TOTAL_JS_CHUNKS = 60;
+// Route wrappers are split into their feature chunks (C1); that costs a few more
+// files but each first route no longer pays for all 18 lazy routes.
+const MAX_TOTAL_JS_CHUNKS = 64;
 const MAX_INITIAL_JS_FILES = 12;
 const MAX_MODULE_PRELOADS = 8;
 const MAX_SUB_KB_CHUNKS = 10;
+// A route may load its own feature plus the shared data/components/vendor chunks, but
+// not the whole back office. This is the gate the chunk budget alone could not see.
+const ROUTE_CLOSURE_BUDGET = 420 * 1024;
 
 const html = readFileSync(join(DIST, 'index.html'), 'utf8');
 const initial = new Set(
@@ -104,18 +109,19 @@ for (const rel of files) {
   }
 }
 // The active language's catalog is loaded before the first render (D-100): count the
-// largest. The build's locale-preload script carries the exact hash map, so main/office/
-// public locale chunks are not mistaken for the catalog.
-const preloadRel = files.find((rel) =>
-  /^assets\/locale-preload-[\w-]+\.js$/.test(rel),
-);
+// largest. The inline theme/language script reads the exact hash map from the
+// `bikri-locales` meta tag, so main/office/public locale chunks are not mistaken for
+// the catalog.
 let localeMap = {};
-if (preloadRel === undefined) {
-  problems.push('no locale-preload script found (language preload missing)');
+const localeMeta = /<meta name="bikri-locales" content='([^']*)'/u.exec(html);
+if (!localeMeta?.[1]) {
+  problems.push('bikri-locales meta map not found (language preload missing)');
 } else {
-  const source = readFileSync(join(DIST, preloadRel), 'utf8');
-  const match = /var m=(\{[^}]*\})/u.exec(source);
-  if (match?.[1]) localeMap = JSON.parse(match[1]);
+  try {
+    localeMap = JSON.parse(localeMeta[1]);
+  } catch {
+    problems.push('bikri-locales meta map is not valid JSON');
+  }
 }
 const localeChunks = [];
 for (const locale of ['en', 'roman-ur', 'ur']) {
@@ -202,6 +208,49 @@ if (danglingImports.length > 0) {
       .join(', ')}`,
   );
 }
+
+// First-route closure: a chunk gate can pass while an entry statically pulls in every
+// other feature. Walk the static import graph from each feature chunk and sum gzip.
+const importGraph = new Map();
+for (const rel of files) {
+  const source = readFileSync(join(DIST, rel), 'utf8');
+  const targets = [];
+  for (const match of source.matchAll(staticImportPattern)) {
+    const specifier = match[1] ?? match[2];
+    if (specifier === undefined || !specifier.startsWith('.')) continue;
+    targets.push(posix.normalize(posix.join(posix.dirname(rel), specifier)));
+  }
+  importGraph.set(rel, targets);
+}
+let largestClosure = { rel: '', size: 0 };
+for (const rel of files) {
+  if (!/^assets\/app-[^/]+\.js$/u.test(rel) || !precached.has(rel)) continue;
+  const seen = new Set();
+  const stack = [rel];
+  while (stack.length > 0) {
+    const current = stack.pop();
+    if (current === undefined || seen.has(current)) continue;
+    seen.add(current);
+    stack.push(...(importGraph.get(current) ?? []));
+  }
+  let size = 0;
+  for (const dependency of seen) {
+    try {
+      size += gz(dependency);
+    } catch {
+      // A chunk outside the dist (manual precache entry) is not counted.
+    }
+  }
+  if (size > largestClosure.size) largestClosure = { rel, size };
+  if (size > ROUTE_CLOSURE_BUDGET) {
+    problems.push(
+      `${rel} first-route closure is ${kb(size)} gz (budget ${kb(ROUTE_CLOSURE_BUDGET)})`,
+    );
+  }
+}
+console.log(
+  `largest first-route closure: ${largestClosure.rel || 'none'} ${kb(largestClosure.size)} gz (budget ${kb(ROUTE_CLOSURE_BUDGET)})`,
+);
 let precacheTotal = 0;
 for (const rel of precache) {
   try {

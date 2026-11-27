@@ -1,6 +1,6 @@
 import type { TFunction } from 'i18next';
 import type { StatementEntry } from '../data/udhaar.ts';
-import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
+import { formatBusinessDate, formatTimestamp } from './date.ts';
 
 const SHORT_DATE_FORMATS = new Map<string, Intl.DateTimeFormat>();
 

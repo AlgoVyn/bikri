@@ -141,21 +141,39 @@ function textWidth(text: string): number {
 
 /** Cut from the start without splitting a surrogate pair or Urdu cluster. */
 function clipStart(text: string, width: number): string {
+  if (!hasNonAscii(text)) {
+    // ASCII is one code unit per printable cell; no grapheme segmentation.
+    return text.length <= width ? text : text.slice(0, Math.max(0, width));
+  }
   // Segment once; the old textWidth + graphemes pair walked Urdu strings three times.
-  const units = hasNonAscii(text) ? graphemes(text) : Array.from(text);
+  const units = graphemes(text);
   if (units.length <= width) return text;
   return units.slice(0, Math.max(0, width)).join('');
 }
 
 /** Cut from the end without splitting a surrogate pair or Urdu cluster. */
 function clipEnd(text: string, width: number): string {
-  const units = hasNonAscii(text) ? graphemes(text) : Array.from(text);
+  if (!hasNonAscii(text)) {
+    return text.length <= width
+      ? text
+      : text.slice(Math.max(0, text.length - Math.max(0, width)));
+  }
+  const units = graphemes(text);
   if (units.length <= width) return text;
   return units.slice(Math.max(0, units.length - Math.max(0, width))).join('');
 }
 
 /** Replace ASCII control characters with spaces; they crash ESC/POS text mode. */
 export function sanitizeInline(text: string): string {
+  let clean = true;
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code < 32 || code === 127) {
+      clean = false;
+      break;
+    }
+  }
+  if (clean) return text;
   let out = '';
   for (const char of text) {
     const code = char.codePointAt(0) ?? 0;
@@ -164,16 +182,78 @@ export function sanitizeInline(text: string): string {
   return out;
 }
 
+/** ASCII-only sanitisation for {@link wrapText}; one pass, no char array. */
+function sanitizeAscii(text: string): string {
+  let clean = true;
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    if (code < 32 || code === 127) {
+      clean = false;
+      break;
+    }
+  }
+  if (clean) return text;
+  let out = '';
+  for (let i = 0; i < text.length; i += 1) {
+    const code = text.charCodeAt(i);
+    out += code < 32 || code === 127 ? ' ' : (text[i] ?? '');
+  }
+  return out;
+}
+
+/**
+ * ASCII wrap: code units are printable cells, so index/slice arithmetic
+ * replaces the per-character array and the join per line (L9). The break rules
+ * are identical to the grapheme path below.
+ */
+function wrapAscii(text: string, width: number): string[] {
+  const clean = sanitizeAscii(text);
+  let end = clean.length;
+  while (end > 0 && clean.charCodeAt(end - 1) === 32) end -= 1;
+  if (end === 0) {
+    return [];
+  }
+  const lines: string[] = [];
+  let start = 0;
+  while (end - start > width) {
+    let breakAt = -1;
+    let content = false;
+    for (let i = start; i <= start + width && i < end; i += 1) {
+      if (clean.charCodeAt(i) === 32) {
+        if (content) breakAt = i;
+      } else {
+        content = true;
+      }
+    }
+    if (breakAt <= start) {
+      lines.push(clean.slice(start, start + width));
+      start += width;
+      continue;
+    }
+    const piece = clean.slice(start, breakAt).trimEnd();
+    start = breakAt + 1;
+    while (start < end && clean.charCodeAt(start) === 32) start += 1;
+    if (piece.length > 0) {
+      lines.push(piece);
+    }
+  }
+  if (start < end) {
+    lines.push(clean.slice(start, end));
+  }
+  return lines;
+}
+
 export function wrapText(text: string, width: number): string[] {
   if (!Number.isInteger(width) || width < 1) {
     throw new Error('width must be a positive integer');
   }
-  const chars = (hasNonAscii(text) ? graphemes(text) : Array.from(text)).map(
-    (ch) => {
-      const code = ch.codePointAt(0) ?? 0;
-      return code < 32 || code === 127 ? ' ' : ch;
-    },
-  );
+  if (!hasNonAscii(text)) {
+    return wrapAscii(text, width);
+  }
+  const chars = graphemes(text).map((ch) => {
+    const code = ch.codePointAt(0) ?? 0;
+    return code < 32 || code === 127 ? ' ' : ch;
+  });
   let end = chars.length;
   while (end > 0 && chars[end - 1] === ' ') end -= 1;
   if (end === 0) {

@@ -20,8 +20,8 @@ import {
   renderReceiptText,
   resolvePaper,
   type SaleReceiptInput,
-  saleBasicInput,
 } from './index.ts';
+import { saleBasicInput } from './templates/saleBasicFixture.ts';
 
 function text80(blocks: ReturnType<typeof buildSaleReceipt>): string {
   return renderReceiptText(blocks, resolvePaper({ paperMm: 80 }));

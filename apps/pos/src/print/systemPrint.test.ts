@@ -2,8 +2,8 @@ import {
   buildSaleReceipt,
   renderReceiptHtml,
   resolvePaper,
-  saleBasicInput,
 } from '@bikri/printer';
+import { saleBasicInput } from '@bikri/printer/testing';
 import { afterEach, describe, expect, it, vi } from 'vitest';
 import { printHtmlViaSystem } from './systemPrint.ts';
 

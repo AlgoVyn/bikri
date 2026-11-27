@@ -16,6 +16,7 @@ import {
   buttonQuiet,
   fieldClass,
 } from '../components/classes.ts';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { PhoneInput } from '../components/PhoneInput.tsx';
@@ -41,7 +42,6 @@ import { formatTimestamp } from '../lib/date.ts';
 import { formatShopMoney } from '../lib/money';
 import { cartItemCount } from './itemCount.ts';
 import { DiscountToggle, percentToBp } from './LineEditor.tsx';
-import { Modal } from './Modal.tsx';
 
 function Actions({ submit, disabled }: { submit: string; disabled?: boolean }) {
   const { t } = useTranslation();

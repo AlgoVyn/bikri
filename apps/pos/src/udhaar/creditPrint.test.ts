@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
+import { shortDateText } from '../lib/udhaarFormat.ts';
 import { statementBlocks } from './creditPrint.ts';
-import { shortDateText } from './format.ts';
 import type { StatementFileMeta } from './statementFile.ts';
 
 describe('customer statement print blocks', () => {

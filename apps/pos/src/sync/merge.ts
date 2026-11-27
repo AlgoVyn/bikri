@@ -4,7 +4,11 @@
  */
 import type { SyncedRow } from '@bikri/db';
 import type { Table, Transaction } from 'dexie';
-import { applyLedgerEntries, applyStockMovements } from '../data/caches.ts';
+import {
+  applyLedgerEntries,
+  applyPurchaseDates,
+  applyStockMovements,
+} from '../data/caches.ts';
 import { isPulledTable } from './tables.ts';
 
 export type ServerRow = { tbl: string; row: SyncedRow };
@@ -200,6 +204,7 @@ export async function mergeRows(
     byTable.set(tbl, list);
   }
 
+  const storedPurchases: SyncedRow[] = [];
   for (const [tbl, list] of byTable) {
     const table = tx.table(tbl) as Table<SyncedRow, string>;
     // A single row uses put() so the row-by-row quarantine path still sees the real
@@ -274,7 +279,13 @@ export async function mergeRows(
       );
       await applyLedgerEntries({ table: (name) => tx.table(name) }, ordered);
     }
+    if (opts.caches && tbl === 'purchases') storedPurchases.push(...list);
   }
+  if (storedPurchases.length > 0)
+    await applyPurchaseDates(
+      { table: (name) => tx.table(name) },
+      storedPurchases,
+    );
   return applied.length;
 }
 

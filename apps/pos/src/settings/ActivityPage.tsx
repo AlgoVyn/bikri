@@ -18,7 +18,7 @@ import {
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
 import { downloadText } from '../lib/download.ts';
-import { addDays, longDate, timeText } from '../reports/format.ts';
+import { addDays, longDate, timeText } from '../lib/reportFormat.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { SettingsGuard } from './Guard.tsx';
 import { SettingsPageLayout } from './Layout.tsx';

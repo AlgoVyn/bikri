@@ -101,6 +101,51 @@ const ATTENTION_TABLES = new Set([
   'day_closes',
 ]);
 
+/** Kinds recomputed by a changed store, so a partial refresh keeps the other rows. */
+const ATTENTION_KINDS: Record<string, AttentionItem['kind'][]> = {
+  products: ['low_stock'],
+  stock_levels: ['low_stock'],
+  promises: ['promises_due'],
+  customers: ['over_limit'],
+  party_balances: ['over_limit'],
+  print_jobs: ['failed_prints'],
+  sync_conflicts: ['conflicts'],
+  held_bills: ['held_expiring'],
+  sales: ['day_not_closed'],
+  day_closes: ['day_not_closed'],
+};
+
+const ATTENTION_ORDER: AttentionItem['kind'][] = [
+  'sync_stale',
+  'sync_pending_old',
+  'clock_wrong',
+  'low_stock',
+  'promises_due',
+  'over_limit',
+  'failed_prints',
+  'conflicts',
+  'held_expiring',
+  'day_not_closed',
+];
+
+function mergeAttention(
+  previous: AttentionItem[],
+  changed: AttentionItem[],
+  tables: ReadonlySet<string>,
+): AttentionItem[] {
+  const affected = new Set<AttentionItem['kind']>();
+  for (const table of tables) {
+    for (const kind of ATTENTION_KINDS[table] ?? []) affected.add(kind);
+  }
+  const merged = [
+    ...previous.filter((item) => !affected.has(item.kind)),
+    ...changed,
+  ];
+  return merged.sort(
+    (a, b) => ATTENTION_ORDER.indexOf(a.kind) - ATTENTION_ORDER.indexOf(b.kind),
+  );
+}
+
 /** Stores that can change the expected cash in this device's drawer. */
 const CASH_TABLES = new Set([
   'payments',
@@ -259,7 +304,12 @@ export function HomePage() {
           },
           changed,
         );
-        if (alive) setAttention(items);
+        if (alive)
+          setAttention((previous) =>
+            changed === undefined
+              ? items
+              : mergeAttention(previous, items, changed),
+          );
       } catch {
         // An attention row is advisory; a failed read must not break Home.
       }
@@ -268,9 +318,9 @@ export function HomePage() {
       pendingTables = new Set([...(pendingTables ?? []), ...tables]);
       if (timer) clearTimeout(timer);
       timer = setTimeout(() => {
+        const changed = pendingTables ?? undefined;
         pendingTables = null;
-        // Recompute every kind: a partial refresh replaced the other warnings.
-        void load();
+        void load(changed);
       }, 250);
     };
     void load();

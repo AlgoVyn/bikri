@@ -5,6 +5,7 @@ import { ConfirmDialog } from '../components/ConfirmDialog.tsx';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { DialogFooter } from '../components/DialogFooter.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -14,7 +15,6 @@ import { PaymentError, receivePayment } from '../data/udhaar.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
 import { ReadOnlyError } from '../data/write.ts';
 import { kickDrawerForCash } from '../print/drawer.ts';
-import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type PayMethod = 'cash' | 'card' | 'bank_wallet';

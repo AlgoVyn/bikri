@@ -1,5 +1,5 @@
 import type { TFunction } from 'i18next';
-import { type RefObject, useEffect, useRef, useState } from 'react';
+import { type RefObject, useEffect, useMemo, useRef, useState } from 'react';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PrivacyCurtain, usePrivacyActive } from '../components/privacy.tsx';
 import type {
@@ -7,7 +7,7 @@ import type {
   HourlyPoint,
   PaymentMix,
 } from '../data/reportBundle.ts';
-import { shortDate } from './format.ts';
+import { shortDate } from '../lib/reportFormat.ts';
 
 const COLORS: Record<keyof PaymentMix, string> = {
   cash: 'var(--color-primary)',
@@ -42,6 +42,27 @@ function useChartLabelFont(
   );
 }
 
+/**
+ * A 3-year range has ~1,100 daily bars; that is both unreadable and expensive to lay
+ * out. Keep daily detail for up to a quarter, then bucket by week/month and sum.
+ */
+function bucketDaily(points: readonly DailyPoint[]): DailyPoint[] {
+  const size = points.length > 730 ? 30 : points.length > 92 ? 7 : 1;
+  if (size === 1) return [...points];
+  const out: DailyPoint[] = [];
+  for (let at = 0; at < points.length; at += size) {
+    const bucket = points.slice(at, at + size);
+    const first = bucket[0];
+    if (first === undefined) continue;
+    out.push({
+      ...first,
+      sold: bucket.reduce((sum, point) => sum + point.sold, 0),
+      grossProfit: bucket.reduce((sum, point) => sum + point.grossProfit, 0),
+    });
+  }
+  return out;
+}
+
 /** Simple responsive bars + profit line, no chart library (screens/16). */
 export function DailyChart({
   points,
@@ -59,7 +80,8 @@ export function DailyChart({
   const width = 720;
   const height = 220;
   const pad = 56;
-  const values = points.flatMap((point) =>
+  const display = useMemo(() => bucketDaily(points), [points]);
+  const values = display.flatMap((point) =>
     showProfit ? [point.sold, point.grossProfit] : [point.sold],
   );
   const min = Math.min(0, ...values);
@@ -68,33 +90,33 @@ export function DailyChart({
   const allZero = values.every((value) => value === 0);
   const x = (index: number) =>
     pad +
-    (points.length === 1
+    (display.length === 1
       ? (width - 2 * pad) / 2
-      : (index / (points.length - 1)) * (width - 2 * pad));
+      : (index / (display.length - 1)) * (width - 2 * pad));
   const y = (value: number) =>
     pad + ((max - value) / span) * (height - 2 * pad);
   const zero = y(0);
   const barWidth = Math.max(
     1,
-    Math.min(18, (width - 2 * pad) / Math.max(1, points.length) - 1),
+    Math.min(18, (width - 2 * pad) / Math.max(1, display.length) - 1),
   );
   const labels = [
-    points[0],
-    points[Math.floor(points.length / 2)],
-    points.at(-1),
+    display[0],
+    display[Math.floor(display.length / 2)],
+    display.at(-1),
   ]
     .filter((point): point is DailyPoint => point !== undefined)
     .filter(
       (point, index, list) =>
         list.findIndex((p) => p.date === point.date) === index,
     );
-  const line = points
+  const line = display
     .map((point, index) => `${x(index)},${y(point.grossProfit)}`)
     .join(' ');
   const svgRef = useRef<SVGSVGElement>(null);
   const labelFont = useChartLabelFont(svgRef, width, !privacy);
   if (privacy) return <PrivacyCurtain className="h-52" />;
-  const summary = points
+  const summary = display
     .map((point) => `${shortDate(point.date, lang)} ${money(point.sold)}`)
     .join('; ');
 
@@ -160,7 +182,7 @@ export function DailyChart({
               </text>
             </g>
           ))}
-          {points.map((point, index) => {
+          {display.map((point, index) => {
             const top = point.sold >= 0 ? y(point.sold) : zero;
             const bottom = point.sold >= 0 ? zero : y(point.sold);
             return (
@@ -172,7 +194,7 @@ export function DailyChart({
                 height={Math.max(0, bottom - top)}
                 rx={1}
                 fill="var(--color-primary)"
-                opacity={point.date === points.at(-1)?.date ? 1 : 0.82}
+                opacity={point.date === display.at(-1)?.date ? 1 : 0.82}
               >
                 <title>
                   {`${shortDate(point.date, lang)} · ${money(point.sold)}`}
@@ -195,7 +217,7 @@ export function DailyChart({
           {labels.map((point) => (
             <text
               key={point.date}
-              x={x(points.indexOf(point))}
+              x={x(display.indexOf(point))}
               y={height - 6}
               textAnchor="middle"
               fontSize={labelFont}

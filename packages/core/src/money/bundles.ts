@@ -91,20 +91,26 @@ function allocateBigInt(amount: bigint, weights: readonly bigint[]): number[] {
 }
 
 /** Moves paisa from the largest surplus to lines below their component cost. */
-function coverCosts(shares: number[], costs: readonly number[]): void {
+export function coverCosts(shares: number[], costs: readonly number[]): void {
   for (let index = 0; index < shares.length; index += 1) {
-    const gap = (costs[index] as number) - (shares[index] as number);
-    if (gap <= 0) continue;
-    for (let moved = 0; moved < gap; moved += 1) {
-      let donor = 0;
-      for (let candidate = 1; candidate < shares.length; candidate += 1) {
+    let gap = (costs[index] as number) - (shares[index] as number);
+    while (gap > 0) {
+      let donor = -1;
+      let best = 0;
+      for (let candidate = 0; candidate < shares.length; candidate += 1) {
+        if (candidate === index) continue;
         const surplus =
           (shares[candidate] as number) - (costs[candidate] as number);
-        const best = (shares[donor] as number) - (costs[donor] as number);
-        if (surplus > best) donor = candidate;
+        if (surplus > best) {
+          best = surplus;
+          donor = candidate;
+        }
       }
-      shares[donor] = (shares[donor] as number) - 1;
-      shares[index] = (shares[index] as number) + 1;
+      if (donor < 0) break;
+      const moved = Math.min(gap, best);
+      shares[donor] = (shares[donor] as number) - moved;
+      shares[index] = (shares[index] as number) + moved;
+      gap -= moved;
     }
   }
 }

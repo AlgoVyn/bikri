@@ -8,6 +8,7 @@ import {
   type PurchaseLineResult,
 } from '@bikri/core';
 import type { BikriDb, MasterRow, SyncedRow } from '@bikri/db';
+import { applyPurchaseDates } from './caches.ts';
 import { isBusinessDate } from './dates.ts';
 import type { LedgerContext } from './products.ts';
 import { writeAction, writeScope } from './write.ts';
@@ -363,6 +364,9 @@ export async function saveDelivery(
           created_at: now,
         });
       }
+      // Keep the supplier list's last-delivery date on the party cache (Dexie V18). Do it
+      // after the ledger inserts so their party-balance writes cannot drop the field.
+      await applyPurchaseDates(w, [purchase]);
       return purchase;
     },
     {

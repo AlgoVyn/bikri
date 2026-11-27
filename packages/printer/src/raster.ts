@@ -9,6 +9,9 @@ export type PackedBitmap = {
 
 const BLACK_BELOW = 128;
 
+/** Pixel storage accepted by `RasterSource`; both expose the same indexing. */
+type RasterBytes = Uint8Array | Uint8ClampedArray;
+
 function assertSize(width: number, height: number): void {
   if (!Number.isInteger(width) || width < 1) {
     throw new Error('raster width must be a positive integer');
@@ -77,28 +80,105 @@ function spread(
   buf[index] = (buf[index] ?? 0) + value;
 }
 
-/** Floyd–Steinberg. 1 = black. Errors use exact sixteenths. */
-function ditherBits(
+/**
+ * Floyd–Steinberg. 1 = black. Errors use exact sixteenths.
+ *
+ * The luma buffer is a private copy owned by the caller, so it is diffused in
+ * place. The 1-bit output is packed as each pixel is decided: allocating a
+ * second `Float32Array`, a `Uint8Array` of bits and then another packed buffer
+ * was three full-image copies per logo (M17.2).
+ */
+function ditherPacked(
   luma: Float32Array,
   width: number,
   height: number,
-): Uint8Array {
-  const buf = new Float32Array(luma);
-  const bits = new Uint8Array(width * height);
+): PackedBitmap {
+  const widthBytes = Math.ceil(width / 8);
+  const data = new Uint8Array(widthBytes * height);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const index = y * width + x;
-      const old = buf[index] ?? 0;
+      const old = luma[index] ?? 0;
       const black = old < BLACK_BELOW;
-      bits[index] = black ? 1 : 0;
+      if (black) {
+        const byteIndex = y * widthBytes + (x >> 3);
+        data[byteIndex] = (data[byteIndex] ?? 0) | (1 << (7 - (x & 7)));
+      }
       const err = old - (black ? 0 : 255);
-      spread(buf, width, height, x + 1, y, err * (7 / 16));
-      spread(buf, width, height, x - 1, y + 1, err * (3 / 16));
-      spread(buf, width, height, x, y + 1, err * (5 / 16));
-      spread(buf, width, height, x + 1, y + 1, err * (1 / 16));
+      spread(luma, width, height, x + 1, y, err * (7 / 16));
+      spread(luma, width, height, x - 1, y + 1, err * (3 / 16));
+      spread(luma, width, height, x, y + 1, err * (5 / 16));
+      spread(luma, width, height, x + 1, y + 1, err * (1 / 16));
     }
   }
-  return bits;
+  return { widthBytes, height, data };
+}
+
+/**
+ * Opaque grayscale RGBA (the Urdu canvas raster and most logos) can be packed
+ * from one channel: `blendedLuma` with r = g = b returns the same floating
+ * expression, minus the alpha branches and the other two channel reads. Pure
+ * black/white dominates and skips the multiply entirely. Returns null when any
+ * pixel is translucent or coloured, so the general path still decides those.
+ */
+function packOpaqueGrayRgba(
+  pixels: RasterBytes,
+  width: number,
+  height: number,
+  widthBytes: number,
+): Uint8Array | null {
+  const data = new Uint8Array(widthBytes * height);
+  let index = 0;
+  for (let y = 0; y < height; y += 1) {
+    let byteIndex = y * widthBytes;
+    for (let x = 0; x < width; x += 1) {
+      const offset = index * 4;
+      const r = pixels[offset] ?? 0;
+      const g = pixels[offset + 1] ?? 0;
+      const b = pixels[offset + 2] ?? 0;
+      const a = pixels[offset + 3] ?? 0;
+      if (a !== 255 || r !== g || g !== b) {
+        return null;
+      }
+      // Same operand order as blendedLuma, so v = 128 still rounds below 128.
+      const black =
+        r === 0
+          ? true
+          : r === 255
+            ? false
+            : 0.299 * r + 0.587 * g + 0.114 * b < BLACK_BELOW;
+      if (black) {
+        data[byteIndex] = (data[byteIndex] ?? 0) | (1 << (7 - (x & 7)));
+      }
+      if ((x & 7) === 7) byteIndex += 1;
+      index += 1;
+    }
+  }
+  return data;
+}
+
+/** Grayscale black-or-white fast path; null means a pixel needs the threshold. */
+function packOpaqueMonoGray(
+  pixels: RasterBytes,
+  width: number,
+  height: number,
+  widthBytes: number,
+): Uint8Array | null {
+  const data = new Uint8Array(widthBytes * height);
+  let index = 0;
+  for (let y = 0; y < height; y += 1) {
+    let byteIndex = y * widthBytes;
+    for (let x = 0; x < width; x += 1) {
+      const value = pixels[index] ?? 255;
+      if (value !== 0 && value !== 255) return null;
+      if (value === 0) {
+        data[byteIndex] = (data[byteIndex] ?? 0) | (1 << (7 - (x & 7)));
+      }
+      if ((x & 7) === 7) byteIndex += 1;
+      index += 1;
+    }
+  }
+  return data;
 }
 
 /** 1-bit threshold straight from the source pixels; no full-image luma buffer. */
@@ -106,11 +186,13 @@ function thresholdPacked(source: RasterSource): PackedBitmap {
   assertSize(source.width, source.height);
   const { width, height } = source;
   const widthBytes = Math.ceil(width / 8);
-  const data = new Uint8Array(widthBytes * height);
   const format = source.format as string;
   if (format === 'gray') {
     if (source.data.length !== width * height)
       throw new Error('gray buffer length does not match width*height');
+    const mono = packOpaqueMonoGray(source.data, width, height, widthBytes);
+    if (mono !== null) return { widthBytes, height, data: mono };
+    const data = new Uint8Array(widthBytes * height);
     for (let y = 0; y < height; y += 1) {
       for (let x = 0; x < width; x += 1) {
         if ((source.data[y * width + x] ?? 255) >= BLACK_BELOW) continue;
@@ -123,6 +205,9 @@ function thresholdPacked(source: RasterSource): PackedBitmap {
   if (format !== 'rgba') throw new Error('unsupported raster format');
   if (source.data.length !== width * height * 4)
     throw new Error('RGBA buffer length does not match width*height*4');
+  const mono = packOpaqueGrayRgba(source.data, width, height, widthBytes);
+  if (mono !== null) return { widthBytes, height, data: mono };
+  const data = new Uint8Array(widthBytes * height);
   for (let y = 0; y < height; y += 1) {
     for (let x = 0; x < width; x += 1) {
       const offset = (y * width + x) * 4;
@@ -140,25 +225,6 @@ function thresholdPacked(source: RasterSource): PackedBitmap {
   return { widthBytes, height, data };
 }
 
-function packBits(
-  bits: Uint8Array,
-  width: number,
-  height: number,
-): PackedBitmap {
-  const widthBytes = Math.ceil(width / 8);
-  const data = new Uint8Array(widthBytes * height);
-  for (let y = 0; y < height; y += 1) {
-    for (let x = 0; x < width; x += 1) {
-      if (bits[y * width + x] !== 1) {
-        continue;
-      }
-      const byteIndex = y * widthBytes + (x >> 3);
-      data[byteIndex] = (data[byteIndex] ?? 0) | (1 << (7 - (x & 7)));
-    }
-  }
-  return { widthBytes, height, data };
-}
-
 /** Threshold (text) or Floyd–Steinberg (logos). Pads the last byte with white bits. */
 export function packMono(
   source: RasterSource,
@@ -166,11 +232,7 @@ export function packMono(
 ): PackedBitmap {
   if (mode === 'threshold') return thresholdPacked(source);
   const luma = toLuma(source);
-  return packBits(
-    ditherBits(luma, source.width, source.height),
-    source.width,
-    source.height,
-  );
+  return ditherPacked(luma, source.width, source.height);
 }
 
 /**
@@ -333,6 +395,56 @@ export function prepareLogo(source: RasterSource, dots: number): RasterSource {
   const maxWidth = Math.max(1, Math.min(dots, Math.floor(dots * 0.6)));
   const scaled = scaleToFit(source, maxWidth, 160);
   return centerOnWidth(scaled, dots);
+}
+
+/**
+ * Bounded cache of packed `GS v 0` logo bytes. A logo is re-scaled and
+ * re-dithered on every receipt, yet the shop logo and the paper width rarely
+ * change, so the finished bytes are reused (M17.2). The key includes the pixel
+ * hash, dimensions, format and target width; a caller must not mutate a logo's
+ * data buffer after printing it (the device logo comes from IndexedDB, which
+ * returns a fresh buffer per read).
+ */
+const LOGO_CACHE_MAX = 8;
+const logoCache = new Map<string, Uint8Array>();
+
+function hashRasterData(data: RasterBytes): string {
+  let h1 = 0x811c9dc5;
+  let h2 = 0x9e3779b9;
+  for (let i = 0; i < data.length; i += 1) {
+    const value = data[i] ?? 0;
+    h1 = Math.imul(h1 ^ value, 0x01000193);
+    h2 = Math.imul(h2 ^ (value + 0x9e), 0x85ebca6b) ^ (h2 >>> 13);
+  }
+  return `${h1 >>> 0}:${h2 >>> 0}`;
+}
+
+/** Packed and encoded logo for `dots`, cached by logo pixels and target width. */
+export function logoGsV0(source: RasterSource, dots: number): Uint8Array {
+  if (!Number.isInteger(dots) || dots < 8) {
+    throw new Error('dots must be an integer >= 8');
+  }
+  const key = [
+    dots,
+    source.format,
+    source.width,
+    source.height,
+    source.data.length,
+    hashRasterData(source.data),
+  ].join(':');
+  const cached = logoCache.get(key);
+  if (cached !== undefined) {
+    return cached;
+  }
+  const bytes = encodeGsV0(packMono(prepareLogo(source, dots), 'dither'));
+  if (logoCache.size >= LOGO_CACHE_MAX) {
+    const oldest = logoCache.keys().next().value;
+    if (oldest !== undefined) {
+      logoCache.delete(oldest);
+    }
+  }
+  logoCache.set(key, bytes);
+  return bytes;
 }
 
 /** Left-align a narrower text bitmap on a white `dots`-wide canvas. */

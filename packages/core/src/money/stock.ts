@@ -21,7 +21,7 @@ export interface StockValueInput {
 
 /** Stock value of tracked products, ignoring negative on-hand (07 §9). */
 export function stockValuePaisa(products: readonly StockValueInput[]): number {
-  const values: number[] = [];
+  let total = 0;
   for (const product of products) {
     assertSafeInteger(product.on_hand_milli, 'on_hand_milli');
     assertSafeInteger(product.avg_cost, 'avg_cost');
@@ -33,9 +33,11 @@ export function stockValuePaisa(products: readonly StockValueInput[]): number {
       continue;
     }
     const held = Math.max(product.on_hand_milli, 0);
-    values.push(mulDivRound(held, product.avg_cost, 1000));
+    total += mulDivRound(held, product.avg_cost, 1000);
+    if (!Number.isSafeInteger(total))
+      throw new RangeError('stock value exceeds safe integer range');
   }
-  return sumSafe(values);
+  return total;
 }
 
 /** True for receipt reasons that carry a unit cost and move the average (07 §7). */

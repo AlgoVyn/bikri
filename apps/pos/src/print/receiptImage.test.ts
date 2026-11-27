@@ -1,9 +1,9 @@
 import {
   type Block,
   buildSaleReceipt,
-  saleBasicInput,
   urduReceiptLabels,
 } from '@bikri/printer';
+import { saleBasicInput } from '@bikri/printer/testing';
 import { describe, expect, it } from 'vitest';
 import { fakeCanvasDocument } from './fakeCanvas.ts';
 import {

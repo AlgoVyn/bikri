@@ -1,6 +1,6 @@
 import type { PrintJob } from '@bikri/db';
 import { useLiveQuery } from 'dexie-react-hooks';
-import { useEffect, useState } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { EmptyState } from '../components/EmptyState.tsx';
@@ -74,20 +74,46 @@ export function PrinterPage() {
       ((await getDb().kv.get('printer'))?.value ?? null) as PrinterKv | null,
     [],
   );
-  const jobs = useLiveQuery(async () => {
+  const printJobs =
+    useLiveQuery(
+      () =>
+        getDb()
+          .print_jobs.orderBy('created_at')
+          .reverse()
+          .limit(50)
+          .toArray() as Promise<PrintJob[]>,
+      [],
+    ) ?? [];
+  const [invoices, setInvoices] = useState<Map<string, string>>(new Map());
+  useEffect(() => {
+    if (printJobs.length === 0) return;
+    let alive = true;
     const db = getDb();
-    const list = (await db.print_jobs
-      .orderBy('created_at')
-      .reverse()
-      .limit(50)
-      .toArray()) as PrintJob[];
-    const sales = await db.sales.bulkGet(list.map((j) => j.sale_id ?? ''));
-    return list.map((j, i) => ({
-      job: j,
-      invoice: sales[i] ? String(sales[i]?.invoice_no) : null,
-    }));
-  }, []);
-  const queued = jobs?.filter(({ job }) => job.status === 'queued').length ?? 0;
+    void db.sales
+      .bulkGet(printJobs.map((job) => job.sale_id ?? ''))
+      .then((sales) => {
+        if (!alive) return;
+        const next = new Map<string, string>();
+        printJobs.forEach((job, index) => {
+          const sale = sales[index];
+          if (sale) next.set(job.id, String(sale.invoice_no));
+        });
+        setInvoices(next);
+      })
+      .catch(() => undefined);
+    return () => {
+      alive = false;
+    };
+  }, [printJobs]);
+  const jobs = useMemo(
+    () =>
+      printJobs.map((job) => ({
+        job,
+        invoice: invoices.get(job.id) ?? null,
+      })),
+    [printJobs, invoices],
+  );
+  const queued = jobs.filter(({ job }) => job.status === 'queued').length;
   const [wizard, setWizard] = useState(false);
   // Cashiers' settings.device covers display and language only (05 §6).
   const canUse = can('settings.device');
@@ -147,9 +173,7 @@ export function PrinterPage() {
   };
 
   if (printer === undefined) return null;
-  const lastFailed = jobs
-    ? latestUnresolvedFailed(jobs.map((entry) => entry.job))
-    : undefined;
+  const lastFailed = latestUnresolvedFailed(jobs.map((entry) => entry.job));
   const where =
     printer?.transport === 'usb'
       ? (printer.usb?.name ?? 'USB')
@@ -368,14 +392,14 @@ export function PrinterPage() {
             </button>
           ) : null}
         </div>
-        {jobs && jobs.length === 0 ? (
+        {jobs.length === 0 ? (
           <EmptyState
             variant="plain"
             icon={<PrinterIcon />}
             message={t('printer.recent_empty')}
           />
         ) : null}
-        {jobs && jobs.length > 0 ? (
+        {jobs.length > 0 ? (
           <ul className="flex flex-col divide-y divide-border">
             {jobs.map(({ job, invoice }) => (
               <li

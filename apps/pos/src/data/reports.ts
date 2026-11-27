@@ -210,11 +210,10 @@ export async function expectedCash(
   deviceId: string,
   now = Date.now(),
 ): Promise<number> {
-  const closes = await db.day_closes
+  const last = await db.day_closes
     .where('[device_id+period_end]')
     .between([deviceId, 0], [deviceId, Number.MAX_SAFE_INTEGER])
-    .toArray();
-  const last = closes.at(-1);
+    .last();
   const device = await db.devices.get(deviceId);
   const start = last ? n(last.period_end) : n(device?.created_at);
   // A backwards clock correction can leave the last close after `now`; include it so

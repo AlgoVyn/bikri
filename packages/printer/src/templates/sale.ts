@@ -15,6 +15,7 @@ import {
 } from '../layout.ts';
 import type { Block } from '../types.ts';
 import {
+  bundleLinesByGroup,
   labelsFrom,
   pushBundleComponent,
   pushCenter,
@@ -93,6 +94,7 @@ function pushItems(
   // A bundle's component lines are printed as one group even if a later line
   // (e.g. imported or re-ordered data) separates them; merging only contiguous
   // rows would print the bundle twice.
+  const bundleGroups = bundleLinesByGroup(lines);
   const renderedGroups = new Set<string>();
   for (const line of lines) {
     if (line.bundleGroup) {
@@ -100,9 +102,7 @@ function pushItems(
         continue;
       }
       renderedGroups.add(line.bundleGroup);
-      const group = lines.filter(
-        (candidate) => candidate.bundleGroup === line.bundleGroup,
-      );
+      const group = bundleGroups.get(line.bundleGroup) ?? [line];
       const bundleQty = line.bundleQty ?? group[0]?.bundleQty ?? 1;
       // The component nets are already the total for every bundle in the group;
       // multiplying them by bundleQty again doubled the fallback header.

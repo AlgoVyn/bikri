@@ -82,7 +82,12 @@ function allowedKeys(file) {
   const officeComponent =
     rel === 'components/PastDatePicker.tsx' ||
     rel === 'components/ListPager.tsx' ||
-    rel === 'components/SalesTabs.tsx';
+    rel === 'components/SalesTabs.tsx' ||
+    // These formatters moved out of their feature directories so the shell and
+    // cross-feature imports no longer pull the whole feature chunk (D-310).
+    rel === 'lib/salesFormat.ts' ||
+    rel === 'lib/udhaarFormat.ts' ||
+    rel === 'lib/reportFormat.ts';
   if (
     officeComponent ||
     OFFICE_DIRS.has(area) ||

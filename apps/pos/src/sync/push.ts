@@ -160,30 +160,39 @@ async function pushAllUnlocked(
   // prerequisites (a product before its owner staff row is a real example), so the server
   // would reject them. A second push of the same op is safe: the server answers from
   // `applied_ops`, and this tab then settles the row itself.
-  if (exclusive) {
-    // The Web Lock proves no other tab is pushing, so every claim is orphaned (ours from
-    // before a reload included); reclaim all of them, not just old ones.
-    await db.outbox.where('status').equals('sending').modify({
-      status: 'pending',
-      sending_at: undefined,
-      claim_token: undefined,
-    });
-  } else {
-    // No cross-tab lock: only reclaim a claim older than a live request. If a fresh
-    // `sending` row remains, stop instead of leapfrogging newer `pending` ops past their
-    // unclaimed prerequisite.
-    const staleBefore = Date.now() - CLAIM_STALE_MS;
-    await db.outbox
-      .where('status')
-      .equals('sending')
-      .filter((entry) => (entry.sending_at ?? 0) < staleBefore)
-      .modify({
+  // Two indexed counts keep an idle poll out of a readwrite transaction: with nothing
+  // pending or sending there is nothing to reclaim and nothing to send.
+  const [pendingCount, sendingCount] = await Promise.all([
+    db.outbox.where('status').equals('pending').count(),
+    db.outbox.where('status').equals('sending').count(),
+  ]);
+  if (pendingCount === 0 && sendingCount === 0) return out;
+  if (sendingCount > 0) {
+    if (exclusive) {
+      // The Web Lock proves no other tab is pushing, so every claim is orphaned (ours from
+      // before a reload included); reclaim all of them, not just old ones.
+      await db.outbox.where('status').equals('sending').modify({
         status: 'pending',
         sending_at: undefined,
         claim_token: undefined,
       });
-    if ((await db.outbox.where('status').equals('sending').count()) > 0)
-      return out;
+    } else {
+      // No cross-tab lock: only reclaim a claim older than a live request. If a fresh
+      // `sending` row remains, stop instead of leapfrogging newer `pending` ops past their
+      // unclaimed prerequisite.
+      const staleBefore = Date.now() - CLAIM_STALE_MS;
+      await db.outbox
+        .where('status')
+        .equals('sending')
+        .filter((entry) => (entry.sending_at ?? 0) < staleBefore)
+        .modify({
+          status: 'pending',
+          sending_at: undefined,
+          claim_token: undefined,
+        });
+      if ((await db.outbox.where('status').equals('sending').count()) > 0)
+        return out;
+    }
   }
   for (let round = 0; round < maxRounds; round += 1) {
     let batch: OutboxEntry[] = [];
@@ -342,6 +351,32 @@ async function pushAllUnlocked(
             newerByKey.set(key, (newerByKey.get(key) ?? 0) + 1);
           }
         }
+        type ShadowRow = NonNullable<(typeof shadowRows)[number]>;
+        // One flush per store at the end: a 200-product batch used to wait for ~600
+        // sequential IDB requests (put/delete/update) inside the settle transaction.
+        const shadowChanges = new Map<
+          string,
+          { put?: ShadowRow; delete?: [string, string] }
+        >();
+        const rowPuts = new Map<string, Map<string, Record<string, unknown>>>();
+        const queueShadowPut = (row: ShadowRow): void => {
+          shadowChanges.set(masterKey(row.tbl, row.id), { put: row });
+        };
+        const queueShadowDelete = (tbl: string, id: string): void => {
+          shadowChanges.set(masterKey(tbl, id), { delete: [tbl, id] });
+        };
+        const queueRowPut = (
+          tbl: string,
+          id: string,
+          row: Record<string, unknown>,
+        ): void => {
+          let rows = rowPuts.get(tbl);
+          if (rows === undefined) {
+            rows = new Map();
+            rowPuts.set(tbl, rows);
+          }
+          rows.set(id, row);
+        };
         for (const { entry, result: r } of masterApplied) {
           const key = masterKey(entry.tbl, entry.row_id);
           // A newer op for the same row may still be pending (for example one queued
@@ -378,7 +413,7 @@ async function pushAllUnlocked(
                     rev: r.server_rev ?? existing?.row.rev ?? local?.rev ?? 0,
                   } as Record<string, unknown>,
                 };
-                await db.pull_shadow.put(next);
+                queueShadowPut(next);
                 shadowByKey.set(key, next);
               }
             }
@@ -397,11 +432,11 @@ async function pushAllUnlocked(
               const serverRev =
                 typeof r.server_rev === 'number' ? r.server_rev : shadowRev;
               if (local && shadowRev > localRev && shadowRev >= serverRev) {
-                await db.table(entry.tbl).put(shadow.row);
                 liveByKey.set(key, shadow.row as Record<string, unknown>);
+                queueRowPut(entry.tbl, entry.row_id, shadow.row);
               }
             }
-            await db.pull_shadow.delete([entry.tbl, entry.row_id]);
+            queueShadowDelete(entry.tbl, entry.row_id);
             shadowByKey.delete(key);
           }
           // Keep the local optimistic revision current; otherwise the next edit of
@@ -420,12 +455,29 @@ async function pushAllUnlocked(
             // (another tab pulled `rev: 3` while this push produced `rev: 2`); never
             // downgrade, or the next edit triggers a spurious field merge.
             const current = liveByKey.get(key);
-            if (r.server_rev > Number(current?.rev ?? 0))
-              await db
-                .table(entry.tbl)
-                .update(entry.row_id, { rev: r.server_rev });
+            if (
+              current !== undefined &&
+              r.server_rev > Number(current.rev ?? 0)
+            ) {
+              const merged = { ...current, rev: r.server_rev };
+              liveByKey.set(key, merged);
+              queueRowPut(entry.tbl, entry.row_id, merged);
+            }
           }
         }
+        for (const [tbl, rows] of rowPuts) {
+          if (rows.size > 0) await db.table(tbl).bulkPut([...rows.values()]);
+        }
+        const shadowPuts: ShadowRow[] = [];
+        const shadowDeletes: [string, string][] = [];
+        for (const change of shadowChanges.values()) {
+          if (change.put !== undefined) shadowPuts.push(change.put);
+          else if (change.delete !== undefined)
+            shadowDeletes.push(change.delete);
+        }
+        if (shadowPuts.length > 0) await db.pull_shadow.bulkPut(shadowPuts);
+        if (shadowDeletes.length > 0)
+          await db.pull_shadow.bulkDelete(shadowDeletes);
         if (rejectedRows.length > 0) await db.outbox.bulkPut(rejectedRows);
         const pendingRows: OutboxEntry[] = [];
         for (const entry of batch) {
@@ -466,19 +518,24 @@ export async function retryFailed(db: BikriDb, seqs: number[]): Promise<void> {
         .map((entry) => entry.tx_id),
     );
     if (txIds.size === 0) return;
-    const entries = (await db.outbox.toArray()).filter(
-      (entry) => entry.status === 'failed' && txIds.has(entry.tx_id),
-    );
-    for (const entry of entries) {
-      if (entry.seq === undefined) continue;
-      // The server caches rejected op ids in applied_ops; a new id makes Retry meaningful.
-      await db.outbox.update(entry.seq, {
+    // `tx_id` (Dexie V14) reads one rejected transaction instead of the whole queue.
+    const entries = (
+      await db.outbox
+        .where('tx_id')
+        .anyOf([...txIds])
+        .toArray()
+    ).filter((entry) => entry.status === 'failed' && entry.seq !== undefined);
+    if (entries.length === 0) return;
+    await db.outbox.bulkPut(
+      entries.map((entry) => ({
+        ...entry,
+        // The server caches rejected op ids in applied_ops; a new id makes Retry meaningful.
         op_id: newId(),
-        status: 'pending',
+        status: 'pending' as const,
         attempts: 0,
         last_error: undefined,
-      });
-    }
+      })),
+    );
   });
 }
 

@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { addDays, daysBetween } from './format.ts';
+import { addDays, daysBetween } from '../lib/reportFormat.ts';
 
 describe('daysBetween', () => {
   it('is inclusive, so Today is one day and a week is seven', () => {

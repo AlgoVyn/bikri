@@ -10,6 +10,8 @@ const ARABIC_THOUSANDS = '\u066C';
  * Other characters are unchanged.
  */
 export function normaliseDigits(input: string): string {
+  // Most receipts and search boxes are plain ASCII; skip the per-character loop.
+  if (!/[\u0660-\u0669\u06f0-\u06f9]/u.test(input)) return input;
   let out = '';
   for (const char of input) {
     const urdu = URDU_DIGITS.indexOf(char);

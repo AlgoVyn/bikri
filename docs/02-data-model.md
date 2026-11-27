@@ -2850,13 +2850,95 @@ BEGIN
 END;
 ```
 
+### 2.38 Performance-review D1/API batch (migration `0039_perf_review_remediation.sql`)
+
+The 27 Nov whole-app performance review left six database/query items. This migration is index/trigger-only: `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` stay 10 and Dexie is unchanged.
+
+```sql
+-- 0039_perf_review_remediation.sql
+--
+-- 2026-11-27 whole-app performance review: the remaining D1/API batch (H8, M14, M15,
+-- M16, L2, L13). Index/trigger-only: `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION`
+-- stay at 10 and Dexie is unchanged.
+
+-- M15: the nightly prune filters these tables by time alone (no tenant predicate),
+-- so the existing tenant-leading indexes cannot serve it.
+CREATE INDEX enrolment_codes_expiry ON enrolment_codes (expires_at);
+CREATE INDEX owner_email_codes_expiry ON owner_email_codes (expires_at);
+CREATE INDEX change_log_watermarks_day ON change_log_watermarks (day);
+
+-- L2: operator_audit is only read by primary key; these two indexes have no reader.
+DROP INDEX IF EXISTS operator_audit_request;
+DROP INDEX IF EXISTS operator_audit_time;
+
+-- M16: a simple product whose UPDATE happens to list `kind` must not run a second
+-- self-UPDATE just to clear a `bundle_since` it never had.
+DROP TRIGGER products_bundle_since_clear;
+CREATE TRIGGER products_bundle_since_clear
+AFTER UPDATE OF kind ON products
+WHEN NEW.kind <> 'bundle'
+  AND (OLD.kind = 'bundle' OR OLD.bundle_since IS NOT NULL)
+BEGIN
+  UPDATE products
+  SET bundle_since = NULL
+  WHERE tenant_id = NEW.tenant_id AND id = NEW.id;
+END;
+
+-- L13: a line with no product (a free-text line, or a deleted product reference) must
+-- not run the bundle-product EXISTS probe at all.
+DROP TRIGGER sale_lines_no_bundle_product;
+CREATE TRIGGER sale_lines_no_bundle_product
+BEFORE INSERT ON sale_lines
+WHEN NEW.product_id IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM products p
+    WHERE p.tenant_id = NEW.tenant_id
+      AND p.id = NEW.product_id
+      AND p.kind = 'bundle'
+      AND COALESCE(p.bundle_since, p.updated_at) <= NEW.created_at
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot be a sale line');
+END;
+
+DROP TRIGGER quotation_lines_no_bundle_product_insert;
+CREATE TRIGGER quotation_lines_no_bundle_product_insert
+BEFORE INSERT ON quotation_lines
+WHEN NEW.product_id IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM products p
+    WHERE p.tenant_id = NEW.tenant_id
+      AND p.id = NEW.product_id
+      AND p.kind = 'bundle'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot be a quotation line');
+END;
+
+DROP TRIGGER quotation_lines_no_bundle_product_update;
+CREATE TRIGGER quotation_lines_no_bundle_product_update
+BEFORE UPDATE OF product_id ON quotation_lines
+WHEN NEW.product_id IS NOT NULL
+  AND EXISTS (
+    SELECT 1 FROM products p
+    WHERE p.tenant_id = NEW.tenant_id
+      AND p.id = NEW.product_id
+      AND p.kind = 'bundle'
+  )
+BEGIN
+  SELECT RAISE(ABORT, 'a bundle cannot be a quotation line');
+END;
+```
+
+Purge and tenant deletion still use the H8 tenant-leading pagination keys (`id`, `change_log.seq`, `applied_ops.op_id`, `change_log_watermarks.day`, `branch_device_codes(branch_id, device_code)`, `enrolment_codes.expires_at`) and no longer sort the tenant's remaining rows per chunk. The nightly prune reads `change_log_floor` with the tenant list, skips the watermark upsert when `MAX(seq)` has not advanced, and reserves D1 calls for the applied-ops, expiry and deletion phases.
+
 ## 3. Dexie schema (till)
 
 `packages/db/src/dexie.ts`. Same table and column names as D1, **without `tenant_id`**: each tenant has its own Dexie database named **`bikri-<tenant_id>`**, so a till's local data can only ever be one shop's (D-073). `localStorage['bikri.active_tenant']` (non-secret) names the database to open; before enrolment there is none. Index strings list only indexed fields; Dexie stores every column.
 
 ```ts
 // Example only — exact index strings to implement.
-export const DEXIE_SCHEMA_V17 = {
+export const DEXIE_SCHEMA_V18 = {
   // master
   shop: 'id',
   branches: 'id, deleted_at',
@@ -2864,20 +2946,20 @@ export const DEXIE_SCHEMA_V17 = {
   staff: 'id, active, deleted_at',
   categories: 'id, sort_order, deleted_at',
   products: 'id, sku, category_id, deleted_at, track_stock', // V9 track_stock; V12 drops name_en/updated_at/kind (filtered in memory)
-  bundle_items: 'id, bundle_id, component_product_id, deleted_at', // V8; fixed recipe; repository checks one active row per (bundle, component), like barcodes
-  product_barcodes: 'id, barcode, product_id, deleted_at',   // NOT unique in Dexie: D1 uniqueness ignores soft-deleted rows; the repository checks "no other non-deleted row" for sku and barcode
+  bundle_items: 'id, bundle_id, component_product_id', // V8; V18 drops deleted_at (filtered in memory); fixed recipe; repository checks one active row per (bundle, component), like barcodes
+  product_barcodes: 'id, barcode, product_id', // NOT unique in Dexie: D1 uniqueness ignores soft-deleted rows; the repository checks "no other non-deleted row" for sku and barcode; V18 drops deleted_at
   customers: 'id, phone, credit_limit', // V12 drops name/deleted_at (filtered in memory)
   suppliers: 'id',
   expense_categories: 'id, code, sort_order',
   promises: 'id, customer_id, [status+promised_on]',
   quotations: 'id, &quote_no, business_date, [device_id+quote_seq], [status+valid_until], converted_sale_id, [status+converted_at], [status+cancelled_at]', // V16; V17 &quote_no + device/seq + terminal-today indexes, drops customer_id
   quotation_lines: 'id, quote_id', // V16; V17 drops product_id (restore reads all lines by quote)
-  sync_conflicts: 'id, resolution',   // pulled read-only; V12 drops row_id/at
+  sync_conflicts: 'id, resolution, [tbl+row_id]',   // pulled read-only; V12 drops row_id/at; V18 adds the bill-detail conflict lookup
   // ledger
   sales: 'id, &invoice_no, business_date, created_at, [device_id+invoice_seq], status',
   sale_lines: 'id, sale_id, business_date, [product_id+business_date], [bundle_id+business_date]', // V7 date/product; V8 bundle; V11 bundle+date; V12 drops standalone product_id; V14 drops standalone bundle_id
 
-  payments: 'id, business_date, sale_id, [party_type+party_id], [device_id+created_at], created_at', // V7 adds created_at for the promise refresh
+  payments: 'id, business_date, sale_id, [device_id+created_at], created_at', // V7 adds created_at for the promise refresh; V18 drops the unused party index
   refunds: 'id, sale_id, business_date, [device_id+created_at], created_at',
   refund_lines: 'id, refund_id, sale_line_id, business_date', // V10 adds the refund's business date (till-only; reports count refunds on their own date)
   sale_voids: 'id, &sale_id, created_at, business_date',
@@ -2885,7 +2967,7 @@ export const DEXIE_SCHEMA_V17 = {
   stock_movements: 'id, [product_id+created_at], [ref_type+ref_id], business_date, created_at', // V4 adds [ref_type+ref_id]; V11 created_at
   purchases: 'id, [supplier_id+created_at], business_date, created_at',
   purchase_lines: 'id, purchase_id',
-  supplier_returns: 'id, [supplier_id+created_at], purchase_id, business_date, created_at',
+  supplier_returns: 'id, purchase_id, business_date, created_at', // V18 drops the unused supplier/time index
   supplier_return_lines: 'id, return_id, purchase_line_id',
   expenses: 'id, business_date, [device_id+created_at], reverses_id, created_at', // V3 reverses_id; V12 drops category_id
   cash_moves: 'id, [device_id+created_at], created_at',
@@ -2896,10 +2978,10 @@ export const DEXIE_SCHEMA_V17 = {
   kv: 'key',
   carts: 'id',                    // up to 3 open carts: 'c1','c2','c3'
   held_bills: 'id, created_at',
-  file_queue: '++id, status, created_at, [status+created_at]', // V12 adds the retention index; status stays standalone for old rows without created_at
+  file_queue: '++id, status, [status+created_at]', // V12 adds the retention index; V18 drops the unused standalone created_at; status stays standalone for old rows without created_at
   print_jobs: 'id, sale_id, refund_id, quotation_id, day_close_id, supplier_return_id, [status+created_at], created_at', // V3 document ids; V6 compound; V12 drops standalone status; V16 quotation_id
   stock_levels: 'product_id',     // { product_id, on_hand_milli }
-  party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at? } (V11 last payment)
+  party_balances: '[party_type+party_id]', // { party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at?, last_delivery_date? } (V11 last payment; V18 supplier last delivery)
   pull_shadow: '[tbl+id]',        // { row, source: 'local'|'server' } restore point or skipped server row (03 §4.2)
 };
 ```
@@ -2924,18 +3006,20 @@ export const DEXIE_SCHEMA_V17 = {
 
 **Dexie V17 (CORE-L1, 27 Nov review)** makes `quotations.quote_no` unique in Dexie (`&quote_no`, matching D1's `UNIQUE (tenant_id, quote_no)`) and adds `[device_id+quote_seq]` so restore recovery finds its last quote number with one index range instead of scanning every quotation. It adds `[status+converted_at]`/`[status+cancelled_at]` so a cashier's "today" quotation tab can find terminal quotes converted/cancelled today even when their business date is older. It drops `quotations.customer_id` and `quotation_lines.product_id`, which no `.where()` caller used; customer/product filtering already happens in memory. Index-only upgrade; no row changes and no server or wire change (`SCHEMA_VERSION` stays 10).
 
+**Dexie V18 (D-308, 27 Nov performance-review cleanup)** adds `sync_conflicts.[tbl+row_id]` and uses it in bill detail: the server stores the conflicted refund/refund-line/void id in `row_id` (never the sale id), so the page looks up only the documents it already loaded instead of parsing every historical `fields_json`. It also stores `party_balances.last_delivery_date` (supplier rows), backfilled once from `purchases`, updated when a delivery is written/pulled and rebuilt by `rebuildCaches`; the supplier directory then reads its existing balance scan rather than scanning lifetime purchases. It drops indexes with no `.where` caller: `payments.[party_type+party_id]`, `supplier_returns.[supplier_id+created_at]`, `product_barcodes.deleted_at`, `bundle_items.deleted_at` and standalone `file_queue.created_at` (`file_queue.status` and `[status+created_at]` stay). Retention now trims resolved `sync_conflicts` older than 90 days. Local-only; D1, money rules and the wire schema are unchanged (`CLIENT_SCHEMA_VERSION` stays 10).
+
 ### 3.1 Local-only tables
 
 | Table | Shape | Purpose |
 |---|---|---|
 | `outbox` | `{ seq, op_id, tx_id, tbl, kind, row_id, row, base_rev?, changed_fields?, created_at, status: 'pending'|'sending'|'failed', attempts, last_error? }` | Ops waiting to be pushed; acknowledged entries are deleted ([03-sync §3](03-sync.md#3-outbox)) |
-| `kv` | `{ key, value }` | `tenant` (id, display_name; from enrolment and `/api/me`), `device` (id, name, code, branch_id, is_admin), `device_token`, `invoice_seq` (last issued number, never decreases, 03 §5), `quote_seq` (last issued quotation sequence for this device, never decreases), `pull_cursor`, `restore_epoch`, `last_push_at`, `last_pull_at`, `printer` (shape in [06 §8](06-printing.md#8-printer-setup-and-test-print-per-device)), `logo_bitmap`, `ui.prefs` (device display: theme, text size, sounds, auto-lock and `privacyMode`), `language`, `locked_staff_id`, `pin_failures` (05 §4), `stock_count_draft` (screens/09), `setup_draft` (screens/01), `label` (label size and options, [screens/20](screens/20-barcode-labels.md)), `snapshot_state` (resumable snapshot progress, 03 §4.3), `initial_sync_pending` (first enrolment has downloaded its snapshot), `pull_errors` (per-table pull failures shown on Sync), `last_full_sync_at`, `poll_after_ms` (from the server, 13 §6), `tenant_status` (`{ status, since, learned_at }` from `/api/me`, pull and push responses; `read_only` puts the till in read-only mode, 13 §7.2), `support` (`{ until, reason }` while operator support access is active, 13 §7.5) |
+| `kv` | `{ key, value }` | `tenant` (id, display_name; from enrolment and `/api/me`), `device` (id, name, code, branch_id, is_admin), `device_token`, `invoice_seq` (last issued number, never decreases, 03 §5), `quote_seq` (last issued quotation sequence for this device, never decreases), `pull_cursor`, `restore_epoch`, `last_push_at`, `last_pull_at`, `printer` (shape in [06 §8](06-printing.md#8-printer-setup-and-test-print-per-device)), `logo_bitmap`, `ui.prefs` (device display: theme, text size, sounds, auto-lock and `privacyMode`), `language`, `locked_staff_id`, `pin_failures` (05 §4), `stock_count_draft` (screens/09), `stock_count_draft_stamp` (cross-tab draft marker), `stock_count_applied:<draft id>` (per-chunk applied ids, screen 09), `setup_draft` (screens/01), `label` (label size and options, [screens/20](screens/20-barcode-labels.md)), `snapshot_state` (resumable snapshot progress, 03 §4.3), `initial_sync_pending` (first enrolment has downloaded its snapshot), `pull_errors` (per-table pull failures shown on Sync), `last_full_sync_at`, `poll_after_ms` (from the server, 13 §6), `tenant_status` (`{ status, since, learned_at }` from `/api/me`, pull and push responses; `read_only` puts the till in read-only mode, 13 §7.2), `support` (`{ until, reason }` while operator support access is active, 13 §7.5) |
 | `carts` | `{ id: 'c1'|'c2'|'c3', customer_id?, lines: CartLine[], bill_discount?: {type, value}, note, updated_at, overrides?, reissue?, backdate?, quote?: { quote_id, quote_no, valid_until, terms, mode: 'new'|'edit'|'convert' } \| null }` | Open carts, survive reload. `quote` keeps the Sell cart in quotation mode (D-305); `edit` updates that open quote on save, `convert` marks the quote converted in the sale transaction, and `new` (including a duplicate) creates a fresh quote number |
 | `held_bills` | same as cart + `{ held_at, held_by, label }` | Parked bills |
 | `file_queue` | `{ id, kind: 'product_image'|'logo', target_id, blob, sha256, status, created_at? }` | Images waiting for upload; failed entries older than 30 days are trimmed |
 | `print_jobs` | `{ id, sale_id?, refund_id?, quotation_id?, day_close_id?, supplier_return_id?, kind: 'sale'|'refund'|'void'|'test'|'day_close'|'statement'|'supplier'|'quotation', status: 'queued'|'printing'|'done'|'failed', started_at?, error?, reprint?, created_at }` | Print history and retry; `done` jobs older than 90 days are trimmed |
 | `stock_levels` | `{ product_id, on_hand_milli }` | Cache = Σ `stock_movements.qty_delta_milli`; updated in the same transaction as each movement; rebuildable |
-| `party_balances` | `{ party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at? }` | Cache = Σ `ledger_entries.amount`; rebuildable |
+| `party_balances` | `{ party_type, party_id, balance, last_activity_at, oldest_unpaid_at, last_payment_at?, last_delivery_date? }` | Cache = Σ `ledger_entries.amount`; rebuildable. `last_delivery_date` (supplier rows, V18) = latest `purchases.business_date`, maintained on write/pull/rebuild |
 
 `CartLine = { key, product_id | null, name, sku, qty_milli, unit_price, discount_type?, discount_value, unit_cost, image_key?, list_price?, note?, track_stock?, unit?, bundle_id?, bundle_group?, bundle_name?, bundle_qty?, bundle_price?, bundle_list_price?, bundle_base_price?, bundle_discount_type?, bundle_discount_value?, bundle_component_qty_milli? }`.
 

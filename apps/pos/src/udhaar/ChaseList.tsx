@@ -23,15 +23,15 @@ import {
   reminderMessage,
 } from '../data/udhaar.ts';
 import { downloadText } from '../lib/download.ts';
-import { useCurrentStaff } from '../state/currentStaff.ts';
-import { useReadOnly } from '../state/readOnly.ts';
 import {
   ageDaysText,
   balanceTone,
   dateText,
   groupLabel,
   timeText,
-} from './format.ts';
+} from '../lib/udhaarFormat.ts';
+import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
 import { PromiseDialog } from './PromiseDialog.tsx';
 import { ReceivePaymentDialog } from './ReceivePaymentDialog.tsx';
 

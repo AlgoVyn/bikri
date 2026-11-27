@@ -34,19 +34,31 @@ export async function listTenants(
   tenants: TenantListRow[];
   account_today: { rows_written: number; rows_read: number };
 }> {
-  const day = utcDay(now);
-  const { results } = await env.DB.prepare(
-    `SELECT t.id, t.slug, t.display_name, t.status, t.daily_write_budget,
-       (SELECT COUNT(*) FROM devices d WHERE d.tenant_id = t.id AND d.revoked_at IS NULL) AS devices,
-       (SELECT MAX(last_seen_at) FROM devices d WHERE d.tenant_id = t.id) AS last_seen_at,
-       (SELECT COUNT(*) FROM shop s WHERE s.tenant_id = t.id AND s.setup_completed_at IS NOT NULL) AS setup,
-       (SELECT COUNT(*) FROM sync_conflicts s WHERE s.tenant_id = t.id AND s.resolution = 'needs_owner') AS conflicts,
-       COALESCE(u.rows_written, 0) AS rows_written, COALESCE(u.rows_read, 0) AS rows_read, COALESCE(u.pushes, 0) AS pushes
-     FROM tenants t LEFT JOIN tenant_usage u ON u.tenant_id = t.id AND u.day = ?1
-     WHERE t.status <> 'deleted' ORDER BY t.display_name`,
-  )
-    .bind(day)
-    .all<Record<string, number | string | null>>();
+  const { results } = await tenantListStatement(env, utcDay(now)).all<
+    Record<string, number | string | null>
+  >();
+  return mapTenantRows(results);
+}
+
+const TENANT_LIST_SQL = `SELECT t.id, t.slug, t.display_name, t.status, t.daily_write_budget,
+   (SELECT COUNT(*) FROM devices d WHERE d.tenant_id = t.id AND d.revoked_at IS NULL) AS devices,
+   (SELECT MAX(last_seen_at) FROM devices d WHERE d.tenant_id = t.id) AS last_seen_at,
+   (SELECT COUNT(*) FROM shop s WHERE s.tenant_id = t.id AND s.setup_completed_at IS NOT NULL) AS setup,
+   (SELECT COUNT(*) FROM sync_conflicts s WHERE s.tenant_id = t.id AND s.resolution = 'needs_owner') AS conflicts,
+   COALESCE(u.rows_written, 0) AS rows_written, COALESCE(u.rows_read, 0) AS rows_read, COALESCE(u.pushes, 0) AS pushes
+ FROM tenants t LEFT JOIN tenant_usage u ON u.tenant_id = t.id AND u.day = ?1
+ WHERE t.status <> 'deleted' ORDER BY t.display_name`;
+
+function tenantListStatement(env: Env, day: string): D1PreparedStatement {
+  return env.DB.prepare(TENANT_LIST_SQL).bind(day);
+}
+
+function mapTenantRows(
+  results: Array<Record<string, number | string | null>>,
+): {
+  tenants: TenantListRow[];
+  account_today: { rows_written: number; rows_read: number };
+} {
   let w = 0;
   let r = 0;
   const tenants = results.map((row) => {
@@ -72,17 +84,72 @@ export async function listTenants(
   return { tenants, account_today: { rows_written: w, rows_read: r } };
 }
 
-export async function usageHistory(env: Env, tenantId: string, days = 7) {
-  const { results } = await env.DB.prepare(
+/**
+ * The console Overview: the tenant list, account usage and status/budget totals in one
+ * batch. `GET /admin/usage` used to run `accountOverview` and `listTenants` back to back,
+ * reading `tenants` and `tenant_usage` twice (L12).
+ */
+export async function usagePage(
+  env: Env,
+  now: number,
+): Promise<{
+  db_size_bytes: number | null;
+  today: { rows_written: number; rows_read: number };
+  tenants_by_status: Record<string, number>;
+  budget_total: number;
+  budget_alert: boolean;
+  tenants: TenantListRow[];
+  account_today: { rows_written: number; rows_read: number };
+}> {
+  const day = utcDay(now);
+  const [listResult, statusRows] = await env.DB.batch([
+    tenantListStatement(env, day),
+    env.DB.prepare('SELECT status, COUNT(*) AS n FROM tenants GROUP BY status'),
+  ]);
+  const { tenants, account_today } = mapTenantRows(
+    (listResult?.results ?? []) as Array<
+      Record<string, number | string | null>
+    >,
+  );
+  const by: Record<string, number> = {};
+  for (const row of (statusRows?.results ?? []) as {
+    status: string;
+    n: number;
+  }[])
+    by[row.status] = row.n;
+  const budgetTotal = tenants.reduce(
+    (sum, tenant) =>
+      tenant.status === 'active' ? sum + tenant.daily_write_budget : sum,
+    0,
+  );
+  return {
+    db_size_bytes: listResult?.meta.size_after ?? null,
+    today: account_today,
+    tenants_by_status: by,
+    budget_total: budgetTotal,
+    budget_alert: budgetTotal > 70_000,
+    tenants,
+    account_today,
+  };
+}
+
+export function usageHistoryStatement(
+  env: Env,
+  tenantId: string,
+  days = 7,
+): D1PreparedStatement {
+  return env.DB.prepare(
     'SELECT day, pushes, rows_written, rows_read FROM tenant_usage WHERE tenant_id = ?1 ORDER BY day DESC LIMIT ?2',
-  )
-    .bind(tenantId, days)
-    .all<{
-      day: string;
-      pushes: number;
-      rows_written: number;
-      rows_read: number;
-    }>();
+  ).bind(tenantId, days);
+}
+
+export async function usageHistory(env: Env, tenantId: string, days = 7) {
+  const { results } = await usageHistoryStatement(env, tenantId, days).all<{
+    day: string;
+    pushes: number;
+    rows_written: number;
+    rows_read: number;
+  }>();
   return results.reverse();
 }
 
@@ -230,6 +297,25 @@ export function supportStatement(
   return env.DB.prepare(
     `UPDATE tenants SET support_until = ${value}, support_reason = ?3, updated_at = ?4 WHERE id = ?1`,
   ).bind(tenantId, until, reason, now);
+}
+
+/**
+ * End support access for good. `support_until` becomes NULL (not `now`) so `/api/me`
+ * stops running the expiry revoke batch on every request after a session ends (M14).
+ * `onlyExpired` keeps a concurrent extension alive when expiry is what ended access.
+ */
+export function endSupportStatement(
+  env: Env,
+  tenantId: string,
+  now: number,
+  onlyExpired = false,
+) {
+  const guard = onlyExpired
+    ? ' AND support_until IS NOT NULL AND support_until <= ?2'
+    : '';
+  return env.DB.prepare(
+    `UPDATE tenants SET support_until = NULL, support_reason = '', updated_at = ?2 WHERE id = ?1${guard}`,
+  ).bind(tenantId, now);
 }
 
 export function restoreEpochStatement(

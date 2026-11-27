@@ -4,6 +4,7 @@ import { Link } from '@tanstack/react-router';
 import { useEffect, useId, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { QtyInput } from '../components/QtyInput.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -23,9 +24,8 @@ import {
   StockAdjustError,
 } from '../data/stock.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { Modal } from '../sell/Modal.tsx';
+import { qtyWithUnit } from '../lib/productFormat.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
-import { qtyWithUnit } from './format.ts';
 
 const KINDS: readonly AdjustKind[] = ['in', 'out', 'count', 'fix'];
 

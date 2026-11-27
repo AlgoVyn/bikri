@@ -19,6 +19,7 @@ import { ChevronLeftIcon } from '../components/icons.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageActions } from '../components/PageActions.tsx';
 import { PageLoading } from '../components/PageLoading.tsx';
+import { ProductThumb } from '../components/ProductThumb.tsx';
 import { usePrivacyActive } from '../components/privacy.tsx';
 import { useToast } from '../components/Toast.tsx';
 import {
@@ -47,19 +48,18 @@ import { ReadOnlyError } from '../data/write.ts';
 import { categoryName } from '../lib/category.ts';
 import { formatTimestamp } from '../lib/date';
 import { downloadText } from '../lib/download.ts';
+import { plainKey, useHotkey } from '../lib/hotkeys.ts';
+import { isLatinName, marginText, qtyWithUnit } from '../lib/productFormat.ts';
+import { shortDate } from '../lib/reportFormat.ts';
 import { useRecordBack } from '../peek/recordBack.ts';
 import { useOpenPeek } from '../peek/usePeekNavigation.ts';
-import { shortDate } from '../reports/format.ts';
 import { useSellStore } from '../sell/sellStore.ts';
 import { mutateCart } from '../sell/useSell.ts';
-import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useMediaQuery } from '../shell/useMediaQuery.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { AdjustDialog } from './AdjustDialog.tsx';
-import { isLatinName, marginText, qtyWithUnit } from './format.ts';
 import { type HistoryLinkAccess, historyLinkVisible } from './historyLink.ts';
-import { ProductThumb } from './ProductThumb.tsx';
 
 const LabelsDialog = lazy(() =>
   import('../labels/LabelsDialog.tsx').then((module) => ({

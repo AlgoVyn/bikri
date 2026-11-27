@@ -28,9 +28,9 @@ import {
 } from '../platform/createTenant.ts';
 import {
   claimOwnerExportStatement,
+  endSupportStatement,
   maskEmail,
   releaseOwnerExportStatement,
-  supportStatement,
 } from '../platform/tenantAdmin.ts';
 import { auditStatements } from '../sync/audit.ts';
 import { changeLogStatement } from '../sync/changeLog.ts';
@@ -158,42 +158,43 @@ shop.post('/owner-signin/start', async (c) => {
   const code = newSixDigitCode();
   const hash = await hmacHex(ownerCodeKey(c.env), `${tenant.id}${id}${code}`);
   const expires = now + SIGNIN.ttl;
-  // The checks above give precise errors, but they are read-then-insert. This conditional
-  // insert is the atomic guard: concurrent starts cannot exceed the cooldown/hour/day caps
-  // or the dead-code pause.
-  const inserted = await db.run(
-    `INSERT INTO owner_email_codes (tenant_id, id, device_id, staff_id, code_hash, created_at, expires_at)
-     SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
-     WHERE NOT EXISTS (SELECT 1 FROM owner_email_codes WHERE tenant_id = ?1 AND device_id = ?3 AND created_at > ?8)
-       AND (SELECT COUNT(*) FROM owner_email_codes WHERE tenant_id = ?1 AND created_at > ?9) < ?10
-       AND (SELECT COUNT(*) FROM owner_email_codes WHERE tenant_id = ?1 AND created_at > ?11) < ?12
-       AND (SELECT COUNT(*) FROM owner_email_codes WHERE tenant_id = ?1 AND attempts >= ?13 AND used_at IS NULL AND created_at > ?9) < ?14`,
-    id,
-    device.id,
-    ownerId,
-    hash,
-    now,
-    expires,
-    now - SIGNIN.cooldown,
-    now - HOUR,
-    SIGNIN.perHour,
-    now - 24 * HOUR,
-    SIGNIN.perDay,
-    SIGNIN.tries,
-    SIGNIN.deadPerHour,
-  );
-  if ((inserted.meta.changes ?? 0) !== 1)
+  // The conditional insert is the atomic guard, and the update that expires earlier
+  // unused codes runs in the same batch only when the insert wrote a row (changes = 1).
+  // A new code ends the previous unused one (expired, not dead: it does not count toward
+  // the pause). Exclude the row just inserted.
+  const [inserted] = await db.batch([
+    db.prepare(
+      `INSERT INTO owner_email_codes (tenant_id, id, device_id, staff_id, code_hash, created_at, expires_at)
+       SELECT ?1, ?2, ?3, ?4, ?5, ?6, ?7
+       WHERE NOT EXISTS (SELECT 1 FROM owner_email_codes WHERE tenant_id = ?1 AND device_id = ?3 AND created_at > ?8)
+         AND (SELECT COUNT(*) FROM owner_email_codes WHERE tenant_id = ?1 AND created_at > ?9) < ?10
+         AND (SELECT COUNT(*) FROM owner_email_codes WHERE tenant_id = ?1 AND created_at > ?11) < ?12
+         AND (SELECT COUNT(*) FROM owner_email_codes WHERE tenant_id = ?1 AND attempts >= ?13 AND used_at IS NULL AND created_at > ?9) < ?14`,
+      id,
+      device.id,
+      ownerId,
+      hash,
+      now,
+      expires,
+      now - SIGNIN.cooldown,
+      now - HOUR,
+      SIGNIN.perHour,
+      now - 24 * HOUR,
+      SIGNIN.perDay,
+      SIGNIN.tries,
+      SIGNIN.deadPerHour,
+    ),
+    db.prepare(
+      'UPDATE owner_email_codes SET expires_at = ?2 WHERE tenant_id = ?1 AND used_at IS NULL AND expires_at > ?2 AND id <> ?3 AND changes() = 1',
+      now,
+      id,
+    ),
+  ]);
+  if ((inserted?.meta.changes ?? 0) !== 1)
     throw rateLimited(
       'Too many codes. Try again shortly.',
       SIGNIN.cooldown / 1000,
     );
-  // A new code ends the previous unused one (expired, not dead: it does not count toward
-  // the pause). Exclude the row just inserted.
-  await db.run(
-    'UPDATE owner_email_codes SET expires_at = ?2 WHERE tenant_id = ?1 AND used_at IS NULL AND expires_at > ?2 AND id <> ?3',
-    now,
-    id,
-  );
   const shopName = String(
     (shopRow?.results?.[0] as { name?: string } | undefined)?.name ??
       tenant.display_name,
@@ -293,7 +294,7 @@ shop.post('/support-access/end', async (c) => {
   if (tenant.support_until === null || tenant.support_until <= now)
     return c.json({ ended: false });
   await db.batch([
-    supportStatement(c.env, tenant.id, now, tenant.support_reason, now, 'set'),
+    endSupportStatement(c.env, tenant.id, now),
     db.prepare(
       "DELETE FROM enrolment_codes WHERE tenant_id = ?1 AND kind = 'support' AND used_at IS NULL",
     ),
@@ -469,12 +470,41 @@ async function deviceOf(db: TenantDb, id: string): Promise<DeviceRow> {
   return d;
 }
 
-async function otherAdmins(db: TenantDb, id: string): Promise<number> {
-  const r = await db.first<{ n: number }>(
-    "SELECT COUNT(*) AS n FROM devices WHERE tenant_id = ?1 AND id <> ?2 AND is_admin = 1 AND kind = 'till' AND revoked_at IS NULL",
-    id,
-  );
-  return r?.n ?? 0;
+/**
+ * The device, the number of other admin tills and (when a branch change is requested)
+ * whether that branch exists, in one D1 batch (L12). The route parameter supplies the id,
+ * so none of the three reads depends on another.
+ */
+async function deviceAdminState(
+  db: TenantDb,
+  id: string,
+  branchId?: string,
+): Promise<{ device: DeviceRow; otherAdmins: number; branchExists: boolean }> {
+  const statements = [
+    db.prepare('SELECT * FROM devices WHERE tenant_id = ?1 AND id = ?2', id),
+    db.prepare(
+      "SELECT COUNT(*) AS n FROM devices WHERE tenant_id = ?1 AND id <> ?2 AND is_admin = 1 AND kind = 'till' AND revoked_at IS NULL",
+      id,
+    ),
+  ];
+  if (branchId !== undefined)
+    statements.push(
+      db.prepare(
+        'SELECT id FROM branches WHERE tenant_id = ?1 AND id = ?2 AND deleted_at IS NULL',
+        branchId,
+      ),
+    );
+  const [deviceRow, adminRow, branchRow] = await db.batch(statements);
+  const device = (deviceRow?.results?.[0] as DeviceRow | undefined) ?? null;
+  if (!device)
+    throw new ApiError('NOT_FOUND', 404, 'No such device in this shop');
+  return {
+    device,
+    otherAdmins: Number(
+      (adminRow?.results?.[0] as { n?: number } | undefined)?.n ?? 0,
+    ),
+    branchExists: branchId === undefined || Boolean(branchRow?.results?.[0]),
+  };
 }
 
 shop.patch('/devices/:id', async (c) => {
@@ -487,16 +517,13 @@ shop.patch('/devices/:id', async (c) => {
     })
     .strict()
     .parse(await readJsonBody(c, 64 * 1024));
-  const d = await deviceOf(db, c.req.param('id'));
+  const state = await deviceAdminState(db, c.req.param('id'), body.branch_id);
+  const d = state.device;
   if (d.revoked_at !== null)
     throw new ApiError('CONFLICT', 409, 'This device is revoked');
   if (body.is_admin === true && d.kind !== 'till')
     throw new ApiError('FORBIDDEN', 403, 'Support devices are never admin');
-  if (
-    body.is_admin === false &&
-    d.is_admin === 1 &&
-    (await otherAdmins(db, d.id)) === 0
-  ) {
+  if (body.is_admin === false && d.is_admin === 1 && state.otherAdmins === 0) {
     throw new ApiError(
       'LAST_ADMIN_DEVICE',
       409,
@@ -513,7 +540,7 @@ shop.patch('/devices/:id', async (c) => {
         409,
         'Sync the waiting changes before moving the device',
       );
-    if (!(await branchExists(db, body.branch_id)))
+    if (!state.branchExists)
       throw new ApiError('NOT_FOUND', 404, 'No such branch');
     next.branch_id = body.branch_id;
     const codes = [
@@ -575,9 +602,10 @@ shop.patch('/devices/:id', async (c) => {
 
 shop.post('/devices/:id/revoke', async (c) => {
   const { db } = c.var;
-  const d = await deviceOf(db, c.req.param('id'));
+  const state = await deviceAdminState(db, c.req.param('id'));
+  const d = state.device;
   if (d.revoked_at !== null) return c.json({ revoked_at: d.revoked_at });
-  if (d.is_admin === 1 && (await otherAdmins(db, d.id)) === 0) {
+  if (d.is_admin === 1 && state.otherAdmins === 0) {
     throw new ApiError(
       'LAST_ADMIN_DEVICE',
       409,

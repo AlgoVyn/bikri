@@ -4,10 +4,10 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { DialogFooter } from '../components/DialogFooter.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { useAreaStrings } from '../i18n/areas.tsx';
-import { Modal } from '../sell/Modal.tsx';
-import { useHotkey } from '../shell/hotkeys.ts';
+import { useHotkey } from '../lib/hotkeys.ts';
 
 export function QuoteDialog({
   open,

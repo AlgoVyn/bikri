@@ -1,9 +1,12 @@
 package agent
 
 import (
+	"bytes"
 	"context"
 	"encoding/base64"
 	"errors"
+	"image"
+	"image/png"
 	"sync"
 	"testing"
 	"time"
@@ -21,12 +24,14 @@ type fakeBackend struct {
 	spoolID     string
 	status      backend.Status
 	statusErr   error
+	statusCalls int
 	statusHook  func()
 	cancelErr   error
 	cancelCalls int
 	canceledIDs []string
 	printers    []backend.Printer
 	printersErr error
+	lastJob     backend.Job
 
 	// Channels let a test interleave Cancel/Submit/Get deterministically.
 	printEntered  chan struct{}
@@ -45,12 +50,15 @@ func (f *fakeBackend) ListPrinters(context.Context) ([]backend.Printer, error) {
 	return f.printers, nil
 }
 
-func (f *fakeBackend) Print(context.Context, backend.Job) (string, error) {
+func (f *fakeBackend) Print(_ context.Context, job *backend.Job) (string, error) {
 	f.mu.Lock()
 	f.printCalls++
 	f.inFlight++
 	if f.inFlight > f.maxInFlight {
 		f.maxInFlight = f.inFlight
+	}
+	if job != nil {
+		f.lastJob = *job
 	}
 	delay := f.printDelay
 	printErr := f.printErr
@@ -77,6 +85,7 @@ func (f *fakeBackend) Print(context.Context, backend.Job) (string, error) {
 
 func (f *fakeBackend) Status(context.Context, string, string) (backend.Status, error) {
 	f.mu.Lock()
+	f.statusCalls++
 	hook := f.statusHook
 	status, err := f.status, f.statusErr
 	f.mu.Unlock()
@@ -142,6 +151,133 @@ func TestManagerClearsPayloadAfterDecode(t *testing.T) {
 	}
 	if req.Data != "" {
 		t.Fatalf("encoded payload = %q, want it cleared", req.Data)
+	}
+}
+
+// The manager validates the PNG header once and hands the dimensions to the
+// backend, so CUPS/GDI do not decode the same IHDR again (L11).
+func TestManagerPassesValidatedPNGDimensions(t *testing.T) {
+	var encoded bytes.Buffer
+	img := image.NewRGBA(image.Rect(0, 0, 7, 5))
+	if err := png.Encode(&encoded, img); err != nil {
+		t.Fatal(err)
+	}
+	fake := &fakeBackend{spoolID: "42"}
+	manager := NewManager(fake)
+	req := validRequest()
+	req.Mode = "driver"
+	req.Encoding = "png"
+	req.Data = base64.StdEncoding.EncodeToString(encoded.Bytes())
+	if _, err := submitJob(manager, req); err != nil {
+		t.Fatal(err)
+	}
+	if fake.lastJob.ImageWidth != 7 || fake.lastJob.ImageHeight != 5 {
+		t.Fatalf("job dimensions = %dx%d, want 7x5", fake.lastJob.ImageWidth, fake.lastJob.ImageHeight)
+	}
+}
+
+func TestDecodeDataDetectsTheAlphabet(t *testing.T) {
+	payload := []byte{0xfb, 0xff, 0x00, 0x01}
+	for name, text := range map[string]string{
+		"std padded":     base64.StdEncoding.EncodeToString(payload),
+		"std raw":        base64.RawStdEncoding.EncodeToString(payload),
+		"url padded":     base64.URLEncoding.EncodeToString(payload),
+		"url raw":        base64.RawURLEncoding.EncodeToString(payload),
+		"plain alphabet": "G0Bh",
+	} {
+		got, err := decodeData(text)
+		if err != nil {
+			t.Fatalf("%s: %v", name, err)
+		}
+		if name != "plain alphabet" && !bytes.Equal(got, payload) {
+			t.Fatalf("%s = %x, want %x", name, got, payload)
+		}
+	}
+	for _, text := range []string{"not base64!", "====", "G0Bh$"} {
+		if _, err := decodeData(text); err == nil {
+			t.Fatalf("invalid base64 accepted: %q", text)
+		}
+	}
+}
+
+// The till polls every 100 ms. A CUPS poll spawns `lpstat`, so concurrent gets
+// share one backend call and a short cache absorbs the polling cadence (L11).
+func TestManagerGetSingleflightsAndCachesStatusPolls(t *testing.T) {
+	fake := &fakeBackend{spoolID: "7", status: backend.Status{State: "printing"}}
+	manager := NewManager(fake)
+	base := time.Now()
+	manager.now = func() time.Time { return base }
+	if _, err := submitJob(manager, validRequest()); err != nil {
+		t.Fatal(err)
+	}
+	first, ok := manager.Get(context.Background(), "job-1")
+	if !ok || first.Status != "printing" {
+		t.Fatalf("first poll = %+v, ok = %v", first, ok)
+	}
+	if fake.statusCalls != 1 {
+		t.Fatalf("status calls = %d, want 1", fake.statusCalls)
+	}
+	// Inside the cache window the stored snapshot is returned.
+	if _, ok := manager.Get(context.Background(), "job-1"); !ok {
+		t.Fatal("cached get failed")
+	}
+	if fake.statusCalls != 1 {
+		t.Fatalf("cached get polled again: %d calls", fake.statusCalls)
+	}
+	// After the window the spooler is asked again.
+	base = base.Add(statusPollTTL + time.Millisecond)
+	if _, ok := manager.Get(context.Background(), "job-1"); !ok {
+		t.Fatal("post-cache get failed")
+	}
+	if fake.statusCalls != 2 {
+		t.Fatalf("expired cache did not poll: %d calls", fake.statusCalls)
+	}
+}
+
+func TestManagerGetSharesAnInFlightPoll(t *testing.T) {
+	entered := make(chan struct{})
+	release := make(chan struct{})
+	var once sync.Once
+	fake := &fakeBackend{spoolID: "7", status: backend.Status{State: "printing"}}
+	fake.statusHook = func() {
+		once.Do(func() { close(entered) })
+		<-release
+	}
+	manager := NewManager(fake)
+	if _, err := submitJob(manager, validRequest()); err != nil {
+		t.Fatal(err)
+	}
+	first := make(chan *JobStatus, 1)
+	go func() {
+		job, _ := manager.Get(context.Background(), "job-1")
+		first <- job
+	}()
+	<-entered
+	second := make(chan *JobStatus, 1)
+	go func() {
+		job, _ := manager.Get(context.Background(), "job-1")
+		second <- job
+	}()
+	// Let the second Get observe the in-flight poll.
+	time.Sleep(20 * time.Millisecond)
+	fake.mu.Lock()
+	calls := fake.statusCalls
+	fake.mu.Unlock()
+	if calls != 1 {
+		close(release)
+		t.Fatalf("concurrent poll spawned %d status calls, want 1", calls)
+	}
+	close(release)
+	for _, ch := range []chan *JobStatus{first, second} {
+		if job := <-ch; job == nil || job.Status != "printing" {
+			t.Fatalf("polled job = %+v", job)
+		}
+	}
+	fake.mu.Lock()
+	calls = fake.statusCalls
+	fake.mu.Unlock()
+	if calls != 1 {
+		t.Fatalf("waiter polled again: %d calls", calls)
 	}
 }
 

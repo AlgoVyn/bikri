@@ -1,5 +1,5 @@
 import { describe, expect, it } from 'vitest';
-import { planBundleRefund, priceBundle } from './bundles.ts';
+import { coverCosts, planBundleRefund, priceBundle } from './bundles.ts';
 
 describe('priceBundle', () => {
   it('lifts a rounding deficit up to the component cost', () => {
@@ -15,6 +15,25 @@ describe('priceBundle', () => {
     expect(result.lines.map((line) => line.net)).toEqual([28, 9, 58]);
     expect(result.lines.every((line) => line.below_cost === false)).toBe(true);
     expect(result.total_net).toBe(95);
+  });
+
+  it('leaves shares untouched when every line is below cost', () => {
+    const shares = [0, 1];
+    coverCosts(shares, [10, 10]);
+    expect(shares).toEqual([0, 1]);
+  });
+
+  it('keeps below-cost lines when no line has surplus to donate', () => {
+    const result = priceBundle({
+      bundle_price: 1,
+      bundle_qty: 1,
+      components: [
+        { qty_milli: 1000, unit_cost: 100, unit_price: 100 },
+        { qty_milli: 1000, unit_cost: 100, unit_price: 100 },
+      ],
+    });
+    expect(result.total_net).toBe(1);
+    expect(result.lines.every((line) => line.below_cost)).toBe(true);
   });
 
   it('handles a one-component bundle', () => {

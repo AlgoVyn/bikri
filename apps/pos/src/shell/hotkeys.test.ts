@@ -1,5 +1,5 @@
 import { afterEach, describe, expect, it } from 'vitest';
-import { dialogOpen } from './hotkeys.ts';
+import { dialogOpen } from '../lib/hotkeys.ts';
 
 afterEach(() => {
   document.body.innerHTML = '';

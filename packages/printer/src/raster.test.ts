@@ -1,5 +1,11 @@
 import { describe, expect, it } from 'vitest';
-import { encodeGsV0, packMono, prepareLogo, scaleToFit } from './raster.ts';
+import {
+  encodeGsV0,
+  logoGsV0,
+  packMono,
+  prepareLogo,
+  scaleToFit,
+} from './raster.ts';
 import type { RasterSource } from './types.ts';
 
 // 06 §10 raster.test.ts: 1-bit packing of a known 16×2 bitmap; band splitting at 255 rows.
@@ -41,6 +47,62 @@ describe('packMono', () => {
       'threshold',
     );
     expect([...packed.data]).toEqual([0x90]);
+  });
+
+  it('packs opaque grayscale RGBA exactly like blended luma', () => {
+    // The Urdu canvas renderer returns opaque black/white/grey, the fast path.
+    const width = 13;
+    const height = 3;
+    const rgba = new Uint8Array(width * height * 4);
+    const graySource = new Uint8Array(width * height);
+    for (let i = 0; i < width * height; i += 1) {
+      const black = (i * 7 + Math.floor(i / width)) % 3 === 0;
+      const value = black ? 0 : 255;
+      graySource[i] = value;
+      rgba[i * 4] = value;
+      rgba[i * 4 + 1] = value;
+      rgba[i * 4 + 2] = value;
+      rgba[i * 4 + 3] = 255;
+    }
+    const fromRgba = packMono(
+      { width, height, data: rgba, format: 'rgba' },
+      'threshold',
+    );
+    const fromGray = packMono(
+      { width, height, data: graySource, format: 'gray' },
+      'threshold',
+    );
+    expect([...fromRgba.data]).toEqual([...fromGray.data]);
+    expect(fromRgba.widthBytes).toBe(2);
+
+    // Mid-greys (antialiased glyph edges) use the same operand order as
+    // blendedLuma; 128 evaluates to 127.999… and must stay black.
+    const shades = new Uint8Array([0, 64, 127, 128, 200, 255]);
+    const shadeRgba = new Uint8Array(shades.length * 4);
+    for (let i = 0; i < shades.length; i += 1) {
+      const value = shades[i] ?? 0;
+      shadeRgba.set([value, value, value, 255], i * 4);
+    }
+    const packed = packMono(
+      { width: shades.length, height: 1, data: shadeRgba, format: 'rgba' },
+      'threshold',
+    );
+    const expected = shades.map((value) =>
+      0.299 * value + 0.587 * value + 0.114 * value < 128 ? 1 : 0,
+    );
+    const bits: number[] = [];
+    for (let x = 0; x < shades.length; x += 1) {
+      bits.push(((packed.data[0] ?? 0) >> (7 - x)) & 1);
+    }
+    expect(bits).toEqual([...expected]);
+  });
+
+  it('packs opaque black/white Gray directly and falls back for other greys', () => {
+    const mono = gray(10, 1, (x) => (x % 2 === 0 ? 0 : 255));
+    expect([...packMono(mono, 'threshold').data]).toEqual([0xaa, 0x80]);
+    // 127 is black at the 50% threshold even though it is not pure white.
+    const grey = gray(10, 1, (x) => (x < 5 ? 127 : 128));
+    expect([...packMono(grey, 'threshold').data]).toEqual([0xf8, 0x00]);
   });
 
   it('dithers a 50% grey to about half black (Floyd–Steinberg)', () => {
@@ -144,5 +206,49 @@ describe('logo preparation (06 §6)', () => {
         10,
       ),
     ).toThrow();
+  });
+});
+
+describe('logo GS v 0 cache (M17.2)', () => {
+  const logo = (offset: number): RasterSource => {
+    const width = 40;
+    const height = 12;
+    const data = new Uint8Array(width * height);
+    for (let i = 0; i < data.length; i += 1) {
+      data[i] = (i + offset) % 3 === 0 ? 0 : 255;
+    }
+    return { width, height, data, format: 'gray' };
+  };
+
+  it('returns the exact bytes of the uncached encoder', () => {
+    const source = logo(0);
+    const expected = encodeGsV0(packMono(prepareLogo(source, 384), 'dither'));
+    expect([...logoGsV0(source, 384)]).toEqual([...expected]);
+  });
+
+  it('reuses the packed bytes for the same pixels from a fresh buffer and dots', () => {
+    const first = logoGsV0(logo(0), 384);
+    // IndexedDB returns a fresh Uint8Array on every kv read; the pixel hash,
+    // not object identity, must find the cached bytes.
+    const second = logoGsV0(logo(0), 384);
+    expect(second).toBe(first);
+    const otherDots = logoGsV0(logo(0), 576);
+    expect(otherDots).not.toBe(first);
+  });
+
+  it('does not reuse bytes for different pixels and bounds the cache', () => {
+    const a = logoGsV0(logo(0), 384);
+    const b = logoGsV0(logo(1), 384);
+    expect([...b]).not.toEqual([...a]);
+    // More distinct logos than the cache holds must not grow it without bound;
+    // the oldest entries are simply re-encoded.
+    for (let i = 2; i < 20; i += 1) {
+      logoGsV0(logo(i), 384);
+    }
+    expect([...logoGsV0(logo(0), 384)]).toEqual([...a]);
+  });
+
+  it('rejects a target narrower than 8 dots', () => {
+    expect(() => logoGsV0(logo(0), 7)).toThrow();
   });
 });

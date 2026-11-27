@@ -60,6 +60,159 @@ func TestListPrintersCachesAndServesStale(t *testing.T) {
 	}
 }
 
+// The /v1/health probe gives up after 300 ms while a shared refresh is still
+// running. With a previous list, the probe must count those printers instead of
+// reporting zero (M17.4).
+func TestListPrintersServesStaleWhenTheWaiterDeadlineExpires(t *testing.T) {
+	done := make(chan struct{})
+	b := &cupsBackend{
+		printers:    []Printer{{Name: "Bixolon", IsDefault: true}},
+		printersAt:  time.Now().Add(-2 * cupsPrinterTTL),
+		refreshing:  true,
+		refreshDone: done,
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
+	defer cancel()
+	list, err := b.ListPrinters(ctx)
+	close(done)
+	if err != nil {
+		t.Fatalf("stale waiter returned an error: %v", err)
+	}
+	if len(list) != 1 || list[0].Name != "Bixolon" {
+		t.Fatalf("stale list = %#v", list)
+	}
+}
+
+func TestListPrintersServesStaleWhenItsOwnRefreshIsSlow(t *testing.T) {
+	original := cupsRun
+	defer func() { cupsRun = original }()
+	release := make(chan struct{})
+	cupsRun = func(ctx context.Context, _ string, _ ...string) (string, error) {
+		<-release
+		return "", ctx.Err()
+	}
+	b := &cupsBackend{
+		printers:   []Printer{{Name: "Bixolon"}},
+		printersAt: time.Now().Add(-2 * cupsPrinterTTL),
+	}
+	ctx, cancel := context.WithTimeout(context.Background(), 5*time.Millisecond)
+	defer cancel()
+	list, err := b.ListPrinters(ctx)
+	if err != nil {
+		t.Fatalf("stale leader returned an error: %v", err)
+	}
+	if len(list) != 1 || list[0].Name != "Bixolon" {
+		t.Fatalf("stale list = %#v", list)
+	}
+	b.printersMu.Lock()
+	done := b.refreshDone
+	b.printersMu.Unlock()
+	close(release)
+	if done != nil {
+		<-done
+	}
+}
+
+// `lpstat -d` and `lpstat -v` are independent; both must be in flight together
+// so a slow CUPS daemon does not cost two sequential timeouts (M17.4).
+func TestEnumerateRunsDefaultAndDevicesConcurrently(t *testing.T) {
+	original := cupsRun
+	defer func() { cupsRun = original }()
+	started := make(chan string, 2)
+	release := make(chan struct{})
+	cupsRun = func(_ context.Context, _ string, args ...string) (string, error) {
+		switch args[0] {
+		case "-e":
+			return "Bixolon\n", nil
+		case "-d":
+			started <- "d"
+			<-release
+			return "system default destination: Bixolon\n", nil
+		case "-v":
+			started <- "v"
+			<-release
+			return "device for Bixolon: usb://BIXOLON/SRP-350III\n", nil
+		}
+		return "", nil
+	}
+	type result struct {
+		list []Printer
+		err  error
+	}
+	got := make(chan result, 1)
+	go func() {
+		list, err := (&cupsBackend{}).enumerate(context.Background())
+		got <- result{list: list, err: err}
+	}()
+	seen := map[string]bool{}
+	for len(seen) < 2 {
+		select {
+		case name := <-started:
+			seen[name] = true
+		case <-time.After(time.Second):
+			close(release)
+			t.Fatalf("commands did not run concurrently: saw %v", seen)
+		}
+	}
+	close(release)
+	res := <-got
+	if res.err != nil {
+		t.Fatal(res.err)
+	}
+	if len(res.list) != 1 || res.list[0].Name != "Bixolon" ||
+		!res.list[0].IsDefault || res.list[0].Port != "usb://BIXOLON/SRP-350III" {
+		t.Fatalf("printers = %#v", res.list)
+	}
+}
+
+func TestCupsPrintUsesValidatedDimensionsAndReleasesThePayload(t *testing.T) {
+	dir := t.TempDir()
+	argsFile := filepath.Join(dir, "lp-args")
+	script := filepath.Join(dir, "lp")
+	body := "#!/bin/sh\nfor arg in \"$@\"; do printf '%s\\n' \"$arg\"; done > " + argsFile +
+		"\necho 'request id is Bixolon-42 (1 file(s))'\n"
+	if err := os.WriteFile(script, []byte(body), 0o755); err != nil {
+		t.Fatal(err)
+	}
+	t.Setenv("PATH", dir+":/bin:/usr/bin")
+	cupsEnvOnce = sync.Once{}
+	cupsEnvCache = nil
+
+	// The data is not a PNG: the manager already validated the header and passed
+	// the dimensions, so CUPS must not decode it again (L11).
+	job := &Job{
+		ID:          "job-1",
+		Printer:     "Bixolon",
+		Mode:        "driver",
+		Encoding:    "png",
+		PaperMM:     80,
+		WidthDots:   576,
+		Data:        []byte("not a png"),
+		ImageWidth:  576,
+		ImageHeight: 2030,
+	}
+	spoolID, err := (&cupsBackend{}).Print(context.Background(), job)
+	if err != nil {
+		t.Fatal(err)
+	}
+	if spoolID != "Bixolon-42" {
+		t.Fatalf("spool id = %q", spoolID)
+	}
+	if job.Data != nil {
+		t.Fatal("the encoded payload stayed referenced after spooling")
+	}
+	data, err := os.ReadFile(argsFile)
+	if err != nil {
+		t.Fatal(err)
+	}
+	args := string(data)
+	for _, want := range []string{"natural-scaling=100", "ppi=183", "media=Custom.80x282mm", "Bikri job-1"} {
+		if !strings.Contains(args, want) {
+			t.Fatalf("lp arguments %q missing %q", args, want)
+		}
+	}
+}
+
 func TestParseQueueNames(t *testing.T) {
 	got := parseQueueNames("Bixolon\n\nOffice  \n")
 	if len(got) != 2 || got[0] != "Bixolon" || got[1] != "Office" {

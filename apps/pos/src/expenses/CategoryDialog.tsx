@@ -1,12 +1,12 @@
 import { useEffect, useState } from 'react';
 import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
+import { Modal } from '../components/Modal.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { getDb } from '../data/db.ts';
 import { createExpenseCategory } from '../data/expenses.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 /** Owner-only `+ Category` for expenses (screens/14). */

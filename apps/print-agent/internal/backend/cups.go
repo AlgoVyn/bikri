@@ -57,9 +57,17 @@ func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 	}
 	if b.refreshing {
 		done := b.refreshDone
+		hasStale := b.printers != nil
+		stale := clonePrinters(b.printers)
 		b.printersMu.Unlock()
 		list, refreshErr, waitErr := b.wait(ctx, done)
 		if waitErr != nil {
+			// A short health probe can expire while a shared refresh is still
+			// running. The last known list is far more useful than reporting zero
+			// printers; the refresh keeps going for the next waiter (M17.4).
+			if hasStale {
+				return stale, nil
+			}
 			return nil, waitErr
 		}
 		if list == nil && refreshErr != nil {
@@ -86,7 +94,11 @@ func (b *cupsBackend) ListPrinters(ctx context.Context) ([]Printer, error) {
 
 	list, refreshErr, waitErr := b.wait(ctx, done)
 	if waitErr != nil {
-		// This caller gave up; the refresh keeps running for the next waiter.
+		// This caller gave up; the refresh keeps running for the next waiter. If
+		// there is a previous list, serve it instead of an empty health answer.
+		if hasStale {
+			return stale, nil
+		}
 		return nil, waitErr
 	}
 	if refreshErr != nil && hasStale {
@@ -133,7 +145,7 @@ func (b *cupsBackend) refresh(ctx context.Context, done chan struct{}) (list []P
 }
 
 func (b *cupsBackend) enumerate(ctx context.Context) ([]Printer, error) {
-	namesOut, err := run(ctx, "lpstat", "-e")
+	namesOut, err := cupsRun(ctx, "lpstat", "-e")
 	if err != nil {
 		return nil, &Error{Code: "CUPS_UNAVAILABLE", Message: err.Error()}
 	}
@@ -141,13 +153,32 @@ func (b *cupsBackend) enumerate(ctx context.Context) ([]Printer, error) {
 	if len(names) == 0 {
 		return []Printer{}, nil
 	}
+	// `-d` (default queue) and `-v` (device URI) are independent. Running them
+	// sequentially made a slow CUPS daemon cost two full timeouts on the health
+	// path; they now run together and each failure stays optional (M17.4).
+	type result struct {
+		out string
+		err error
+	}
+	defaultCh := make(chan result, 1)
+	deviceCh := make(chan result, 1)
+	go func() {
+		out, err := cupsRun(ctx, "lpstat", "-d")
+		defaultCh <- result{out: out, err: err}
+	}()
+	go func() {
+		out, err := cupsRun(ctx, "lpstat", "-v")
+		deviceCh <- result{out: out, err: err}
+	}()
+	defaultResult := <-defaultCh
+	deviceResult := <-deviceCh
 	defaultName := ""
-	if out, err := run(ctx, "lpstat", "-d"); err == nil {
-		defaultName = parseDefaultQueue(out)
+	if defaultResult.err == nil {
+		defaultName = parseDefaultQueue(defaultResult.out)
 	}
 	devices := map[string]string{}
-	if out, err := run(ctx, "lpstat", "-v"); err == nil {
-		devices = parseDevices(out)
+	if deviceResult.err == nil {
+		devices = parseDevices(deviceResult.out)
 	}
 	printers := make([]Printer, 0, len(names))
 	for _, name := range names {
@@ -160,7 +191,10 @@ func (b *cupsBackend) enumerate(ctx context.Context) ([]Printer, error) {
 	return printers, nil
 }
 
-func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
+func (b *cupsBackend) Print(ctx context.Context, job *Job) (string, error) {
+	if job == nil {
+		return "", &Error{Code: "SPOOL_ERROR", Message: "no job"}
+	}
 	if !ValidPrinterName(job.Printer) {
 		return "", &Error{Code: "UNKNOWN_PRINTER", Message: "no valid printer name"}
 	}
@@ -168,12 +202,15 @@ func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
 	var imageHeight, imageWidth int
 	if job.Encoding == "png" {
 		ext = ".png"
-		// Validate here too so a direct backend caller (or a future transport)
-		// cannot hand CUPS filters an unbounded PNG. The manager also validates
-		// centrally before any backend runs.
-		width, height, err := ImageConfig(job.Data)
-		if err != nil {
-			return "", err
+		// The manager validates the IHDR centrally and passes the dimensions;
+		// a direct backend caller still gets the guard here (L11).
+		width, height := job.ImageWidth, job.ImageHeight
+		if !validImageSize(width, height) {
+			var err error
+			width, height, err = ImageConfig(job.Data)
+			if err != nil {
+				return "", err
+			}
 		}
 		imageWidth, imageHeight = width, height
 	}
@@ -190,6 +227,9 @@ func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
 	if err := file.Close(); err != nil {
 		return "", &Error{Code: "SPOOL_ERROR", Message: err.Error()}
 	}
+	// `lp` reads the temp file, not the payload; release the encoded document
+	// before waiting on the subprocess.
+	job.Data = nil
 
 	copies := job.Copies
 	if copies < 1 {
@@ -206,7 +246,7 @@ func (b *cupsBackend) Print(ctx context.Context, job Job) (string, error) {
 		if job.WidthDots <= 0 {
 			job.WidthDots = imageWidth
 		}
-		args = append(args, cupsDriverArgs(job, imageHeight)...)
+		args = append(args, cupsDriverArgs(*job, imageHeight)...)
 	}
 	// `--` ends options: a file name or queue that begins with `-` can never be
 	// interpreted as another lp flag.
@@ -353,6 +393,10 @@ func cachedCupsEnv() []string {
 	cupsEnvOnce.Do(func() { cupsEnvCache = cupsEnv(os.Environ()) })
 	return cupsEnvCache
 }
+
+// cupsRun is a seam for tests that need to observe enumeration concurrency and
+// failures without a real CUPS daemon.
+var cupsRun = run
 
 func run(ctx context.Context, name string, args ...string) (string, error) {
 	cmd := exec.CommandContext(ctx, name, args...)

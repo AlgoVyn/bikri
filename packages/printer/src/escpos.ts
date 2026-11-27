@@ -7,10 +7,10 @@ import {
   lineNeedsRtl,
 } from './layout.ts';
 import {
-  encodeGsV0,
   fitRasterToDots,
+  logoGsV0,
+  type PackedBitmap,
   packMono,
-  prepareLogo,
   scaleToFit,
 } from './raster.ts';
 import type {
@@ -62,8 +62,12 @@ const INITIAL_STYLE: Style = {
 };
 
 class ByteBuf {
-  private buffer = new Uint8Array(1024);
+  private buffer: Uint8Array;
   private length = 0;
+
+  constructor(capacity = 1024) {
+    this.buffer = new Uint8Array(capacity);
+  }
 
   private ensure(extra: number): void {
     const needed = this.length + extra;
@@ -85,6 +89,50 @@ class ByteBuf {
     this.ensure(bytes.length);
     this.buffer.set(bytes, this.length);
     this.length += bytes.length;
+  }
+
+  /**
+   * Write `GS v 0` bands straight into the buffer. Encoding them into a
+   * separate `Uint8Array` first and then copying it here doubled the largest
+   * allocation on an image-mode receipt (M17.1). The bytes are identical to
+   * {@link encodeGsV0}.
+   */
+  gsv0(packed: PackedBitmap): void {
+    if (
+      !Number.isInteger(packed.widthBytes) ||
+      packed.widthBytes < 1 ||
+      packed.widthBytes > 65535
+    ) {
+      throw new Error('raster width is out of range');
+    }
+    if (!Number.isInteger(packed.height) || packed.height < 1) {
+      throw new Error('raster height is out of range');
+    }
+    const needed = packed.widthBytes * packed.height;
+    if (packed.data.length < needed) {
+      throw new Error('raster data is shorter than width*height');
+    }
+    const xL = packed.widthBytes & 0xff;
+    const xH = (packed.widthBytes >> 8) & 0xff;
+    let row = 0;
+    while (row < packed.height) {
+      const band = Math.min(255, packed.height - row);
+      const start = row * packed.widthBytes;
+      const end = start + band * packed.widthBytes;
+      this.ensure(8 + (end - start));
+      this.buffer[this.length] = 0x1d;
+      this.buffer[this.length + 1] = 0x76;
+      this.buffer[this.length + 2] = 0x30;
+      this.buffer[this.length + 3] = 0x00;
+      this.buffer[this.length + 4] = xL;
+      this.buffer[this.length + 5] = xH;
+      this.buffer[this.length + 6] = band & 0xff;
+      this.buffer[this.length + 7] = (band >> 8) & 0xff;
+      this.length += 8;
+      this.buffer.set(packed.data.subarray(start, end), this.length);
+      this.length += end - start;
+      row += band;
+    }
   }
 
   ascii(text: string): void {
@@ -286,7 +334,7 @@ function encodeCommands(
   commands: LaidCommand[],
   state: EncodeState,
 ): Uint8Array {
-  const buf = new ByteBuf();
+  const buf = new ByteBuf(state.imageMode ? 65536 : 1024);
   buf.push(0x1b, 0x40, 0x1b, 0x74, 0x00);
   // 06 §3: only override the printer's native geometry when the print area is
   // narrower than the paper. A true 58 mm profile and a full-width 80 mm
@@ -331,9 +379,9 @@ function encodeCommands(
     applyStyle(INITIAL_STYLE);
   };
 
-  const writeRaster = (packed: ReturnType<typeof packMono>): void => {
+  const writeRaster = (packed: PackedBitmap): void => {
     resetStyle();
-    buf.append(encodeGsV0(packed));
+    buf.gsv0(packed);
   };
 
   for (const command of commands) {
@@ -378,7 +426,10 @@ function encodeCommands(
         if (state.logo === null) {
           break;
         }
-        writeRaster(packMono(prepareLogo(state.logo, state.dots), 'dither'));
+        // The packed GS v 0 bytes are cached by logo pixels and paper width, so
+        // a repeated receipt does not re-scale or re-dither the logo (M17.2).
+        resetStyle();
+        buf.append(logoGsV0(state.logo, state.dots));
         break;
       }
       case 'image': {

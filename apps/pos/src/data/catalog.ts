@@ -888,31 +888,22 @@ export async function productDetail(
   const dayByDate = new Map(days.map((day) => [day.date, day]));
   const first = days[0]?.date ?? '';
   const last = days[13]?.date ?? '';
-  const sales = await db.sales
-    .where('business_date')
-    .between(first, last, true, true)
-    .toArray();
-  const byId = new Map(
-    sales.filter((s) => s.status !== 'void').map((s) => [s.id, s]),
-  );
-  // The product index is selective (one product, not the shop's whole line table); the
-  // sale map then keeps only the 14-day window. Loading every sale line by sale id
-  // would make one round trip per chunk on a busy shop.
-  const productLines: { line: SyncedRow; sale: SyncedRow }[] = [];
-  for (const line of await db.sale_lines
+  // Read only the lines that can belong to this product. The previous version read
+  // every shop sale in the 14-day window and then looked up these lines against it,
+  // which made an unrelated sale invalidate and re-read the whole shop.
+  const productLinesRaw = await db.sale_lines
     .where('[product_id+business_date]')
     .between([id, first], [id, last], true, true)
-    .toArray()) {
-    const sale = byId.get(String(line.sale_id));
-    if (!sale) continue;
-    productLines.push({ line, sale });
-    const day = dayByDate.get(String(sale.business_date));
-    if (!day) continue;
-    day.qty += Number(line.qty_milli);
-    // Each sale keeps its own tax-inclusive snapshot; using the shop's current mode
-    // would rewrite history after a tax setting change.
-    day.revenue += lineRevenue(line, sale.tax_inclusive === 1);
-  }
+    .toArray();
+  // A bundle has no sale lines of its own; its component lines are the source.
+  const bundleLinesRaw = bundle
+    ? (
+        await db.sale_lines
+          .where('[bundle_id+business_date]')
+          .between([id, first], [id, last], true, true)
+          .toArray()
+      ).filter((line) => line.bundle_group !== undefined)
+    : [];
   // Refunds count on the date they happen, including a refund today of a sale older
   // than the 14-day chart window (07 §9). Load the refunds in the window first, then
   // their original sale lines and every earlier refund of those lines for the
@@ -933,14 +924,33 @@ export async function productDetail(
             .filter((line): line is SyncedRow => line !== undefined)
             .map((line) => [String(line.id), line]),
         );
+  const saleIds = new Set<string>();
+  for (const line of productLinesRaw) saleIds.add(String(line.sale_id));
+  for (const line of bundleLinesRaw) saleIds.add(String(line.sale_id));
+  for (const line of refundOriginalLines.values())
+    saleIds.add(String(line.sale_id));
+  const sales = await db.sales.bulkGet([...saleIds]);
+  const byId = new Map(
+    sales
+      .filter((sale): sale is SyncedRow => sale !== undefined)
+      .filter((sale) => sale.status !== 'void')
+      .map((sale) => [sale.id, sale]),
+  );
+  const productLines: { line: SyncedRow; sale: SyncedRow }[] = [];
+  for (const line of productLinesRaw) {
+    const sale = byId.get(String(line.sale_id));
+    if (!sale) continue;
+    productLines.push({ line, sale });
+    const day = dayByDate.get(String(sale.business_date));
+    if (!day) continue;
+    day.qty += Number(line.qty_milli);
+    // Each sale keeps its own tax-inclusive snapshot; using the shop's current mode
+    // would rewrite history after a tax setting change.
+    day.revenue += lineRevenue(line, sale.tax_inclusive === 1);
+  }
   const saleCache = new Map(byId);
-  const saleFor = async (saleId: string): Promise<SyncedRow | undefined> => {
-    const known = saleCache.get(saleId);
-    if (known) return known;
-    const sale = await db.sales.get(saleId);
-    if (sale) saleCache.set(saleId, sale);
-    return sale;
-  };
+  const saleFor = (saleId: string): SyncedRow | undefined =>
+    saleCache.get(saleId);
   const simpleRefundLines = [...refundOriginalLines.values()].filter(
     (line) => line.product_id === id,
   );
@@ -967,7 +977,7 @@ export async function productDetail(
       bySaleLine.set(key, list);
     }
     for (const line of simpleRefundLines) {
-      const sale = await saleFor(String(line.sale_id));
+      const sale = saleFor(String(line.sale_id));
       if (!sale) continue;
       const forLine = (bySaleLine.get(String(line.id)) ?? []).sort(
         (a, b) =>
@@ -1003,13 +1013,7 @@ export async function productDetail(
     const seenSaleGroups = new Set<string>();
     // The bundle+date index (Dexie V11) keeps this to the 14-day window instead of
     // every component line the bundle ever sold.
-    const bundleLines = (
-      await db.sale_lines
-        .where('[bundle_id+business_date]')
-        .between([id, first], [id, last], true, true)
-        .toArray()
-    ).filter((line) => line.bundle_group !== undefined);
-    for (const line of bundleLines) {
+    for (const line of bundleLinesRaw) {
       const sale = byId.get(String(line.sale_id));
       if (!sale) continue;
       const day = dayByDate.get(String(sale.business_date));
@@ -1071,7 +1075,7 @@ export async function productDetail(
       for (const [lineId, refundsForLine] of byLine) {
         const original = refundOriginalLines.get(lineId);
         if (!original) continue;
-        const sale = await saleFor(String(original.sale_id));
+        const sale = saleFor(String(original.sale_id));
         if (!sale) continue;
         const sorted = [...refundsForLine].sort(
           (a, b) =>
@@ -1630,8 +1634,20 @@ export async function referencedByUnsyncedOp(
   db: BikriDb,
   productId: string,
 ): Promise<boolean> {
-  const pending = await db.outbox.toArray();
-  return pending.some(
+  // Only active ops can still reference the product. The old `toArray()` loaded every
+  // failed op too, including its full row payload; two [status+seq] ranges stay bounded
+  // by what the next push would actually send.
+  const [pending, sending] = await Promise.all([
+    db.outbox
+      .where('[status+seq]')
+      .between(['pending', -Infinity], ['pending', Infinity])
+      .toArray(),
+    db.outbox
+      .where('[status+seq]')
+      .between(['sending', -Infinity], ['sending', Infinity])
+      .toArray(),
+  ]);
+  return [...pending, ...sending].some(
     (op) =>
       op.tbl !== 'products' &&
       op.tbl !== 'product_barcodes' &&

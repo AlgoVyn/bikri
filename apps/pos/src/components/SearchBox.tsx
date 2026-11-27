@@ -1,5 +1,5 @@
 import { useId, useRef } from 'react';
-import { composing } from '../shell/hotkeys.ts';
+import { composing } from '../lib/hotkeys.ts';
 import { SearchIcon } from './icons.tsx';
 import { searchInputClass, searchWrapperClass } from './search.ts';
 

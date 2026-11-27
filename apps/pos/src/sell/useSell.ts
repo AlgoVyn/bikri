@@ -27,10 +27,14 @@ const NO_SOLD = new Map<string, number>();
  * `useCatalogueRows` already sorts in this order and keeps positions when it patches a
  * stock level, so a completed bill never re-sorts the catalogue.
  */
-export function useSellProducts(): SellRow[] | undefined {
+export function useSellProducts(
+  costMethod: 'avg' | 'last' = 'avg',
+): SellRow[] | undefined {
   const sold = useSold30();
   // `buildProductRows` always sets the haystack; the cast avoids re-spreading rows.
-  const rows = useCatalogueRows(sold ?? NO_SOLD) as SellRow[] | undefined;
+  const rows = useCatalogueRows(sold ?? NO_SOLD, costMethod) as
+    | SellRow[]
+    | undefined;
   return (
     rows ?? (getWarmCatalogue(getDb().tenantId)?.rows as SellRow[] | undefined)
   );
@@ -39,7 +43,8 @@ export function useSellProducts(): SellRow[] | undefined {
 /** Every word must appear; an exact barcode or SKU also matches. */
 export function filterRows(rows: readonly SellRow[], query: string): SellRow[] {
   const q = query.trim().toLowerCase();
-  if (!q) return rows.slice();
+  // The empty search shows the cached order; copying 5k rows on every render is waste.
+  if (!q) return rows as SellRow[];
   const words = q.split(/\s+/u);
   return rows.filter((r) => words.every((w) => r.haystack.includes(w)));
 }

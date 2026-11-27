@@ -183,6 +183,47 @@ export function effectiveQuoteLines(
     .sort((a, b) => a.line_no - b.line_no);
 }
 
+type QuoteMemo = {
+  lines: QuoteLineInfo[];
+  /** `undefined` = not computed yet, `null` = no such quote header. */
+  header: Record<string, unknown> | null | undefined;
+  /** computeCart output per header shape (bill discount/tax/rounding). */
+  totals: Map<string, ReturnType<typeof computeCart>>;
+  /** Line shape and unique line_no were validated once for these effective lines. */
+  shapesChecked: boolean;
+};
+
+/**
+ * A `checkQuoteHeader`/`checkQuoteLine`/`checkQuoteLineDelete` call used to rebuild the
+ * effective line list and run `computeCart(60)` for every op: 61 runs for a 60-line quote
+ * (H10). The group array is the transaction, so a WeakMap keeps one memo per quote and
+ * releases it with the request.
+ */
+const quoteMemos = new WeakMap<PushOp[], Map<string, QuoteMemo>>();
+
+function quoteMemoFor(
+  look: Lookups,
+  group: PushOp[],
+  quoteId: string,
+): QuoteMemo {
+  let byQuote = quoteMemos.get(group);
+  if (byQuote === undefined) {
+    byQuote = new Map();
+    quoteMemos.set(group, byQuote);
+  }
+  let memo = byQuote.get(quoteId);
+  if (memo === undefined) {
+    memo = {
+      lines: effectiveQuoteLines(look, group, quoteId),
+      header: undefined,
+      totals: new Map(),
+      shapesChecked: false,
+    };
+    byQuote.set(quoteId, memo);
+  }
+  return memo;
+}
+
 function assertLineShape(row: QuoteLineInfo): void {
   const qty = n(row.qty_milli);
   const price = n(row.unit_price);
@@ -317,6 +358,8 @@ export function effectiveQuoteHeader(
   group: PushOp[],
   quoteId: string,
 ): Record<string, unknown> | null {
+  const memo = quoteMemoFor(look, group, quoteId);
+  if (memo.header !== undefined) return memo.header;
   const current = look.quotes.get(quoteId);
   const op = group.find(
     (candidate) =>
@@ -324,24 +367,33 @@ export function effectiveQuoteHeader(
       candidate.kind !== 'delete' &&
       candidate.row?.id === quoteId,
   );
-  if (op?.row) return headerFrom(current, op.row, op.changed_fields);
-  if (!current) return null;
-  return { ...current };
+  if (op?.row) {
+    memo.header = headerFrom(current, op.row, op.changed_fields);
+    return memo.header;
+  }
+  memo.header = current ? { ...current } : null;
+  return memo.header;
 }
 
 function assertTotals(
   look: Lookups,
+  group: PushOp[],
+  quoteId: string,
   header: Record<string, unknown>,
-  lines: QuoteLineInfo[],
   productCheckLineIds?: ReadonlySet<string>,
 ): ReturnType<typeof computeCart> {
+  const memo = quoteMemoFor(look, group, quoteId);
+  const lines = memo.lines;
   if (lines.length < 1 || lines.length > 60)
     throw new Reject('CONSTRAINT_FAILED');
-  const lineNos = new Set<number>();
-  for (const line of lines) {
-    assertLineShape(line);
-    if (lineNos.has(line.line_no)) throw new Reject('CONSTRAINT_FAILED');
-    lineNos.add(line.line_no);
+  if (!memo.shapesChecked) {
+    const lineNos = new Set<number>();
+    for (const line of lines) {
+      assertLineShape(line);
+      if (lineNos.has(line.line_no)) throw new Reject('CONSTRAINT_FAILED');
+      lineNos.add(line.line_no);
+    }
+    memo.shapesChecked = true;
   }
   assertBundleShape(look, lines, productCheckLineIds);
   const billType = header.bill_discount_type;
@@ -350,30 +402,40 @@ function assertTotals(
     throw new Reject('CONSTRAINT_FAILED');
   if (billType === null && billValue !== 0)
     throw new Reject('CONSTRAINT_FAILED');
-  const input: CartInput = {
-    lines: lines.map((line) => ({
-      qty_milli: n(line.qty_milli),
-      unit_price: n(line.unit_price),
-      ...(line.discount_type && n(line.discount_value) > 0
-        ? {
-            discount_type: line.discount_type as 'rs' | 'pct',
-            discount_value: n(line.discount_value),
-          }
-        : {}),
-    })),
-    bill_discount:
-      billType && billValue > 0
-        ? { type: billType as 'rs' | 'pct', value: billValue }
-        : null,
-    tax_rate_bp: n(header.tax_rate_bp),
-    tax_mode: n(header.tax_inclusive) === 1 ? 'inclusive' : 'exclusive',
-    round_total_to: Math.max(1, n(header.round_total_to) || 1),
-  };
-  let totals: ReturnType<typeof computeCart>;
-  try {
-    totals = computeCart(input);
-  } catch {
-    throw new Reject('CONSTRAINT_FAILED');
+  const taxRateBp = n(header.tax_rate_bp);
+  const taxInclusive =
+    n(header.tax_inclusive) === 1 ? 'inclusive' : 'exclusive';
+  const roundTotalTo = Math.max(1, n(header.round_total_to) || 1);
+  // The document shape decides the totals; a note/status edit with the same lines reuses
+  // the cached computeCart result instead of re-running the BigInt money path (H10).
+  const totalsKey = `${String(billType)}|${billValue}|${taxRateBp}|${taxInclusive}|${roundTotalTo}`;
+  let totals = memo.totals.get(totalsKey);
+  if (totals === undefined) {
+    const input: CartInput = {
+      lines: lines.map((line) => ({
+        qty_milli: n(line.qty_milli),
+        unit_price: n(line.unit_price),
+        ...(line.discount_type && n(line.discount_value) > 0
+          ? {
+              discount_type: line.discount_type as 'rs' | 'pct',
+              discount_value: n(line.discount_value),
+            }
+          : {}),
+      })),
+      bill_discount:
+        billType && billValue > 0
+          ? { type: billType as 'rs' | 'pct', value: billValue }
+          : null,
+      tax_rate_bp: taxRateBp,
+      tax_mode: taxInclusive,
+      round_total_to: roundTotalTo,
+    };
+    try {
+      totals = computeCart(input);
+    } catch {
+      throw new Reject('CONSTRAINT_FAILED');
+    }
+    memo.totals.set(totalsKey, totals);
   }
   for (let i = 0; i < lines.length; i += 1) {
     const line = lines[i];
@@ -731,11 +793,12 @@ export function checkQuoteHeader(
     throw new Reject('CONSTRAINT_FAILED');
   }
 
-  const lines = effectiveQuoteLines(look, group, id);
+  const lines = quoteMemoFor(look, group, id).lines;
   const totals = assertTotals(
     look,
+    group,
+    id,
     header,
-    lines,
     current ? new Set<string>() : undefined,
   );
   const changedHeader = new Set(op.changed_fields ?? []);
@@ -797,13 +860,13 @@ export function checkQuoteLine(
   );
   if (!editor || !can(editor.role, editor.permissions_json, 'sale.create'))
     throw new Reject('FORBIDDEN');
-  const lines = effectiveQuoteLines(look, group, quoteId);
+  const lines = quoteMemoFor(look, group, quoteId).lines;
   const changed = new Set(op.changed_fields ?? []);
   const productCheck =
     !stored || anyField(changed, LINE_PRODUCT_FIELDS)
       ? new Set([rowId])
       : new Set<string>();
-  const totals = assertTotals(look, header, lines, productCheck);
+  const totals = assertTotals(look, group, quoteId, header, productCheck);
   if (!stored || anyField(changed, LINE_POLICY_FIELDS)) {
     const priceLineIds =
       !stored || anyField(changed, LINE_PRICE_FIELDS)
@@ -854,7 +917,6 @@ export function checkQuoteLineDelete(
   );
   if (!editor || !can(editor.role, editor.permissions_json, 'sale.create'))
     throw new Reject('FORBIDDEN');
-  const lines = effectiveQuoteLines(look, group, quoteId);
   // Removing a line does not create a new price or discount; no policy re-approval.
-  assertTotals(look, header, lines, new Set<string>());
+  assertTotals(look, group, quoteId, header, new Set<string>());
 }

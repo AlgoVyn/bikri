@@ -14,6 +14,7 @@ import {
   type SalesFilter,
   type SalesHistoryData,
   type SalesSummary,
+  salesCsv,
 } from '../data/salesHistory.ts';
 
 export type SalesWorkerRequest = {
@@ -24,6 +25,9 @@ export type SalesWorkerRequest = {
   page: number;
   pageSize: number;
   version: number;
+  /** Build the full filtered CSV instead of one page of rows. */
+  csv?: boolean;
+  timeZone?: string;
 };
 
 export type SalesWorkerResponse = {
@@ -32,6 +36,7 @@ export type SalesWorkerResponse = {
   days?: SalesDay[];
   pageCount?: number;
   rowCount?: number;
+  csv?: string;
   error?: string;
 };
 
@@ -91,6 +96,11 @@ async function compute(
       filter,
       query === '' ? undefined : cache.lineText,
     );
+    if (request.csv === true)
+      return {
+        id,
+        csv: salesCsv(history.rows, request.timeZone ?? 'Asia/Karachi'),
+      };
     const pages = pageOf(history.days, pageSize);
     return {
       id,

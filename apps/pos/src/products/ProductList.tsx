@@ -24,6 +24,7 @@ import {
   PageActions,
 } from '../components/PageActions.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
+import { ProductThumb } from '../components/ProductThumb.tsx';
 import { usePrivacyActive } from '../components/privacy.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
@@ -39,14 +40,13 @@ import {
 import { getDb } from '../data/db.ts';
 import { categoryName } from '../lib/category.ts';
 import { downloadText } from '../lib/download.ts';
+import { plainKey, useHotkey } from '../lib/hotkeys.ts';
 import { rememberListScroll } from '../lib/listScroll.ts';
+import { isLatinName, marginText, qtyWithUnit } from '../lib/productFormat.ts';
 import type { SortDirection } from '../lib/sort.ts';
-import { plainKey, useHotkey } from '../shell/hotkeys.ts';
 import { useCatalogueRows, useSold30 } from '../state/catalogue.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { isLatinName, marginText, qtyWithUnit } from './format.ts';
-import { ProductThumb } from './ProductThumb.tsx';
 
 const LabelsDialog = lazy(() =>
   import('../labels/LabelsDialog.tsx').then((module) => ({

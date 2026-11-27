@@ -416,12 +416,24 @@ export function missingRestoreTables(
   return SYNC_IMPORT_ORDER.filter((tbl) => !present.has(tbl));
 }
 
+const LOCAL_ONLY_SETS = new Map<string, ReadonlySet<string>>();
+
+function localOnlyFor(tbl: string | undefined): ReadonlySet<string> {
+  if (tbl === undefined) return new Set();
+  let set = LOCAL_ONLY_SETS.get(tbl);
+  if (set === undefined) {
+    set = new Set(LOCAL_ONLY_COLUMNS[tbl] ?? []);
+    LOCAL_ONLY_SETS.set(tbl, set);
+  }
+  return set;
+}
+
 /** Coerce an export row into the scalars `POST …/import` accepts. */
 export function importableRow(
   row: ExportRow,
   tbl?: string,
 ): Record<string, string | number | null> | null {
-  const localOnly = new Set(tbl ? (LOCAL_ONLY_COLUMNS[tbl] ?? []) : []);
+  const localOnly = localOnlyFor(tbl);
   const out: Record<string, string | number | null> = {};
   for (const [key, value] of Object.entries(row)) {
     if (key === 'tenant_id' || localOnly.has(key)) continue;

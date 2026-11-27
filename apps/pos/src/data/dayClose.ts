@@ -63,8 +63,10 @@ export async function dayCloseInfo(
   deviceId: string,
   start: number,
   end: number,
+  /** Payments already read for the same device/period; avoids a second range query. */
+  paid?: readonly SyncedRow[],
 ): Promise<DayCloseInfo> {
-  const payments = await sumPayments(src, deviceId, start, end);
+  const payments = paid ?? (await sumPayments(src, deviceId, start, end));
   const sales = (
     await (src.table('sales') as Table<SyncedRow>)
       .where('created_at')
@@ -114,13 +116,11 @@ export async function dayCloseData(
   now = Date.now(),
   openingOverride?: number,
 ): Promise<DayCloseData> {
-  const closes = (
-    await (src.table('day_closes') as Table<SyncedRow>)
+  const last =
+    (await (src.table('day_closes') as Table<SyncedRow>)
       .where('[device_id+period_end]')
       .between([deviceId, 0], [deviceId, Number.MAX_SAFE_INTEGER])
-      .toArray()
-  ).sort((a, b) => n(a.period_end) - n(b.period_end));
-  const last = closes.at(-1) ?? null;
+      .last()) ?? null;
   const deviceRow = await (src.table('devices') as Table<SyncedRow>).get(
     deviceId,
   );
@@ -154,7 +154,13 @@ export async function dayCloseData(
     (sum, row) => sum + n(row.amount) * (row.reverses_id ? -1 : 1),
     0,
   );
-  const info = await dayCloseInfo(src, deviceId, periodStart, periodEnd);
+  const info = await dayCloseInfo(
+    src,
+    deviceId,
+    periodStart,
+    periodEnd,
+    payments,
+  );
   const components: DayCloseComponents = {
     opening_cash: last ? n(last.counted_cash) : (openingOverride ?? 0),
     cash_sales: pick('in', ['sale']),

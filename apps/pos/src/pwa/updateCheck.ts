@@ -32,7 +32,9 @@ async function checkOnce(): Promise<boolean> {
  * Starts the startup, hourly and visibility checks. Idempotent: calling it again returns
  * the same cleanup function. Returns a function that stops all checks.
  */
-export function startUpdateChecks(): () => void {
+export function startUpdateChecks(
+  options: { skipStartupCheck?: boolean } = {},
+): () => void {
   if (cleanup !== null) return cleanup;
   if (typeof window === 'undefined' || !('serviceWorker' in navigator)) {
     cleanup = () => {
@@ -59,9 +61,10 @@ export function startUpdateChecks(): () => void {
 
   // Check as soon as this page has an active registration. A fresh page load is usually
   // the moment a till comes back after the shop closed, so this is when a deploy that
-  // happened meanwhile must surface.
+  // happened meanwhile must surface. `registerSW` already performs the registration
+  // update on startup, so skip this duplicate check when called from there.
   const ready = navigator.serviceWorker.ready;
-  if (ready !== undefined) {
+  if (!options.skipStartupCheck && ready !== undefined) {
     void ready
       .then(() => {
         if (active) void check();

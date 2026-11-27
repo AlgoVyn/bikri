@@ -1,5 +1,6 @@
 import { businessDate } from '@bikri/core';
 import { afterEach, describe, expect, it } from 'vitest';
+import { rebuildCaches } from './caches.ts';
 import { ledgerContext, saveNewProduct } from './catalog.ts';
 import {
   deliveryDetail,
@@ -216,6 +217,96 @@ describe('suppliers and deliveries (T-045)', () => {
       statement.rows.map((row) => String(row.entry.business_date)),
     ).toEqual(['2026-10-01', '2026-10-10']);
     expect(statement.rows.at(-1)?.balance).toBe(0);
+  });
+
+  it('keeps the latest delivery date on the party cache and rebuilds it from purchases', async () => {
+    const { db, ctx } = await setup('supplier-cache');
+    const item = await product(db, ctx);
+    const supplier = await createSupplier(
+      db,
+      { name: 'Cache Co' },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    const today = '2026-10-31';
+    const deliver = (id: string, date: string, cost = 100000) =>
+      saveDelivery(
+        db,
+        {
+          purchaseId: id,
+          supplierId: supplier.id,
+          invoiceNo: '',
+          date,
+          lines: [{ productId: item.id, qtyMilli: 1000, unitCost: cost }],
+          otherCharges: 0,
+          paidNow: 0,
+        },
+        ctx,
+        { today, now: NOW + 2000 },
+      );
+    await deliver('cache-new', '2026-10-05');
+    await deliver('cache-old', '2026-10-01');
+    // A later payment rebuilds the balance row; it must keep the delivery date.
+    await paySupplier(
+      db,
+      {
+        paymentId: 'cache-payment',
+        supplierId: supplier.id,
+        amount: 50000,
+        method: 'cash',
+      },
+      ctx,
+      NOW + 4000,
+    );
+    expect(
+      (await db.party_balances.get(['supplier', supplier.id]))
+        ?.last_delivery_date,
+    ).toBe('2026-10-05');
+    const listed = (await supplierList(db)).rows.find(
+      (row) => row.supplier.id === supplier.id,
+    );
+    expect(listed?.lastDeliveryDate).toBe('2026-10-05');
+
+    // A restore/initial snapshot clears the party cache; rebuild reads purchases once.
+    await db.party_balances.clear();
+    await rebuildCaches(db);
+    expect(
+      (await db.party_balances.get(['supplier', supplier.id]))
+        ?.last_delivery_date,
+    ).toBe('2026-10-05');
+
+    // A free delivery writes no ledger row (so no ordinary balance update), but the
+    // supplier list must still show its latest delivery.
+    const free = await createSupplier(
+      db,
+      { name: 'Free Co' },
+      ctx,
+      'st-1',
+      NOW,
+    );
+    await saveDelivery(
+      db,
+      {
+        purchaseId: 'cache-free',
+        supplierId: free.id,
+        invoiceNo: '',
+        date: today,
+        lines: [{ productId: item.id, qtyMilli: 1000, unitCost: 0 }],
+        otherCharges: 0,
+        paidNow: 0,
+      },
+      ctx,
+      { today, now: NOW + 3000 },
+    );
+    expect(await db.party_balances.get(['supplier', free.id])).toMatchObject({
+      balance: 0,
+      last_delivery_date: today,
+    });
+    expect(
+      (await supplierList(db)).rows.find((row) => row.supplier.id === free.id)
+        ?.lastDeliveryDate,
+    ).toBe(today);
   });
 
   it('search is optional, the header total stays shop-wide, and deleted/empty rows are refused', async () => {

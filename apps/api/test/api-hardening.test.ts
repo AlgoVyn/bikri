@@ -490,6 +490,56 @@ describe('API-H4: ending support revokes access at once', () => {
     ).toBe(0);
     for (const device of [a, b])
       expect((await api('/me', { token: device.token })).status).toBe(401);
+    // M14: ending clears the deadline, so `/me` does not run the revoke batch forever.
+    expect(
+      await env.DB.prepare(
+        'SELECT support_until, support_reason FROM tenants WHERE id = ?1',
+      )
+        .bind(shop.tenantId)
+        .first<{ support_until: number | null; support_reason: string }>(),
+    ).toEqual({ support_until: null, support_reason: '' });
+  });
+
+  it('clears an expired support deadline after the revoke batch', async () => {
+    const shop = await seedShop('H4 expiry clear');
+    const past = Date.now() - 1;
+    const support = await addSupportDevice(shop, past);
+    await env.DB.prepare(
+      'UPDATE tenants SET support_until = ?2, support_reason = ?3 WHERE id = ?1',
+    )
+      .bind(shop.tenantId, past, 'Expired')
+      .run();
+    // A regular till request notices the expiry, revokes support devices and clears the
+    // deadline in the same batch (M14).
+    expect((await api('/me', { token: shop.till.token })).status).toBe(200);
+    expect(
+      await env.DB.prepare(
+        'SELECT support_until, support_reason FROM tenants WHERE id = ?1',
+      )
+        .bind(shop.tenantId)
+        .first<{ support_until: number | null; support_reason: string }>(),
+    ).toEqual({ support_until: null, support_reason: '' });
+    expect((await api('/me', { token: support.token })).status).toBe(401);
+    expect(
+      await count(
+        "SELECT COUNT(*) AS n FROM audit_log WHERE tenant_id = ?1 AND action = 'support_access_end'",
+        shop.tenantId,
+      ),
+    ).toBe(1);
+    // The next `/me` sees NULL and must not touch support devices again.
+    const revokedAt = await env.DB.prepare(
+      'SELECT revoked_at FROM devices WHERE tenant_id = ?1 AND id = ?2',
+    )
+      .bind(shop.tenantId, support.id)
+      .first<{ revoked_at: number }>();
+    expect((await api('/me', { token: shop.till.token })).status).toBe(200);
+    expect(
+      await env.DB.prepare(
+        'SELECT revoked_at FROM devices WHERE tenant_id = ?1 AND id = ?2',
+      )
+        .bind(shop.tenantId, support.id)
+        .first<{ revoked_at: number }>(),
+    ).toEqual(revokedAt);
   });
 });
 

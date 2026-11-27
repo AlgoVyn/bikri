@@ -1,11 +1,7 @@
 import { describe, expect, it } from 'vitest';
 import { fitPageCss, renderReceiptHtml } from './html.ts';
-import {
-  buildSaleReceipt,
-  resolvePaper,
-  saleBasicInput,
-  urduReceiptLabels,
-} from './index.ts';
+import { buildSaleReceipt, resolvePaper, urduReceiptLabels } from './index.ts';
+import { saleBasicInput } from './templates/saleBasicFixture.ts';
 
 describe('renderReceiptHtml (06 §5.3)', () => {
   for (const mm of [58, 80] as const) {

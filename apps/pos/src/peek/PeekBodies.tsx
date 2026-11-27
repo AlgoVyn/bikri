@@ -4,9 +4,9 @@ import { useTranslation } from 'react-i18next';
 import { MoneyText } from '../components/MoneyText.tsx';
 import { quoteStatus } from '../data/quotes.ts';
 import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
-import { isLatinName, qtyWithUnit } from '../products/format.ts';
-import { statusLabel, statusTone } from '../sales/format.ts';
-import { ageLabel, entryDescription } from '../udhaar/format.ts';
+import { isLatinName, qtyWithUnit } from '../lib/productFormat.ts';
+import { statusLabel, statusTone } from '../lib/salesFormat.ts';
+import { ageLabel, entryDescription } from '../lib/udhaarFormat.ts';
 import {
   type BillPeekData,
   billLineTotal,

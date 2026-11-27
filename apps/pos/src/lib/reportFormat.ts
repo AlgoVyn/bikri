@@ -1,7 +1,7 @@
 import { formatQtyFromMilli } from '@bikri/core';
 import type { MasterRow } from '@bikri/db';
 import type { TFunction } from 'i18next';
-import { formatBusinessDate, formatTimestamp } from '../lib/date.ts';
+import { formatBusinessDate, formatTimestamp } from './date.ts';
 
 export const DAY = 86_400_000;
 

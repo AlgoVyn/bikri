@@ -4,6 +4,7 @@ import { useTranslation } from 'react-i18next';
 import { buttonPrimary, buttonQuiet } from '../components/classes.ts';
 import { DateField } from '../components/DateField.tsx';
 import { DialogFooter } from '../components/DialogFooter.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyInput } from '../components/MoneyInput.tsx';
 import { useDisplayMoney } from '../components/MoneyText.tsx';
 import { useToast } from '../components/Toast.tsx';
@@ -12,7 +13,6 @@ import { getDb } from '../data/db.ts';
 import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { createPromise, PromiseError } from '../data/udhaar.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { Modal } from '../sell/Modal.tsx';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 const field =

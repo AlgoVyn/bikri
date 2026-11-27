@@ -13,6 +13,7 @@ import {
 import { StoreIcon } from '../components/icons.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { PhoneInput } from '../components/PhoneInput.tsx';
+import { ReceiptPreview } from '../components/ReceiptPreview.tsx';
 import { useToast } from '../components/Toast.tsx';
 import { useSubmitGuard } from '../components/useSubmitGuard.ts';
 import { getDb } from '../data/db.ts';
@@ -31,8 +32,7 @@ import {
 } from '../data/settings.ts';
 import { type LogoData, SHOP_GOVT_ID_MAX } from '../data/setup.ts';
 import { AreaStrings } from '../i18n/areas.tsx';
-import { ditheredPreview, LogoError, processLogo } from '../setup/logo.ts';
-import { ReceiptPreview } from '../setup/ReceiptPreview.tsx';
+import { ditheredPreview, LogoError, processLogo } from '../lib/logo.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { SettingsGuard } from './Guard.tsx';

@@ -8,6 +8,8 @@ import type { Cart, CartLine, HeldBill, MasterRow } from '@bikri/db';
 import { useNavigate } from '@tanstack/react-router';
 import { useLiveQuery } from 'dexie-react-hooks';
 import {
+  lazy,
+  Suspense,
   useCallback,
   useDeferredValue,
   useEffect,
@@ -63,13 +65,12 @@ import { deviceInfo } from '../data/localTenant.ts';
 import { saveQuote } from '../data/quotes.ts';
 import { belowCataloguePrices } from '../data/sale.ts';
 import { useShopTimeZone } from '../data/useShopTimeZone.ts';
+import { beep } from '../lib/beep.ts';
 import { formatBusinessDate } from '../lib/date.ts';
-import { QuoteDialog } from '../quotes/QuoteDialog.tsx';
+import { composing, flushFocusedField, useHotkey } from '../lib/hotkeys.ts';
 import { loadDevicePrefs } from '../shell/devicePrefs.ts';
-import { composing, flushFocusedField, useHotkey } from '../shell/hotkeys.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { beep } from './beep.ts';
 import { CartPanel } from './CartPanel.tsx';
 import { cartItemCount } from './itemCount.ts';
 import { PayDialog } from './PayDialog.tsx';
@@ -94,6 +95,12 @@ import {
   useShopMoney,
 } from './useSell.ts';
 
+const QuoteDialog = lazy(() =>
+  import('../quotes/QuoteDialog.tsx').then((module) => ({
+    default: module.QuoteDialog,
+  })),
+);
+
 type OverridePermission = Permission | 'udhaar.hard_limit';
 type OverrideRequest = {
   permission: OverridePermission;
@@ -114,7 +121,7 @@ export function SellPage() {
   const timeZone = useShopTimeZone();
   const readOnly = useReadOnly();
   const money = useShopMoney();
-  const rows = useSellProducts();
+  const rows = useSellProducts(money.cost_method);
   const carts = useCarts();
   const device = useLiveQuery(() => deviceInfo(getDb()), []);
   const prefs = useLiveQuery(() => loadDevicePrefs(getDb()), []);
@@ -905,6 +912,8 @@ export function SellPage() {
   });
   const stableOnAddItem = useStableCallback(focusSearch);
   const stableOnHeld = useStableCallback(() => setDialog('held'));
+  const stableOpenQuoteDialog = useStableCallback(openQuoteDialog);
+  const stableCancelQuoteMode = useStableCallback(cancelQuoteMode);
 
   // --- hotkeys (screens/05) ---
   const ready = dialog === null && override === null;
@@ -1120,7 +1129,7 @@ export function SellPage() {
             <button
               type="button"
               className="min-h-11 shrink-0 px-2 underline underline-offset-2"
-              onClick={cancelQuoteMode}
+              onClick={stableCancelQuoteMode}
             >
               {t('sell.quote_cancel_edit')}
             </button>
@@ -1346,8 +1355,8 @@ export function SellPage() {
             onHold={stableOpenHold}
             onClear={stableOnClear}
             quote={cart.quote ?? null}
-            onSaveQuote={() => void openQuoteDialog()}
-            onCancelQuote={cancelQuoteMode}
+            onSaveQuote={stableOpenQuoteDialog}
+            onCancelQuote={stableCancelQuoteMode}
             onPay={stableOnPay}
             onAddItem={stableOnAddItem}
             onHeld={stableOnHeld}
@@ -1361,24 +1370,28 @@ export function SellPage() {
         ) : null}
       </aside>
 
-      <QuoteDialog
-        open={quoteOpen}
-        onOpenChange={setQuoteOpen}
-        cart={cart}
-        total={totals.total}
-        itemCount={cartItemCount(cart.lines)}
-        customerName={customerName ?? ''}
-        defaultValidUntil={cart.quote?.valid_until ?? quoteDefaultDate}
-        minDate={today}
-        maxDate={quoteMaxDate}
-        defaultTerms={cart.quote?.terms ?? ''}
-        editing={cart.quote?.mode === 'edit'}
-        saving={quoteSaving}
-        onSave={(input) => void onSaveQuote(input)}
-        onCustomer={() => {
-          setDialog('customer');
-        }}
-      />
+      {quoteOpen ? (
+        <Suspense fallback={null}>
+          <QuoteDialog
+            open
+            onOpenChange={setQuoteOpen}
+            cart={cart}
+            total={totals.total}
+            itemCount={cartItemCount(cart.lines)}
+            customerName={customerName ?? ''}
+            defaultValidUntil={cart.quote?.valid_until ?? quoteDefaultDate}
+            minDate={today}
+            maxDate={quoteMaxDate}
+            defaultTerms={cart.quote?.terms ?? ''}
+            editing={cart.quote?.mode === 'edit'}
+            saving={quoteSaving}
+            onSave={(input) => void onSaveQuote(input)}
+            onCustomer={() => {
+              setDialog('customer');
+            }}
+          />
+        </Suspense>
+      ) : null}
       <QuickSaleDialog
         open={dialog === 'quick'}
         onOpenChange={(o) => setDialog(o ? 'quick' : null)}

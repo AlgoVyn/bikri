@@ -21,6 +21,7 @@ import { useToast } from '../components/Toast.tsx';
 import { getDb } from '../data/db.ts';
 import { pruneLocalHistoryIfDue } from '../data/retention.ts';
 import { ReadOnlyError } from '../data/write.ts';
+import { composing, dialogOpen, ignoresHotkey } from '../lib/hotkeys.ts';
 import { PeekGate } from '../peek/PeekGate.tsx';
 import { recordBackForPath, useRecordBack } from '../peek/recordBack.ts';
 import { usePrintService } from '../print/usePrintService.ts';
@@ -37,7 +38,6 @@ import {
 } from './devicePrefs.ts';
 import { GlobalSearchGate } from './GlobalSearchGate.tsx';
 import { GlobalSearchTrigger } from './GlobalSearchTrigger.tsx';
-import { composing, dialogOpen, ignoresHotkey } from './hotkeys.ts';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
 import { PriceCheck } from './PriceCheck.tsx';
 import { usePriceCheck } from './priceCheckStore.ts';

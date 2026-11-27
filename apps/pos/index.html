@@ -8,6 +8,7 @@
     <link rel="icon" href="/favicon.svg" type="image/svg+xml" />
     <link rel="apple-touch-icon" href="/icons/apple-touch-icon.png" />
     <title>Bikri POS</title>
+    <meta name="bikri-locales" content="" />
     <script>// Apply the chosen theme and language before the first paint. The shop DB is loaded later.
 try {
   const theme = localStorage.getItem('bikri.theme');
@@ -24,6 +25,22 @@ try {
   document.documentElement.lang = language;
   document.documentElement.dir = language === 'ur' ? 'rtl' : 'ltr';
   // Only Urdu uses the Arabic script; roman-ur is Latin and gets Inter.
+  // The build writes the hashed locale chunk map into this meta tag, so the catalog
+  // starts downloading in parallel with the entry module (no extra preload script RTT).
+  try {
+    const locales = document.querySelector('meta[name="bikri-locales"]');
+    const map = locales ? JSON.parse(locales.getAttribute('content') || '{}') : {};
+    const catalog = map[language];
+    if (catalog) {
+      const link = document.createElement('link');
+      link.rel = 'modulepreload';
+      link.crossOrigin = '';
+      link.href = `%BASE_URL%${catalog}`;
+      document.head.appendChild(link);
+    }
+  } catch {
+    /* a malformed map is never worth blocking the app */
+  }
   const font =
     language === 'ur'
       ? 'fonts/noto-naskh-arabic-arabic-wght-normal.woff2'
@@ -42,7 +59,6 @@ try {
   /* storage may be disabled */
 }
 </script>
-    <meta name="bikri-locale-preload" content="" />
   </head>
   <body>
     <div id="root"></div>

@@ -25,9 +25,9 @@ import {
   updateCategory,
 } from '../data/catalog.ts';
 import { getDb } from '../data/db.ts';
+import { tileBg } from '../lib/tiles.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
-import { tileBg } from './tiles.ts';
 
 /** Categories (screens/08): add, rename, colour, reorder, delete when empty. */
 export function CategoriesPage() {

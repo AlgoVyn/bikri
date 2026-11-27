@@ -39,8 +39,8 @@ import {
 import { ReadOnlyError } from '../data/write.ts';
 import { readDateFilter, rememberDateFilter } from '../lib/dateFilter.ts';
 import { downloadText } from '../lib/download.ts';
-import { tileBg } from '../products/tiles.ts';
-import { plainKey, useHotkey } from '../shell/hotkeys.ts';
+import { plainKey, useHotkey } from '../lib/hotkeys.ts';
+import { tileBg } from '../lib/tiles.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 import { useReadOnly } from '../state/readOnly.ts';
 import { CashMoveDialog } from './CashMoveDialog.tsx';

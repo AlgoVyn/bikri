@@ -16,6 +16,7 @@ import {
   fieldClass,
 } from '../components/classes.ts';
 import { DialogFooter } from '../components/DialogFooter.tsx';
+import { Modal } from '../components/Modal.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
 import { PageLoading } from '../components/PageLoading';
 import { QtyInput } from '../components/QtyInput.tsx';
@@ -31,19 +32,18 @@ import {
 } from '../data/refunds.ts';
 import { billDetail } from '../data/salesHistory.ts';
 import { shopTimeZone } from '../data/shopTimeZone.ts';
-import { kickDrawerForCash } from '../print/drawer.ts';
-import { Modal } from '../sell/Modal.tsx';
-import { useSellStore } from '../sell/sellStore.ts';
-import { useCurrentStaff } from '../state/currentStaff.ts';
-import { useReadOnly } from '../state/readOnly.ts';
-import { billVisible } from '../state/reportScope.ts';
-import { ApprovalDialog } from './ApprovalDialog.tsx';
 import {
   METHOD_KEYS,
   REFUND_REASONS,
   type ReasonKey,
   reasonLabel,
-} from './format.ts';
+} from '../lib/salesFormat.ts';
+import { kickDrawerForCash } from '../print/drawer.ts';
+import { useSellStore } from '../sell/sellStore.ts';
+import { useCurrentStaff } from '../state/currentStaff.ts';
+import { useReadOnly } from '../state/readOnly.ts';
+import { billVisible } from '../state/reportScope.ts';
+import { ApprovalDialog } from './ApprovalDialog.tsx';
 
 type Choice = { saleLineId: string; qtyMilli: number; restock: boolean };
 

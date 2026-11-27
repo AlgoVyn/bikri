@@ -1,4 +1,3 @@
-import { createHash } from 'node:crypto';
 import { API_BASE, BASE_PATH } from '@bikri/core';
 import tailwindcss from '@tailwindcss/vite';
 import { tanstackRouter } from '@tanstack/router-plugin/vite';
@@ -54,20 +53,14 @@ function localePreload(): Plugin {
       }
       const html = bundle['index.html'];
       if (html?.type !== 'asset' || typeof html.source !== 'string') return;
-      const placeholder = /<meta name="bikri-locale-preload"[^>]*>/u;
+      const placeholder = /<meta name="bikri-locales"[^>]*>/u;
       if (!placeholder.test(html.source)) return;
-      // The strict script CSP allows external scripts only. Emit a hashed file and
-      // reference it from the document; the map still points at the language chunks.
-      const source = `try{var l=localStorage.getItem('bikri.language')||'en';var m=${JSON.stringify(locales)};var f=m[l];if(f){var k=document.createElement('link');k.rel='modulepreload';k.crossOrigin='';k.href='${BASE_PATH}/'+f;document.head.appendChild(k)}}catch(e){}`;
-      const hash = createHash('sha256')
-        .update(source)
-        .digest('hex')
-        .slice(0, 12);
-      const fileName = `assets/locale-preload-${hash}.js`;
-      this.emitFile({ type: 'asset', fileName, source });
+      // The pre-paint inline script (already covered by the CSP hash) reads this map
+      // and adds the modulepreload itself. A separate preload script cost one serial
+      // round trip before the active catalog could start downloading.
       html.source = html.source.replace(
         placeholder,
-        `<script defer src="${BASE_PATH}/${fileName}"></script>`,
+        `<meta name="bikri-locales" content='${JSON.stringify(locales)}' />`,
       );
     },
   };
@@ -75,6 +68,9 @@ function localePreload(): Plugin {
 
 export default defineConfig({
   base: `${BASE_PATH}/`,
+  // Parse locale catalogs with JSON.parse instead of shipping a multi-megabyte JS
+  // object literal; V8 parses JSON faster and the startup catalog is the largest one.
+  json: { stringify: true },
   plugins: [
     rewriteFontBase(),
     localePreload(),
@@ -158,8 +154,43 @@ export default defineConfig({
               // assets/admin and remain excluded from the offline precache.
               debugName: 'app-area',
               name: (moduleId) => {
-                if (/\/src\/(admin|routes\/admin)\//u.test(moduleId))
+                // The operator console and the public request pages stay automatic
+                // so chunkFileNames can move them under assets/admin|public.
+                if (
+                  /\/src\/(?:admin|routes\/admin)(?:\/|\.)/u.test(moduleId) ||
+                  /\/src\/(?:public|routes\/request(?:-status)?(?:\.|\/))/u.test(
+                    moduleId,
+                  )
+                )
                   return null;
+                // Merge each lazy route wrapper into the feature chunk it renders.
+                // Previously every file under src/routes/ matched "routes" and the
+                // 18 wrappers collapsed into one 436 KB-gz first-route closure.
+                const route = /\/src\/routes\/([^/]+)/u.exec(moduleId);
+                if (route) {
+                  const area: Record<string, string> = {
+                    index: 'app-home',
+                    sell: 'app-sell',
+                    sales: 'app-sales',
+                    suppliers: 'app-suppliers',
+                    quotations: 'app-quotes',
+                    'day-close': 'app-dayclose',
+                    reports: 'app-reports',
+                    expenses: 'app-expenses',
+                    products: 'app-products',
+                    stock: 'app-products',
+                    labels: 'app-labels',
+                    settings: 'app-settings',
+                    setup: 'app-setup',
+                    udhaar: 'app-udhaar',
+                    $: 'app-shell',
+                    __root: 'app-shell',
+                    'dev.demo': 'app-shared',
+                    'dev.ui': 'app-shared',
+                  };
+                  const name = area[route[1] ?? ''];
+                  if (name !== undefined) return name;
+                }
                 const match = /\/src\/([a-z0-9]+)\//u.exec(moduleId);
                 return match ? `app-${match[1]}` : null;
               },
@@ -187,13 +218,13 @@ export default defineConfig({
             moduleIds.length > 0 && moduleIds.every((id) => pattern.test(id));
           if (
             inArea(
-              /\/src\/(?:admin|routes\/admin)\/|\/packages\/i18n\/admin\//u,
+              /\/src\/(?:admin|routes\/admin)(?:\/|\.)|\/packages\/i18n\/admin\//u,
             )
           )
             return 'assets/admin/[name]-[hash].js';
           if (
             inArea(
-              /\/src\/(?:public|routes\/request)|\/packages\/i18n\/public\//u,
+              /\/src\/(?:public|routes\/request(?:-status)?(?:\.|\/))|\/packages\/i18n\/public\//u,
             )
           )
             return 'assets/public/[name]-[hash].js';

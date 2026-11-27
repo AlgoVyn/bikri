@@ -24,8 +24,8 @@ import { DeliveryError, saveDelivery } from '../data/purchases.ts';
 import { shopTimeZone } from '../data/shopTimeZone.ts';
 import { supplierBalance } from '../data/suppliers.ts';
 import { ReadOnlyError } from '../data/write.ts';
-import { isLatinName } from '../products/format.ts';
-import { composing } from '../shell/hotkeys.ts';
+import { composing } from '../lib/hotkeys.ts';
+import { isLatinName } from '../lib/productFormat.ts';
 import { useCurrentStaff } from '../state/currentStaff.ts';
 
 type Line = {
