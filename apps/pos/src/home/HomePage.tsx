@@ -421,13 +421,6 @@ export function HomePage() {
         />
         <div className="relative flex flex-wrap items-center justify-between gap-3">
           <div className="flex min-w-0 flex-wrap items-baseline gap-x-3 gap-y-0.5">
-            <p className="hidden items-center gap-2 text-caption font-semibold uppercase tracking-[0.16em] text-primary-subtle-ink sm:flex">
-              <span
-                aria-hidden="true"
-                className="size-1.5 shrink-0 rounded-full bg-accent"
-              />
-              {t('home.overview')}
-            </p>
             <h1 className="text-title font-semibold tracking-tight">
               {t('home.welcome', { name: String(staff?.name ?? '') })}
             </h1>

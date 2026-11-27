@@ -122,7 +122,7 @@ test.describe('design layout invariants', () => {
     await page.waitForTimeout(300);
     await page.getByTestId('sell-tile').first().click();
     await page.getByRole('button', { name: /View cart/ }).click();
-    await page.getByRole('button', { name: 'Take payment' }).click();
+    await page.getByRole('button', { name: 'Sell', exact: true }).click();
     const done = page.getByTestId('pay-done');
     const box = await done.boundingBox();
     expect(box?.height ?? 0).toBeLessThan(70);

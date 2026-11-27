@@ -170,7 +170,7 @@ test.describe('deterministic visual snapshots', () => {
       if (viewport.width === 390) {
         await page.getByRole('button', { name: /View cart/ }).click();
       }
-      await page.getByRole('button', { name: 'Take payment' }).click();
+      await page.getByRole('button', { name: 'Sell', exact: true }).click();
       await page.waitForTimeout(250);
       await shot('pay');
       await page.keyboard.press('Escape');

@@ -91,7 +91,7 @@ When the cart was opened from `New quote`, `Edit` or `Duplicate`, Sell shows a q
 `Editing quotation QTN-A-1042 · valid until 28 Nov 2026` with `Cancel edit` and, for a new quote, `New quotation · number assigned when you save`.
 
 - The cart is the normal Sell cart: search, scanning, quantities, prices, line/bill discounts, notes, bundles and hotkeys behave exactly as in a sale.
-- `Save quote` is the primary action in quote mode. `Take payment` is hidden in this mode so a cashier cannot accidentally create a sale while they think they are saving a quote. To sell the same cart, save it first, then use `Convert to sale`; or cancel quote mode and use the normal Sell cart.
+- `Save quote` is the primary action in quote mode. The `Sell` button is hidden in this mode so a cashier cannot accidentally create a sale while they think they are saving a quote. To sell the same cart, save it first, then use `Convert to sale`; or cancel quote mode and use the normal Sell cart.
 - Cancel edit returns to the quote detail (existing quote) or clears the quote-mode cart (new quote) after confirming when there are lines.
 - The quote uses the current cart prices and taxes. Editing an open quote is allowed even after it was printed; the detail shows the last updated time, and `Print` prints the current version.
 - Changing a product price, tax setting or bundle recipe later does not change a saved quote. Conversion revalidates against today's catalogue and shows the difference.

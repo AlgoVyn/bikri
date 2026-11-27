@@ -239,7 +239,7 @@ test.describe('Pay on a phone', () => {
     await page.setViewportSize({ width: 390, height: 844 });
     await t2(page);
     await page.getByTestId('cart-bar').click();
-    await page.getByRole('button', { name: 'Take payment' }).click();
+    await page.getByRole('button', { name: 'Sell', exact: true }).click();
     await expect(pay(page)).toBeVisible();
     const box = await pay(page).getByTestId('pay-done').boundingBox();
     expect(box).not.toBeNull();

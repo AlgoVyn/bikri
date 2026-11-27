@@ -4,6 +4,12 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Sell action row — 2026-11-28
+- Rename the cart primary from **Take payment** to **Sell** (empty cart **Add items**, quote mode **Save quote**). The primary stays on the same row as Hold/Held/Clear/Save quote at every width; quiet actions scroll horizontally if space is tight. The Pay modal title and F8 command remain **Take payment** (D-312).
+
+### Home header cleanup — 2026-11-28
+- Remove the redundant **Shop overview** eyebrow from the Home welcome header and its three locale keys; the greeting and business date now stand alone. The Home screen spec is updated.
+
 ### 27 Nov visual-design review remediation (D-311) — 2026-11-27
 - **Tokens/controls:** add `--color-divider` for passive cards/rows (Graphite `#2F3541`, ~1.3:1) while controls keep the 3:1 `border-border`/`border-border-strong`; raise `text-caption` to 12 px and remove the 10 px `text-micro` step; draw one shared chevron on every native select and use segmented controls for the 2–3 option Display settings.
 - **Contrast/legibility:** label previews pin black ink on white paper in the dark theme; the import stepper's active circle uses solid white/primary ink (5.59:1); the rail offline dot uses a 6.47:1 amber and a visible `Offline · N waiting` pill; KPI/peek figures use neutral surfaces instead of the selection tint.

@@ -426,12 +426,12 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
         ) : null}
       </dl>
 
-      <div className="flex flex-col gap-1.5 2xl:flex-row 2xl:items-stretch">
-        <div className="flex flex-wrap items-center gap-1.5 2xl:min-w-0 2xl:flex-1">
+      <div className="flex items-center gap-1.5">
+        <div className="flex min-w-0 flex-1 items-center gap-1.5 overflow-x-auto [scrollbar-width:none] [&::-webkit-scrollbar]:hidden">
           {p.quote && p.quote.mode !== 'convert' ? (
             <button
               type="button"
-              className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+              className={`${buttonQuiet} shrink-0 max-sm:px-2 text-small lg:min-h-12 lg:px-3`}
               onClick={p.onCancelQuote}
             >
               {t('sell.quote_cancel_edit')}
@@ -440,7 +440,7 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
             <>
               <button
                 type="button"
-                className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+                className={`${buttonQuiet} shrink-0 max-sm:px-2 text-small lg:min-h-12 lg:px-3`}
                 disabled={cart.lines.length === 0}
                 onClick={p.onHold}
               >
@@ -448,14 +448,14 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
               </button>
               <button
                 type="button"
-                className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+                className={`${buttonQuiet} shrink-0 max-sm:px-2 text-small lg:min-h-12 lg:px-3`}
                 onClick={p.onHeld}
               >
                 {t('sell.held_bills', { count: p.heldCount })}
               </button>
               <button
                 type="button"
-                className={`${buttonDangerQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+                className={`${buttonDangerQuiet} shrink-0 max-sm:px-2 text-small lg:min-h-12 lg:px-3`}
                 disabled={isEmptyCart(cart)}
                 onClick={p.onClear}
               >
@@ -465,7 +465,7 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
                 <button
                   type="button"
                   data-testid="save-quote"
-                  className={`${buttonQuiet} max-sm:px-3 lg:min-h-12 lg:px-3 lg:text-small`}
+                  className={`${buttonQuiet} shrink-0 max-sm:px-2 text-small lg:min-h-12 lg:px-3`}
                   disabled={cart.lines.length === 0}
                   onClick={p.onSaveQuote}
                 >
@@ -480,7 +480,7 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
           data-testid={
             p.quote && p.quote.mode !== 'convert' ? 'save-quote' : undefined
           }
-          className={`${buttonPrimary} min-h-14 w-full text-title 2xl:ms-auto 2xl:min-h-12 2xl:w-auto 2xl:px-4 2xl:text-body`}
+          className={`${buttonPrimary} min-h-12 shrink-0 px-4 text-body`}
           disabled={
             p.quote && p.quote.mode !== 'convert'
               ? cart.lines.length === 0
@@ -498,7 +498,7 @@ export const CartPanel = memo(function CartPanel(p: CartPanelProps) {
             ? t('sell.save_quote')
             : isEmptyCart(cart)
               ? t('sell.add_items')
-              : t('sell.take_payment')}
+              : t('sell.sell')}
         </button>
       </div>
     </div>

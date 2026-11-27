@@ -17,7 +17,7 @@ test('a sale after the sample day uses the next invoice number', async ({
   await page.evaluate(() => window.__bikriTest?.navigate('/sell'));
   await page.waitForTimeout(500);
   await page.locator('[data-testid="sell-tile"]').last().click();
-  await page.getByRole('button', { name: 'Take payment' }).click();
+  await page.getByRole('button', { name: 'Sell', exact: true }).click();
   await page.getByTestId('pay-done').click();
   await expect(
     page.getByRole('dialog', { name: 'Sale complete' }),
