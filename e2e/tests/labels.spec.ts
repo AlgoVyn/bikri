@@ -1,6 +1,11 @@
 import { expect, test } from '@playwright/test';
 import { readBarcodes } from 'zxing-wasm/reader';
-import { idbAll, idbUpdate, openReadyShop } from './helpers.ts';
+import {
+  clickPageAction,
+  idbAll,
+  idbUpdate,
+  openReadyShop,
+} from './helpers.ts';
 
 // T-052: barcode labels (screens/20 ACs 1, 2, 4, 5; journey 18).
 
@@ -21,6 +26,32 @@ test.describe('Barcode labels (T-052)', () => {
     await expect(dialog).toBeVisible();
     await expect(dialog.getByText('Cable', { exact: true })).toBeVisible();
     await dialog.getByRole('button', { name: 'Cancel' }).click();
+  });
+
+  test('the preview keeps black ink on white paper in the dark theme', async ({
+    page,
+  }) => {
+    await openReadyShop(page, '/bikri/');
+    const [productId] =
+      (await page.evaluate(() =>
+        window.__bikriTest?.seedProducts([
+          { name: 'Cable', price: 50000, stock: 3 },
+        ]),
+      )) ?? [];
+    if (!productId) throw new Error('missing product');
+    await page.goto(`/bikri/products/${productId}`);
+    await clickPageAction(page, /Print label/);
+    const dialog = page.getByRole('dialog', { name: 'Print labels' });
+    await dialog.getByRole('button', { name: 'Generate barcode' }).click();
+    await page.evaluate(() => {
+      document.documentElement.dataset.theme = 'dark';
+    });
+    const preview = dialog.getByTestId('label-preview');
+    const ink = await preview
+      .locator('span.font-medium')
+      .first()
+      .evaluate((element) => getComputedStyle(element).color);
+    expect(ink).toBe('rgb(0, 0, 0)');
   });
 
   test('Settings prints a test label', async ({ page }) => {
@@ -69,7 +100,7 @@ test.describe('Barcode labels (T-052)', () => {
       }),
     );
     await page.goto(`/bikri/products/${productId}`);
-    await page.getByRole('button', { name: /Print label/ }).click();
+    await clickPageAction(page, /Print label/);
     const dialog = page.getByRole('dialog', { name: 'Print labels' });
     await dialog.getByRole('button', { name: 'Generate barcode' }).click();
     await dialog.getByRole('button', { name: /Print 1 label/ }).click();
@@ -110,7 +141,7 @@ test.describe('Barcode labels (T-052)', () => {
       )) ?? [];
     if (!productId) throw new Error('missing product');
     await page.goto(`/bikri/products/${productId}`);
-    await page.getByRole('button', { name: /Print label/ }).click();
+    await clickPageAction(page, /Print label/);
     const dialog = page.getByRole('dialog', { name: 'Print labels' });
     await expect(dialog).toBeVisible();
 

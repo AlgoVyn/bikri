@@ -41,7 +41,12 @@ import { GlobalSearchTrigger } from './GlobalSearchTrigger.tsx';
 import { NAV, type NavItem, navItemFor } from './nav.ts';
 import { PriceCheck } from './PriceCheck.tsx';
 import { usePriceCheck } from './priceCheckStore.ts';
-import { StaffMenu, useShopName } from './TopBarParts.tsx';
+import {
+  StaffMenu,
+  SyncStatusPill,
+  useShopName,
+  useSyncStatus,
+} from './TopBarParts.tsx';
 import { useIsDesktop } from './useIsDesktop.ts';
 
 /** `/sell` and its completion/dialog state: the cashier needs every price, always. */
@@ -51,7 +56,7 @@ function isSellingRoute(pathname: string): boolean {
 }
 
 const navLink =
-  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-1 text-small transition-colors duration-150 lg:flex-none lg:py-2';
+  'relative flex min-h-11 min-w-0 flex-1 flex-col items-center justify-center gap-0.5 px-0.5 text-small transition-colors duration-150 max-[420px]:px-0 sm:px-1 lg:flex-none lg:py-2';
 
 const RAIL_COMPACT_KEY = 'bikri.rail_compact';
 
@@ -105,6 +110,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
     if (readOnly && selling) void navigate({ to: '/', replace: true });
   }, [readOnly, selling, navigate]);
   const shopName = useShopName();
+  const sync = useSyncStatus();
   const desktop = useIsDesktop();
   const [compactRail, setCompactRail] = useState(readCompactRail);
   const [moreOpen, setMoreOpen] = useState(false);
@@ -360,7 +366,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
         {t('shell.skip_content')}
       </a>
       {!desktop ? (
-        <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-border bg-surface px-3 shadow-topbar">
+        <header className="fixed start-0 end-0 top-0 z-30 flex h-topbar items-center gap-2 border-b border-divider bg-surface px-3 shadow-topbar">
           {recordBack ? (
             <button
               type="button"
@@ -384,6 +390,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
             </span>
           )}
           <div className="flex shrink-0 items-center gap-1">
+            <SyncStatusPill sync={sync} />
             <GlobalSearchTrigger variant="topbar" />
             {updateReady ? (
               <button
@@ -398,13 +405,13 @@ function AppShellInner({ children }: { children: ReactNode }) {
                 {t('shell.update')}
               </button>
             ) : null}
-            <StaffMenu shopName={shopName} variant="topbar" />
+            <StaffMenu shopName={shopName} sync={sync} variant="topbar" />
           </div>
         </header>
       ) : null}
       <nav
         aria-label={t('nav.rail')}
-        className="fixed z-30 flex border-border bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-tabbar lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:border-e lg:border-rail-border lg:bg-rail"
+        className="fixed z-30 flex border-divider bg-surface max-lg:inset-x-0 max-lg:bottom-0 max-lg:h-tabbar max-lg:items-stretch max-lg:justify-around max-lg:border-t max-lg:shadow-tabbar lg:inset-y-0 lg:start-0 lg:w-rail lg:flex-col lg:border-e lg:border-rail-border lg:bg-rail"
       >
         <button
           type="button"
@@ -447,12 +454,12 @@ function AppShellInner({ children }: { children: ReactNode }) {
                     />
                     <span
                       aria-hidden="true"
-                      className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-primary lg:hidden"
+                      className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-accent lg:hidden"
                     />
                   </>
                 ) : null}
                 <item.Icon />
-                <span className="rail-label max-w-full truncate leading-tight">
+                <span className="rail-label max-w-full truncate leading-tight max-[420px]:text-caption max-[420px]:tracking-tight">
                   {t(item.label)}
                 </span>
               </Link>
@@ -473,7 +480,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
               {moreActive ? (
                 <span
                   aria-hidden="true"
-                  className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-primary"
+                  className="absolute inset-x-4 top-0 h-0.5 rounded-full bg-accent"
                 />
               ) : null}
               <MoreIcon />
@@ -482,7 +489,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
             {moreOpen ? (
               <ul
                 id="more-menu"
-                className="absolute end-1 bottom-full mb-2 w-48 rounded-card border border-border bg-surface py-1 shadow-modal"
+                className="absolute end-1 bottom-full mb-2 w-48 rounded-card border border-divider bg-surface py-1 shadow-modal"
               >
                 {more.map((item) => (
                   <li key={item.to}>
@@ -502,6 +509,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
         ) : null}
         {desktop ? (
           <div className="hidden w-full shrink-0 flex-col border-t border-rail-border lg:flex">
+            <SyncStatusPill sync={sync} variant="rail" />
             <GlobalSearchTrigger variant="rail" />
             {updateReady ? (
               <button
@@ -532,7 +540,7 @@ function AppShellInner({ children }: { children: ReactNode }) {
               </button>
             ) : null}
             <div className="mt-1 border-t border-rail-border pt-2">
-              <StaffMenu shopName={shopName} variant="rail" />
+              <StaffMenu shopName={shopName} sync={sync} variant="rail" />
             </div>
           </div>
         ) : null}

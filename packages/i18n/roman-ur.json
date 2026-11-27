@@ -1055,6 +1055,8 @@
     "sync_detail_synced": "Aakhri sync {{ago}} · {{count}} baqi",
     "sync_detail_pending": "{{count}} tabdeeliyan baqi · aakhri sync {{ago}}",
     "sync_offline": "Offline",
+    "sync_pill_offline": "Offline · {{count}} baqi",
+    "sync_pill_pending": "{{count}} baqi",
     "sync_detail_offline": "Offline · {{count}} tabdeeliyan isi device par mehfooz",
     "sync_detail_error": "Sync ka masla: {{message}} · tafseel kholein",
     "sync_failed_ops": "{{count}} qabool nahin huin",

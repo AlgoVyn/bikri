@@ -283,7 +283,7 @@ function LabelsDialogContent({
       {rowsWithProducts.length === 0 ? (
         <p className="text-small text-text-muted">{t('office.labels.empty')}</p>
       ) : null}
-      <ul className="flex flex-col divide-y divide-border rounded-card border border-border">
+      <ul className="flex flex-col divide-y divide-divider rounded-card border border-divider">
         {rowsWithProducts.map((row) => (
           <li
             key={row.productId}
@@ -414,13 +414,13 @@ function LabelsDialogContent({
           </p>
           <div
             data-testid="label-preview"
-            className="mx-auto w-full overflow-auto rounded-control border border-border bg-white p-2 text-center text-body"
+            className="mx-auto w-full overflow-auto rounded-control border border-divider bg-white p-2 text-center text-body text-black"
             style={{ maxWidth: `${Math.min(preview.widthMm * 2, 200)}mm` }}
           >
             {first ? (
               <div className="flex flex-col gap-0.5">
                 {settings.showShop ? (
-                  <span className="truncate text-caption text-text-muted">
+                  <span className="truncate text-caption text-black/70">
                     {data?.shopName}
                   </span>
                 ) : null}

@@ -42,7 +42,8 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-bg` | `#F1F5F9` | `#0E1014` | App background | slate-100 (site) / Graphite near-black (D-217) |
 | `--color-surface` | `#FFFFFF` | `#1C2027` | Cards, modals | site / Graphite surface (D-217) |
 | `--color-surface-2` | `#F1F5F9` | `#2E333E` | Inputs, hover, elevated surfaces | slate-100 (site) / Graphite elevated (D-217) |
-| `--color-border` | `#E2E8F0` | `#656B7B` | Dividers (decorative; ≥ 3:1 on Graphite surfaces) | slate-200 / Graphite (D-217) |
+| `--color-border` | `#E2E8F0` | `#656B7B` | Control/overlay boundaries (≥ 3:1 on Graphite surfaces) | slate-200 / Graphite (D-217) |
+| `--color-divider` | `#E2E8F0` | `#2F3541` | Passive card, row and section lines (≈1.3:1 in Graphite) | D-311 |
 | `--color-border-strong` | `#64748B` | `#8F95A3` | Input outlines, controls (≥ 3:1) | slate-500 (site) / Graphite (D-217) |
 | `--color-text` | `#0F172A` | `#E6E8ED` | Body | slate-900 / Graphite off-white (D-217; avoids pure white) |
 | `--color-text-muted` | `#475569` | `#9BA1AC` | Secondary / muted | slate-600 / Graphite muted (D-217) |
@@ -62,6 +63,7 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-danger` | `#B91C1C` | `#E89090` | Below cost, refunds, destructive | red-700 (site scale; red-600 fails 4.5:1 on the slate-100 page) / calmer Graphite red (D-217) |
 | `--color-danger-subtle` / ink | `#FEE2E2` / `#991B1B` | `#3A1414` / `#F5C8C8` | Error banners | derived (Tailwind red) / Graphite (D-217) |
 | `--color-warning` | `#B45309` | `#D9AE4A` | Low stock, over limit, short | derived (amber-700; site's `#f59e0b` fails text contrast on white) / Graphite amber (D-217) |
+| `--color-warning-rail` | `#D9AE4A` | `#D9AE4A` | Rail offline dot/pill (6.47:1 on the navy rail) | D-311 |
 | `--color-warning-subtle` / ink | `#FEF3C7` / `#92400E` | `#2A2108` / `#F3E0A8` | Warning banners | site notice colours / Graphite (D-217) |
 | `--color-success` | `#047857` | `#4BC2BF` | Synced, drawer correct | emerald-700 (site) / brand turquoise (D-217) |
 | `--color-success-subtle` / ink | `#D1FAE5` / `#065F46` | `#0C2E2D` / `#B7EBE9` | Success banners | emerald-100 (site) / turquoise tint (D-217) |
@@ -134,13 +136,13 @@ Not allowed: `--color-accent` teal or `#4DA6FF` as text on white (fail 4.5:1); `
 
 ### Spacing, radius, elevation
 
-4 px grid: `--space-1 4px` … `--space-8 32px`, `--space-12 48px`. Radius: inputs/buttons 10 px, cards 14 px, modals 18 px, pills 999 px. Shadows (light): one soft two-layer level for cards (`0 1px 2px rgb(15 23 42 / .04), 0 1px 3px rgb(15 23 42 / .06)`), a top-bar shadow (`0 1px 2px rgb(15 23 42 / .04)`), a matching upward tab-bar shadow, and one for modals (`0 12px 32px rgb(15 23 42 / .18)`). In Graphite dark, card and bar shadows are none — elevation comes from lighter surfaces and the 3:1 border; modals keep a darker shadow (`0 12px 32px rgb(0 0 0 / 0.5)`). Touch targets ≥ 44×44 px; buttons on Sell/Pay ≥ 48 px high.
+4 px grid: `--space-1 4px` … `--space-8 32px`, `--space-12 48px`. Radius: inputs/buttons 10 px, cards 14 px, modals 18 px, pills 999 px. Shadows (light): one soft two-layer level for cards (`0 1px 2px rgb(15 23 42 / .04), 0 1px 3px rgb(15 23 42 / .06)`), a top-bar shadow (`0 1px 2px rgb(15 23 42 / .04)`), a matching upward tab-bar shadow, and one for modals (`0 12px 32px rgb(15 23 42 / .18)`). In Graphite dark, card and bar shadows are none — elevation comes from lighter surfaces, while passive card/row lines use `--color-divider` (≈1.3:1) and controls keep the 3:1 `border-border`/`border-border-strong`; modals keep a darker shadow (`0 12px 32px rgb(0 0 0 / 0.5)`). Touch targets ≥ 44×44 px; buttons on Sell/Pay ≥ 48 px high.
 
 ### Typography
 
 | Role | Font | Size / line height |
 |---|---|---|
-| UI Latin | **Inter** (variable, self-hosted, subset Latin; also the Algovyn website font) | 15/22 body, 13/18 small |
+| UI Latin | **Inter** (variable, self-hosted, subset Latin; also the Algovyn website font) | 15/22 body, 13/18 small, 12/16 caption (the data floor) |
 | Screen title (`text-h1`) | Inter semibold | 24/30 |
 | Section title (`text-h2`) | Inter semibold | 18/26 |
 | Card / dialog title (`text-title`) | Inter semibold | 20/28 |
@@ -176,7 +178,7 @@ Implement the hierarchy with `PageActions` (`apps/pos/src/components/`): `primar
 
 ### Surfaces and elevation
 
-A card is a *grouping of one job*, not decoration. Do not nest a filter card, a summary card and a list card on one screen: use one surface with a toolbar and dividers, or keep the context strip flat on the page background. Cards use `border-border` + `shadow-card`; overlays (modal, sheet, menu) are the only surfaces with `shadow-modal`. Spacing inside a surface is 16 px, between sections 24 px, between label and value 4–8 px.
+A card is a *grouping of one job*, not decoration. Do not nest a filter card, a summary card and a list card on one screen: use one surface with a toolbar and dividers, or keep the context strip flat on the page background. Cards use `border-divider` + `shadow-card`; controls and choice cards use `border-border`/`border-border-strong`; overlays (modal, sheet, menu) are the only surfaces with `shadow-modal`. Spacing inside a surface is 16 px, between sections 24 px, between label and value 4–8 px.
 
 ### Motion
 

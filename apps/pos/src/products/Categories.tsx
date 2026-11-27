@@ -63,7 +63,7 @@ export function CategoriesPage() {
         }
       >
         <form
-          className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3 sm:flex-row"
+          className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-3 sm:flex-row"
           onSubmit={async (e) => {
             e.preventDefault();
             if (!name.trim() || !addGuard.lock()) return;
@@ -123,7 +123,7 @@ export function CategoriesPage() {
           </button>
         </form>
         {categories && categories.length === 0 ? (
-          <div className="flex flex-col items-center gap-3 rounded-card border border-border bg-surface px-6 py-10 text-center shadow-card">
+          <div className="flex flex-col items-center gap-3 rounded-card border border-divider bg-surface px-6 py-10 text-center shadow-card">
             <span className="flex size-12 items-center justify-center rounded-full bg-primary-subtle text-primary-subtle-ink">
               <TagIcon />
             </span>
@@ -141,7 +141,7 @@ export function CategoriesPage() {
             return (
               <li
                 key={c.id}
-                className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3"
+                className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-3"
               >
                 <div className="flex items-center gap-2">
                   <span

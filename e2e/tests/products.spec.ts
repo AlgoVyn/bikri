@@ -1,5 +1,6 @@
 import { expect, type Page, test } from '@playwright/test';
 import {
+  clickPageAction,
   expectNoHorizontalScroll,
   expectNoSeriousAxe,
   idbUpdate,
@@ -69,8 +70,8 @@ test.describe('Products (T-014)', () => {
     await expect(name).toHaveValue('Type-C cable 1 m white');
     await expect(name).toBeFocused();
     await expect(page.getByLabel('Brand')).toHaveValue('Anker');
-    await expect(page.getByLabel('Sale price')).toHaveValue('1499');
-    await expect(page.getByLabel('Cost price')).toHaveValue('1100');
+    await expect(page.getByLabel('Sale price')).toHaveValue('1,499');
+    await expect(page.getByLabel('Cost price')).toHaveValue('1,100');
     await expect(page.getByLabel('Warranty', { exact: true })).toHaveValue(
       '30',
     );
@@ -127,7 +128,7 @@ test.describe('Products (T-014)', () => {
   }) => {
     await openReadyShop(page, '/bikri/products');
     await addCable(page);
-    await page.getByRole('link', { name: 'Edit', exact: true }).click();
+    await clickPageAction(page, 'Edit');
     await page
       .getByLabel('Notes')
       .fill('Wholesale rate changes weekly.\nBox includes the charger only.');
@@ -171,7 +172,7 @@ test.describe('Products (T-014)', () => {
   }) => {
     await openReadyShop(page, '/bikri/products');
     await addCable(page);
-    await page.getByRole('link', { name: 'Edit', exact: true }).click();
+    await clickPageAction(page, 'Edit');
     await page.getByRole('switch', { name: 'Track stock' }).click();
     await expect(page.getByText(/Stock tracking will stop\./u)).toBeVisible();
 
@@ -240,7 +241,7 @@ test.describe('Products (T-014)', () => {
     await expectNoSeriousAxe(page);
 
     // Turning tracking off warns in Urdu and can be cancelled before saving.
-    await page.getByRole('link', { name: 'تبدیل کریں' }).click();
+    await clickPageAction(page, 'تبدیل کریں');
     await page.getByRole('switch', { name: 'اسٹاک ٹریک کریں' }).click();
     await expect(page.getByText(/اسٹاک ٹریکنگ بند ہو جائے گی/u)).toBeVisible();
     await page
@@ -358,10 +359,7 @@ test.describe('Products (T-014)', () => {
     await addCable(page);
     await expect(page).toHaveURL(/\/products\/[^/]+$/u);
     const detailUrl = page.url();
-    await page
-      .getByTestId('product-actions')
-      .getByRole('link', { name: 'Edit' })
-      .click();
+    await clickPageAction(page, 'Edit');
     await expect(page).toHaveURL(/\/products\/[^/]+\/edit$/u);
     const editUrl = page.url();
 

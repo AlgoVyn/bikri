@@ -218,8 +218,8 @@ function KitFrame({
           dir={dir}
           className={
             locale === 'ur'
-              ? 'flex flex-col gap-3 rounded-card border border-border bg-bg p-4 text-text [font-size:18px]'
-              : 'flex flex-col gap-3 rounded-card border border-border bg-bg p-4 text-text'
+              ? 'flex flex-col gap-3 rounded-card border border-divider bg-bg p-4 text-text [font-size:18px]'
+              : 'flex flex-col gap-3 rounded-card border border-divider bg-bg p-4 text-text'
           }
         >
           <h2 className="text-title">{title}</h2>

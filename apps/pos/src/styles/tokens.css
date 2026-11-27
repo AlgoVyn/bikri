@@ -24,9 +24,7 @@
   --text-body--line-height: calc(22 / 15);
   --text-small: calc(13 / 15 * 1rem);
   --text-small--line-height: calc(18 / 13);
-  --text-micro: calc(10 / 15 * 1rem);
-  --text-micro--line-height: 1.2;
-  --text-caption: calc(11 / 15 * 1rem);
+  --text-caption: calc(12 / 15 * 1rem);
   --text-caption--line-height: 1.35;
   /* The receipt preview must stay at printed size; it must not follow the Urdu text size. */
   --text-receipt: 10px;
@@ -60,7 +58,10 @@
   --color-surface: #ffffff;
   --color-surface-2: #f1f5f9;
   --color-border: #e2e8f0;
+  /* Passive card, row and section lines. Interactive controls use border-border/strong. */
+  --color-divider: #e2e8f0;
   --color-border-strong: #64748b;
+  --select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%2364748b' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
   --color-text: #0f172a;
   --color-text-muted: #475569;
   --color-text-secondary: #334155;
@@ -89,6 +90,8 @@
   --color-danger-subtle: #fee2e2;
   --color-danger-subtle-ink: #991b1b;
   --color-warning: #b45309;
+  /* On the always-navy rail, #B45309 is only 2.68:1; this amber is 6.47:1. */
+  --color-warning-rail: #d9ae4a;
   --color-warning-subtle: #fef3c7;
   --color-warning-subtle-ink: #92400e;
   --color-success: #047857;
@@ -130,7 +133,9 @@
   --dark-surface: #1c2027;
   --dark-surface-2: #2e333e;
   --dark-border: #656b7b;
+  --dark-divider: #2f3541;
   --dark-border-strong: #8f95a3;
+  --dark-select-chevron: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' viewBox='0 0 20 20' fill='none' stroke='%239ba1ac' stroke-width='1.75' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpath d='M6 8l4 4 4-4'/%3E%3C/svg%3E");
   --dark-text: #e6e8ed;
   --dark-text-secondary: #c2c6ce;
   --dark-text-muted: #9ba1ac;
@@ -195,7 +200,9 @@
   --color-surface: var(--dark-surface);
   --color-surface-2: var(--dark-surface-2);
   --color-border: var(--dark-border);
+  --color-divider: var(--dark-divider);
   --color-border-strong: var(--dark-border-strong);
+  --select-chevron: var(--dark-select-chevron);
   --color-text: var(--dark-text);
   --color-text-secondary: var(--dark-text-secondary);
   --color-text-muted: var(--dark-text-muted);
@@ -245,7 +252,9 @@
     --color-surface: var(--dark-surface);
     --color-surface-2: var(--dark-surface-2);
     --color-border: var(--dark-border);
+    --color-divider: var(--dark-divider);
     --color-border-strong: var(--dark-border-strong);
+    --select-chevron: var(--dark-select-chevron);
     --color-text: var(--dark-text);
     --color-text-secondary: var(--dark-text-secondary);
     --color-text-muted: var(--dark-text-muted);
@@ -449,7 +458,7 @@ progress {
 /* The one receipt motif: a paper edge used in Sale complete and receipt previews. */
 .receipt-paper {
   background: var(--color-surface);
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-divider);
   border-block: 2px dashed var(--color-border-strong);
   box-shadow: var(--shadow-card);
 }
@@ -489,7 +498,7 @@ progress {
   max-width: 560px;
   margin-inline: auto;
   height: 92dvh;
-  border: 1px solid var(--color-border);
+  border: 1px solid var(--color-divider);
   border-block-end: 0;
   border-start-start-radius: var(--radius-modal);
   border-start-end-radius: var(--radius-modal);
@@ -504,7 +513,7 @@ progress {
     height: auto;
     border-block: 0;
     border-inline-end: 0;
-    border-inline-start: 1px solid var(--color-border);
+    border-inline-start: 1px solid var(--color-divider);
     border-start-start-radius: var(--radius-modal);
     border-end-start-radius: var(--radius-modal);
     border-start-end-radius: 0;
@@ -558,5 +567,34 @@ progress {
 @media (max-width: 1279px) {
   .bikri-peek[data-state="open"] {
     animation: bikri-peek-up var(--duration-overlay) var(--ease-standard);
+  }
+}
+
+/*
+  One native-select treatment: hide the platform chevron and draw the shared one. The
+  colour/border/background still come from the component's utility classes; this rule only
+  supplies the affordance and room for it. Unlayered on purpose so `px-*` cannot remove the
+  end padding.
+*/
+select:not([multiple]) {
+  appearance: none;
+  background-image: var(--select-chevron);
+  background-position: right 0.5rem center;
+  background-repeat: no-repeat;
+  background-size: 0.875rem 0.875rem;
+  padding-inline-end: 1.75rem;
+}
+
+[dir="rtl"] select:not([multiple]) {
+  background-position: left 0.5rem center;
+}
+
+/*
+  A toast must never sit on a modal's submit row. On phones the sheet covers the viewport, so
+  suppress the toast host while a dialog is open; the live region remains mounted for AT.
+*/
+@media (max-width: 767px) {
+  body:has([role="dialog"]) .bikri-toast-host {
+    display: none;
   }
 }

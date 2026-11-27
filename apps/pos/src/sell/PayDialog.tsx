@@ -518,7 +518,7 @@ function PayStep({
         </div>
         <aside
           aria-label={t('pay.summary')}
-          className="order-1 flex flex-col gap-3 rounded-card border border-border bg-surface-2/50 p-3 lg:order-none lg:sticky lg:top-0"
+          className="order-1 flex flex-col gap-3 rounded-card border border-divider bg-surface-2/50 p-3 lg:order-none lg:sticky lg:top-0"
         >
           <div>
             <p className="text-small text-text-muted">
@@ -534,7 +534,7 @@ function PayStep({
               {t('pay.items_count', { count: cartItemCount(cart.lines) })}
             </p>
           </div>
-          <dl className="flex flex-col gap-2 border-t border-border pt-2 text-small">
+          <dl className="flex flex-col gap-2 border-t border-divider pt-2 text-small">
             <div className="flex justify-between gap-2">
               <dt className="text-text-muted">{t('pay.paid')}</dt>
               <dd>
@@ -551,7 +551,7 @@ function PayStep({
             ) : null}
           </dl>
           <div className="grid grid-cols-2 gap-2">
-            <div className="rounded-control border border-border bg-surface p-2">
+            <div className="rounded-control border border-divider bg-surface p-2">
               <p className="text-small text-text-muted">
                 {t('pay.change_label')}
               </p>
@@ -567,7 +567,7 @@ function PayStep({
                 <p className="text-title font-semibold">—</p>
               )}
             </div>
-            <div className="rounded-control border border-border bg-surface p-2">
+            <div className="rounded-control border border-divider bg-surface p-2">
               <p className="text-small text-text-muted">{t('pay.due_label')}</p>
               {s.remaining > 0 ? (
                 <p
@@ -599,7 +599,7 @@ function PayStep({
         ) : null}
       </div>
 
-      <DialogFooter>
+      <DialogFooter className="max-md:flex-col max-md:items-stretch">
         <label className="me-auto flex min-h-11 items-center gap-2">
           <input
             type="checkbox"
@@ -611,7 +611,7 @@ function PayStep({
         </label>
         <button
           type="submit"
-          className={`${buttonPrimary} min-h-14 text-title max-md:flex-1`}
+          className={`${buttonPrimary} min-h-14 whitespace-nowrap text-title max-md:w-full`}
           disabled={!valid || pending}
           data-testid="pay-done"
         >
@@ -763,7 +763,7 @@ function MethodPanel({
   }
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex min-h-11 items-center justify-between gap-2 rounded-control border border-border px-3">
+      <div className="flex min-h-11 items-center justify-between gap-2 rounded-control border border-divider px-3">
         <span data-testid="pay-customer">
           {customer ? String(customer.customer.name) : t('pay.no_customer')}
         </span>

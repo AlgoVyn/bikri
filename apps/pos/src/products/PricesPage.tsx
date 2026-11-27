@@ -120,7 +120,7 @@ export function PricesPage() {
           />
         }
       >
-        <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
+        <section className="flex flex-col gap-3 rounded-card border border-divider bg-surface p-4">
           <div className="grid gap-3 sm:grid-cols-2">
             <label className="flex flex-col gap-1" htmlFor={`${id}-cat`}>
               <span className="text-small font-medium">
@@ -235,14 +235,14 @@ export function PricesPage() {
         </section>
 
         {rows ? (
-          <section className="flex flex-col gap-3 rounded-card border border-border bg-surface p-4">
+          <section className="flex flex-col gap-3 rounded-card border border-divider bg-surface p-4">
             <p role="status" data-testid="prices-summary">
               {t('prices.summary', {
                 count: changed.length,
                 total: rows.length,
               })}
             </p>
-            <div className="overflow-x-auto rounded-card border border-border">
+            <div className="overflow-x-auto rounded-card border border-divider">
               <table className="w-full text-small">
                 <thead className="bg-surface-2">
                   <tr>
@@ -258,7 +258,7 @@ export function PricesPage() {
                     <tr
                       key={r.product.id}
                       data-testid="price-row"
-                      className="border-t border-border"
+                      className="border-t border-divider"
                     >
                       <td className="px-2 py-1">{String(r.product.name_en)}</td>
                       <td className="px-2 py-1 text-start">

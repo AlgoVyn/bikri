@@ -1,6 +1,7 @@
 import { readFile } from 'node:fs/promises';
 import { expect, type Page, test } from '@playwright/test';
 import {
+  clickPageAction,
   clickRecordBack,
   expectNoHorizontalScroll,
   idbAll,
@@ -27,6 +28,26 @@ async function newSupplier(page: Page, name = 'Hall Road Traders') {
   await expect(
     page.getByRole('link', { name: new RegExp(name) }),
   ).toBeVisible();
+}
+
+async function exportStatement(
+  page: Page,
+  container: string,
+  kind: 'CSV' | 'PDF',
+) {
+  const direct = page
+    .getByTestId(container)
+    .getByRole('button', { name: 'Export', exact: true });
+  if (await direct.isVisible()) {
+    await direct.click();
+    await page.getByRole('menuitem', { name: kind }).click();
+    return;
+  }
+  await page.getByTestId('page-actions-more').click();
+  await page
+    .getByRole('button', { name: kind, exact: true })
+    .filter({ visible: true })
+    .click();
 }
 
 test.describe('Suppliers and deliveries (T-045)', () => {
@@ -207,7 +228,7 @@ test.describe('Suppliers and deliveries (T-045)', () => {
       method: 'cash',
     });
 
-    await page.getByRole('button', { name: 'Pay supplier' }).click();
+    await clickPageAction(page, 'Pay supplier');
     const pay = page.getByRole('dialog', { name: 'Pay supplier' });
     await expect(pay.getByLabel('Amount')).toHaveValue('500');
     await pay.getByRole('button', { name: 'Save payment' }).click();
@@ -236,7 +257,7 @@ test.describe('Suppliers and deliveries (T-045)', () => {
     await expect(
       page.getByText(/The supplier owes you Rs 2,400/),
     ).toBeVisible();
-    await expect(page.getByLabel('Money received now')).toHaveValue('2400');
+    await expect(page.getByLabel('Money received now')).toHaveValue('2,400');
     await page.getByRole('button', { name: 'Save return' }).click();
     await expect(page.getByTestId('supplier-balance')).toContainText('Settled');
     const returns = await idbAll<{ total: number; refund_received: number }>(
@@ -266,25 +287,17 @@ test.describe('Suppliers and deliveries (T-045)', () => {
       levelsAfter.find((l) => l.product_id === productId)?.on_hand_milli,
     ).toBe(23000);
 
-    await page
-      .getByTestId('suppliers-detail')
-      .getByRole('button', { name: 'Export', exact: true })
-      .click();
     const [statementPdf] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('menuitem', { name: 'PDF' }).click(),
+      exportStatement(page, 'suppliers-detail', 'PDF'),
     ]);
     const statementPdfBytes = await readFile((await statementPdf.path()) ?? '');
     expect(statementPdfBytes.subarray(0, 8).toString('latin1')).toBe(
       '%PDF-1.4',
     );
-    await page
-      .getByTestId('suppliers-detail')
-      .getByRole('button', { name: 'Export', exact: true })
-      .click();
     const [statementCsv] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('menuitem', { name: 'CSV' }).click(),
+      exportStatement(page, 'suppliers-detail', 'CSV'),
     ]);
     const statementText = await readFile(
       (await statementCsv.path()) ?? '',
@@ -309,7 +322,7 @@ test.describe('Suppliers and deliveries (T-045)', () => {
     await expect(page.getByText('Total you owe suppliers')).toBeVisible();
     const [csv] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Export CSV' }).click(),
+      clickPageAction(page, 'Export CSV'),
     ]);
     const text = await readFile((await csv.path()) ?? '', 'utf8');
     expect(text).toContain('name,phone,balance,last_delivery');

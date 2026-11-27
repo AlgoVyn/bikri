@@ -2,6 +2,7 @@ import { readFile } from 'node:fs/promises';
 import AxeBuilder from '@axe-core/playwright';
 import { expect, type Page, test } from '@playwright/test';
 import {
+  clickPageAction,
   clickRecordBack,
   expectNoHorizontalScroll,
   idbAll,
@@ -57,7 +58,7 @@ test.describe('Sales history and refunds (T-040, T-041)', () => {
     await clickRecordBack(page, 'Back to sales');
     const [download] = await Promise.all([
       page.waitForEvent('download'),
-      page.getByRole('button', { name: 'Export CSV' }).click(),
+      clickPageAction(page, 'Export CSV'),
     ]);
     const path = await download.path();
     const csv = await readFile(path ?? '', 'utf8');

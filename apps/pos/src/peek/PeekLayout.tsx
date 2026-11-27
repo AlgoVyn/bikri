@@ -8,9 +8,9 @@ export function PeekFigure({
   children: ReactNode;
 }) {
   return (
-    <div className="min-w-0 rounded-card bg-primary-subtle p-3">
-      <span className="block text-small text-primary-subtle-ink">{label}</span>
-      <strong className="mt-0.5 block whitespace-nowrap text-title font-semibold text-primary-subtle-ink">
+    <div className="min-w-0 rounded-card border border-divider bg-surface-2 p-3">
+      <span className="block text-small text-text-muted">{label}</span>
+      <strong className="mt-0.5 block whitespace-nowrap text-title font-semibold text-text">
         {children}
       </strong>
     </div>
@@ -23,11 +23,11 @@ export function PeekFacts({
   rows: readonly { label: string; value: ReactNode }[];
 }) {
   return (
-    <div className="rounded-card border border-border">
+    <div className="rounded-card border border-divider">
       {rows.map((row) => (
         <div
           key={row.label}
-          className="flex items-start justify-between gap-3 border-b border-border px-3 py-2 text-small last:border-b-0"
+          className="flex items-start justify-between gap-3 border-b border-divider px-3 py-2 text-small last:border-b-0"
         >
           <span className="shrink-0 text-text-muted">{row.label}</span>
           <span className="min-w-0 text-end">{row.value}</span>
@@ -45,8 +45,8 @@ export function PeekSection({
   children: ReactNode;
 }) {
   return (
-    <section className="overflow-hidden rounded-card border border-border">
-      <h3 className="border-b border-border bg-surface-2 px-3 py-2 text-title font-semibold">
+    <section className="overflow-hidden rounded-card border border-divider">
+      <h3 className="border-b border-divider bg-surface-2 px-3 py-2 text-title font-semibold">
         {title}
       </h3>
       {children}
@@ -64,7 +64,7 @@ export function PeekRow({
   strong?: boolean;
 }) {
   return (
-    <div className="flex items-start justify-between gap-3 border-b border-border px-3 py-2 text-small last:border-b-0">
+    <div className="flex items-start justify-between gap-3 border-b border-divider px-3 py-2 text-small last:border-b-0">
       <span className="min-w-0">{label}</span>
       <span
         className={`shrink-0 text-end ${strong ? 'font-semibold' : 'font-medium'}`}
@@ -77,7 +77,7 @@ export function PeekRow({
 
 export function PeekNote({ children }: { children: ReactNode }) {
   return (
-    <p className="rounded-card bg-primary-subtle px-3 py-2 text-small text-primary-subtle-ink">
+    <p className="rounded-card bg-info-subtle px-3 py-2 text-small text-info-subtle-ink">
       {children}
     </p>
   );

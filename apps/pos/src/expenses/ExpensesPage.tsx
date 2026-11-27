@@ -15,6 +15,7 @@ import { ExpensesIcon, UndoIcon } from '../components/icons.tsx';
 import { ListPager } from '../components/ListPager.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { MoneyText } from '../components/MoneyText.tsx';
+import { PageActions } from '../components/PageActions.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading.tsx';
 import { ScrollStrip } from '../components/ScrollStrip.tsx';
@@ -207,42 +208,76 @@ function ExpensesPageContent() {
         subtitle={t('office.expenses.subtitle')}
         hideTitleOnPhone
         actions={
-          <>
-            {can('cash.move') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={readOnly}
-                onClick={() => setCashOpen(true)}
-              >
-                {t('office.expenses.cash_in_out')}
-              </button>
-            ) : null}
-            {can('export.data') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={!data || data.rows.length === 0}
-                onClick={() =>
-                  data &&
-                  downloadText('bikri-expenses.csv', expensesCsv(data.rows))
-                }
-              >
-                {t('office.expenses.export_csv')}
-              </button>
-            ) : null}
-            {can('expense.create') &&
-            (Boolean(readOnly) || !data || data.rows.length > 0) ? (
-              <button
-                type="button"
-                className={`${buttonPrimary} gap-2 max-sm:order-first`}
-                disabled={readOnly}
-                onClick={() => setNewOpen(true)}
-              >
-                {t('office.expenses.new_expense')}
-              </button>
-            ) : null}
-          </>
+          <PageActions
+            primary={
+              can('expense.create') &&
+              (Boolean(readOnly) || !data || data.rows.length > 0) ? (
+                <button
+                  type="button"
+                  className={`${buttonPrimary} gap-2`}
+                  disabled={readOnly}
+                  onClick={() => setNewOpen(true)}
+                >
+                  {t('office.expenses.new_expense')}
+                </button>
+              ) : undefined
+            }
+            secondary={
+              <>
+                {can('cash.move') ? (
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    disabled={readOnly}
+                    onClick={() => setCashOpen(true)}
+                  >
+                    {t('office.expenses.cash_in_out')}
+                  </button>
+                ) : null}
+                {can('export.data') ? (
+                  <button
+                    type="button"
+                    className={buttonQuiet}
+                    disabled={!data || data.rows.length === 0}
+                    onClick={() =>
+                      data &&
+                      downloadText('bikri-expenses.csv', expensesCsv(data.rows))
+                    }
+                  >
+                    {t('office.expenses.export_csv')}
+                  </button>
+                ) : null}
+              </>
+            }
+            more={[
+              ...(can('cash.move')
+                ? [
+                    {
+                      label: t('office.expenses.cash_in_out'),
+                      mobileOnly: true,
+                      disabled: readOnly,
+                      onSelect: () => setCashOpen(true),
+                    },
+                  ]
+                : []),
+              ...(can('export.data')
+                ? [
+                    {
+                      label: t('office.expenses.export_csv'),
+                      mobileOnly: true,
+                      disabled: !data || data.rows.length === 0,
+                      onSelect: () => {
+                        if (data)
+                          downloadText(
+                            'bikri-expenses.csv',
+                            expensesCsv(data.rows),
+                          );
+                      },
+                    },
+                  ]
+                : []),
+            ]}
+          />
         }
       />
 
@@ -367,7 +402,7 @@ function ExpensesPageContent() {
 
         {pageDays.map((day) => (
           <section key={day.date} className="flex flex-col gap-1">
-            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 pt-3 pb-1">
+            <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-divider px-3 pt-3 pb-1">
               <h2 className="text-title font-semibold">
                 {dateText(day.date, i18n.language, tz)}
               </h2>
@@ -380,7 +415,7 @@ function ExpensesPageContent() {
                 <li
                   key={row.expense.id}
                   data-testid="expense-row"
-                  className={`flex min-h-14 flex-wrap items-center gap-2 border-b border-border p-2 last:border-0 ${row.expense.reverses_id ? 'text-text-muted line-through' : ''}`}
+                  className={`flex min-h-14 flex-wrap items-center gap-2 border-b border-divider p-2 last:border-0 ${row.expense.reverses_id ? 'text-text-muted line-through' : ''}`}
                 >
                   <span className="min-w-0 flex-[2_1_10rem]">
                     <span className="block truncate font-medium">

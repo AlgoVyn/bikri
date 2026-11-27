@@ -1055,6 +1055,8 @@
     "sync_detail_synced": "Last sync {{ago}} · {{count}} waiting",
     "sync_detail_pending": "{{count}} changes waiting · last sync {{ago}}",
     "sync_offline": "Offline",
+    "sync_pill_offline": "Offline · {{count}} waiting",
+    "sync_pill_pending": "{{count}} waiting",
     "sync_detail_offline": "Offline · {{count}} changes saved on this device",
     "sync_detail_error": "Sync problem: {{message}} · Open details",
     "sync_failed_ops": "{{count}} not accepted",

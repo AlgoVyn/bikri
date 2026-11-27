@@ -67,7 +67,7 @@ function RestockOption({
 }) {
   return (
     <label
-      className="mt-1 flex min-h-9 cursor-pointer items-center gap-2 rounded-control bg-surface-2/60 px-2.5 text-small transition-colors hover:bg-surface-2"
+      className="mt-1 flex min-h-11 cursor-pointer items-center gap-2 rounded-control bg-surface-2/60 px-2.5 text-small transition-colors hover:bg-surface-2"
       title={hint}
     >
       <input
@@ -511,7 +511,7 @@ export function RefundDialog({
               return (
                 <li
                   key={block.key}
-                  className="flex flex-col gap-1 rounded-control border border-border p-2"
+                  className="flex flex-col gap-1 rounded-control border border-divider p-2"
                   data-testid="refund-bundle"
                 >
                   <div className="flex flex-wrap items-baseline justify-between gap-2">
@@ -657,7 +657,7 @@ export function RefundDialog({
             return (
               <li
                 key={line.id}
-                className="flex flex-col gap-1 rounded-control border border-border p-2"
+                className="flex flex-col gap-1 rounded-control border border-divider p-2"
               >
                 <div className="flex flex-wrap items-baseline justify-between gap-2">
                   {mode === 'items' ? (
@@ -756,7 +756,7 @@ export function RefundDialog({
 
       {plan ? (
         <p
-          className="flex items-center justify-between border-t border-border px-2 py-1 text-small"
+          className="flex items-center justify-between border-t border-divider px-2 py-1 text-small"
           data-testid="refund-running"
         >
           <span>{t('office.refund.selected', { count: selectedBlocks })}</span>
@@ -834,7 +834,7 @@ export function RefundDialog({
       ) : null}
 
       {plan ? (
-        <dl className="rounded-control border border-border p-2 text-small">
+        <dl className="rounded-control border border-divider p-2 text-small">
           <div className="flex justify-between gap-2">
             <dt>{t('office.refund.exact')}</dt>
             <dd>
@@ -849,7 +849,7 @@ export function RefundDialog({
               </dd>
             </div>
           ) : null}
-          <div className="mt-1 flex justify-between gap-2 border-t border-border pt-1 text-total font-semibold">
+          <div className="mt-1 flex justify-between gap-2 border-t border-divider pt-1 text-total font-semibold">
             <dt>
               {plan.amount > 0
                 ? t('office.refund.refund_amount')

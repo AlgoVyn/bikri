@@ -215,7 +215,7 @@ export function RestoreTab({
                       ? 'border-primary bg-primary-subtle font-medium text-primary-subtle-ink'
                       : done
                         ? 'border-success-subtle bg-success-subtle text-success-subtle-ink'
-                        : 'border-border text-text-muted'
+                        : 'border-divider text-text-muted'
                   }`}
                 >
                   <span
@@ -254,7 +254,7 @@ export function RestoreTab({
           />
           <span>{t('admin.restore_confirm')}</span>
         </label>
-        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+        <div className="flex flex-wrap gap-2 border-t border-divider pt-4">
           <button
             type="button"
             className={primaryBtn}

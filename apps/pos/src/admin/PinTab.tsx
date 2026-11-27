@@ -164,7 +164,7 @@ export function PinTab({ tenantId }: { tenantId: string }) {
             {formError}
           </p>
         ) : null}
-        <div className="border-t border-border pt-4">
+        <div className="border-t border-divider pt-4">
           <button
             type="submit"
             className={primaryBtn}

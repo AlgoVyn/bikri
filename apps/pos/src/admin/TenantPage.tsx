@@ -127,7 +127,7 @@ export function TenantPage({ id }: { id: string }) {
         <ChevronLeftIcon className="size-4 rtl:rotate-180" />
         {t('admin.back_to_shops')}
       </a>
-      <header className="relative flex flex-wrap items-start gap-4 overflow-hidden rounded-card border border-border bg-surface p-4 shadow-card lg:p-5">
+      <header className="relative flex flex-wrap items-start gap-4 overflow-hidden rounded-card border border-divider bg-surface p-4 shadow-card lg:p-5">
         <span
           aria-hidden="true"
           className={`absolute inset-x-0 top-0 h-1 ${tone}`}
@@ -196,7 +196,7 @@ export function TenantPage({ id }: { id: string }) {
         role="tablist"
         aria-label={tenant.display_name}
         aria-orientation="horizontal"
-        className="flex flex-wrap gap-1 rounded-card border border-border bg-surface p-1 shadow-card"
+        className="flex flex-wrap gap-1 rounded-card border border-divider bg-surface p-1 shadow-card"
         onKeyDown={onTabKeyDown}
       >
         {TABS.map((item) => (

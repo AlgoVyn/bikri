@@ -14,12 +14,12 @@ export function ListSurface({
   children: ReactNode;
 }) {
   return (
-    <div className="overflow-hidden rounded-card border border-border bg-surface shadow-card">
+    <div className="overflow-hidden rounded-card border border-divider bg-surface shadow-card">
       {toolbar !== undefined ? (
-        <div className="border-b border-border p-3">{toolbar}</div>
+        <div className="border-b border-divider p-3">{toolbar}</div>
       ) : null}
       {summary !== undefined ? (
-        <div className="border-b border-border px-3 py-2">{summary}</div>
+        <div className="border-b border-divider px-3 py-2">{summary}</div>
       ) : null}
       {children}
     </div>

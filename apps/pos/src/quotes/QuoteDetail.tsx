@@ -397,6 +397,11 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
   const seenGroups = new Set<string>();
   const canConvert = !terminal && !readOnly && canQuote;
   const moreActions: PageActionItem[] = [];
+  moreActions.push({
+    label: t('office.quotations.share'),
+    mobileOnly: true,
+    onSelect: () => void doShare(),
+  });
   if (!desktop && canConvert)
     moreActions.push({
       label: t('office.quotations.print'),
@@ -446,7 +451,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
             <ChevronLeftIcon className="size-5 rtl:rotate-180" />
           </Link>
         ) : null}
-        <h1 className="me-auto font-mono text-h1 font-semibold">
+        <h1 className="me-auto font-sans tabular-nums text-h1 font-semibold">
           {String(quote.quote_no)}
         </h1>
         <span
@@ -534,7 +539,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
           <Link
             to="/sales/$id"
             params={{ id: String(quote.converted_sale_id) }}
-            className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+            className="inline-flex min-h-11 items-center gap-1 font-medium underline underline-offset-2"
             onClick={(event) =>
               openPeek(
                 event,
@@ -570,7 +575,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
       ) : null}
 
       <dl
-        className={`grid grid-cols-2 gap-2 rounded-card border border-border bg-surface p-3 text-small ${
+        className={`grid grid-cols-2 gap-2 rounded-card border border-divider bg-surface p-3 text-small ${
           wide ? '' : 'sm:grid-cols-4'
         }`}
       >
@@ -613,10 +618,10 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
         />
       </dl>
 
-      <section className="rounded-card border border-border bg-surface">
+      <section className="rounded-card border border-divider bg-surface">
         <table className="w-full text-small">
           <thead>
-            <tr className="border-b border-border text-start text-text-muted">
+            <tr className="border-b border-divider text-start text-text-muted">
               <th className="p-2 text-start">{t('office.quotations.item')}</th>
               <th className="p-2 text-start">{t('office.quotations.qty')}</th>
               <th
@@ -648,7 +653,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
                 const first = groupLines[0] ?? line;
                 return (
                   <Fragment key={group}>
-                    <tr className="border-b border-border bg-surface-2">
+                    <tr className="border-b border-divider bg-surface-2">
                       <td colSpan={5} className="p-2">
                         <span className="flex flex-wrap items-center gap-2 font-medium">
                           <span>
@@ -672,7 +677,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
                     {groupLines.map((component) => (
                       <tr
                         key={String(component.id)}
-                        className="border-b border-border last:border-0"
+                        className="border-b border-divider last:border-0"
                       >
                         <td className="p-2 ps-6">
                           {String(component.name_snapshot)}
@@ -689,7 +694,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
               return (
                 <tr
                   key={String(line.id)}
-                  className="border-b border-border last:border-0"
+                  className="border-b border-divider last:border-0"
                 >
                   <td className="p-2">
                     {String(line.name_snapshot)}
@@ -727,7 +732,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
       </section>
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <section className="rounded-card border border-border bg-surface p-3 text-small">
+        <section className="rounded-card border border-divider bg-surface p-3 text-small">
           <h2 className="mb-2 text-title font-semibold">
             {t('office.quotations.total')}
           </h2>
@@ -780,7 +785,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
           ) : null}
         </section>
 
-        <section className="rounded-card border border-border bg-surface p-3 text-small">
+        <section className="rounded-card border border-divider bg-surface p-3 text-small">
           <h2 className="mb-2 text-title font-semibold">
             {t('office.quotations.terms')}
           </h2>
@@ -794,7 +799,7 @@ function QuoteDetailBody({ quoteId, data }: { quoteId: string; data: Loaded }) {
           ) : (
             <p className="text-text-muted">—</p>
           )}
-          <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-border pt-2 text-caption text-text-muted">
+          <div className="mt-3 flex flex-wrap justify-between gap-2 border-t border-divider pt-2 text-caption text-text-muted">
             <span>
               {t('office.quotations.created_by', {
                 staff: data.staffName || '—',
@@ -924,7 +929,7 @@ function Row({
 }) {
   return (
     <div
-      className={`flex flex-wrap items-baseline justify-between gap-2 ${strong ? 'border-t border-border pt-1 font-semibold' : ''}`}
+      className={`flex flex-wrap items-baseline justify-between gap-2 ${strong ? 'border-t border-divider pt-1 font-semibold' : ''}`}
     >
       <span>{label}</span>
       <span>{value}</span>

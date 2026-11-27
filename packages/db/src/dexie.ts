@@ -348,6 +348,8 @@ export type CartLine = {
   key: string;
   product_id: string | null;
   name: string;
+  /** Urdu name snapshot for the live cart; receipts keep the sold name snapshot. */
+  name_ur?: string;
   sku: string;
   qty_milli: number;
   unit_price: number;
@@ -365,6 +367,7 @@ export type CartLine = {
   bundle_id?: string;
   bundle_group?: string;
   bundle_name?: string;
+  bundle_name_ur?: string;
   bundle_qty?: number;
   /** Effective bundle price in the cart (can be edited at Sell). */
   bundle_price?: number;

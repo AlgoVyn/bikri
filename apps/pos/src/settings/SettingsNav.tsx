@@ -217,7 +217,7 @@ function SettingsNavContent({
       />
       <section
         aria-labelledby="data-safety"
-        className="rounded-card border border-border bg-surface p-3"
+        className="rounded-card border border-divider bg-surface p-3"
       >
         <h2 id="data-safety" className="text-title font-semibold">
           {t('office.settings.health_title')}
@@ -324,7 +324,7 @@ function SettingsNavContent({
             <h2 className="mb-1 px-1 text-small font-semibold text-text-muted">
               {group.label}
             </h2>
-            <ul className="flex flex-col divide-y divide-border overflow-hidden rounded-card border border-border bg-surface">
+            <ul className="flex flex-col divide-y divide-divider overflow-hidden rounded-card border border-divider bg-surface">
               {group.rows.map((row) => (
                 <SettingsRow
                   key={row.to}
@@ -345,7 +345,7 @@ function SettingsNavContent({
         ) : null}
       </nav>
       {info?.device ? (
-        <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
+        <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-3">
           <div className="flex items-start gap-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-control bg-surface-2 text-text-muted">
               <DeviceIcon />

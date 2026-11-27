@@ -18,7 +18,7 @@ import { useToast } from '../components/Toast.tsx';
 import { countdownParts, formatWhen, statusLabelKey } from './format.ts';
 
 const dialogClass =
-  'fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 overflow-y-auto rounded-modal border border-border bg-surface p-4 text-text shadow-modal backdrop:bg-scrim';
+  'fixed inset-0 z-50 m-auto flex h-fit max-h-[calc(100%-2rem)] w-[min(28rem,calc(100%-2rem))] flex-col gap-4 overflow-y-auto rounded-modal border border-divider bg-surface p-4 text-text shadow-modal backdrop:bg-scrim';
 
 /** Native dialog so the operator pages do not pull Radix into the till bundle. */
 export function Modal({
@@ -176,7 +176,7 @@ export function FileField({
           htmlFor={id}
           className={`${quietBtn} cursor-pointer ${
             disabled
-              ? 'pointer-events-none border-border bg-surface-2 text-text-muted'
+              ? 'pointer-events-none border-divider bg-surface-2 text-text-muted'
               : ''
           }`}
         >
@@ -253,11 +253,11 @@ export function Panel({
   const Heading = headingLevel;
   return (
     <section
-      className={`rounded-card border border-border bg-surface shadow-card ${className}`}
+      className={`rounded-card border border-divider bg-surface shadow-card ${className}`}
       aria-labelledby={title !== undefined ? id : undefined}
     >
       {title !== undefined ? (
-        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+        <div className="flex flex-wrap items-start justify-between gap-3 border-b border-divider px-4 py-3">
           <div className="min-w-0">
             <Heading id={id} className="text-title font-semibold">
               {title}
@@ -316,7 +316,7 @@ export function StatCard({
   compact?: boolean;
 }) {
   return (
-    <div className="rounded-card border border-border bg-surface p-4 shadow-card">
+    <div className="rounded-card border border-divider bg-surface p-4 shadow-card">
       <p className="text-small font-medium text-text-muted">{label}</p>
       <p
         className={`mt-1 font-semibold tabular-nums ${compact ? 'text-title' : 'text-figure'}`}
@@ -479,10 +479,10 @@ export function PairingPanel({
   const waHref = `https://wa.me/?text=${encodeURIComponent(waText)}`;
   return (
     <section
-      className="overflow-hidden rounded-card border border-border bg-surface shadow-card"
+      className="overflow-hidden rounded-card border border-divider bg-surface shadow-card"
       aria-labelledby="pairing-title"
     >
-      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-border px-4 py-3">
+      <div className="flex flex-wrap items-start justify-between gap-3 border-b border-divider px-4 py-3">
         <h2 id="pairing-title" className="text-title font-semibold">
           {heading ?? t('admin.pairing_once')}
         </h2>
@@ -532,7 +532,7 @@ export function PairingPanel({
           </div>
         </div>
         <p className="text-small text-text-muted tabular-nums">{when}</p>
-        <div className="flex flex-wrap gap-2 border-t border-border pt-4">
+        <div className="flex flex-wrap gap-2 border-t border-divider pt-4">
           <button
             type="button"
             className={quietBtn}

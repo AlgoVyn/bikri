@@ -156,7 +156,7 @@ export function BackupsPage() {
           <div className="overflow-x-auto">
             <table className="w-full min-w-[760px] text-start text-small">
               <caption className="sr-only">{t('admin.backups_title')}</caption>
-              <thead className="border-b border-border bg-surface-2 text-text-muted">
+              <thead className="border-b border-divider bg-surface-2 text-text-muted">
                 <tr>
                   <th scope="col" className="px-4 py-3 text-start font-medium">
                     {t('admin.col_date')}
@@ -176,7 +176,7 @@ export function BackupsPage() {
                 {rows.map((row) => (
                   <tr
                     key={row.key}
-                    className="border-b border-border align-top last:border-b-0 hover:bg-surface-2/60"
+                    className="border-b border-divider align-top last:border-b-0 hover:bg-surface-2/60"
                   >
                     <td className="px-4 py-3 whitespace-nowrap">
                       {formatWhen(row.uploaded, lang)}

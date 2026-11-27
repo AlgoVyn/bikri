@@ -28,6 +28,7 @@ import { ProductThumb } from '../components/ProductThumb.tsx';
 import { usePrivacyActive } from '../components/privacy.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
+import { useToast } from '../components/Toast.tsx';
 import {
   defaultProductSortDirection,
   filterAndSortProducts,
@@ -73,7 +74,8 @@ export function ProductList({
 } = {}) {
   const { t, i18n } = useTranslation();
   const navigate = useNavigate();
-  const { can } = useCurrentStaff();
+  const { can, staff } = useCurrentStaff();
+  const toast = useToast();
   const readOnly = useReadOnly();
   const searchRef = useRef<HTMLInputElement>(null);
   const [query, setQuery] = useState('');
@@ -84,9 +86,23 @@ export function ProductList({
     defaultProductSortDirection('name'),
   );
   const [filtersOpen, setFiltersOpen] = useState(false);
+  const [samplePending, setSamplePending] = useState(false);
   const [selecting, setSelecting] = useState(false);
   const [selected, setSelected] = useState<Set<string>>(new Set());
   const [labelsOpen, setLabelsOpen] = useState(false);
+  const loadSamples = async () => {
+    if (!staff || readOnly || samplePending) return;
+    setSamplePending(true);
+    try {
+      const { addSampleProducts } = await import('../data/home.ts');
+      const count = await addSampleProducts(getDb(), staff.id);
+      toast.push(t('home.samples_loaded', { count }));
+    } catch {
+      toast.push(t('errors.generic'), 'error');
+    } finally {
+      setSamplePending(false);
+    }
+  };
   const activeFilters =
     (categoryId ? 1 : 0) +
     (stock !== 'all' ? 1 : 0) +
@@ -264,6 +280,26 @@ export function ProductList({
           onAction={
             canEdit ? () => void navigate({ to: '/products/new' }) : undefined
           }
+          actions={
+            canEdit && !readOnly ? (
+              <>
+                <Link to="/products/import" className={buttonQuiet}>
+                  {t('home.import')}
+                </Link>
+                <Link to="/products/suggested" className={buttonQuiet}>
+                  {t('home.suggested')}
+                </Link>
+                <button
+                  type="button"
+                  className="min-h-11 self-center text-small font-medium text-primary underline"
+                  disabled={samplePending}
+                  onClick={() => void loadSamples()}
+                >
+                  {t('home.load_samples')}
+                </button>
+              </>
+            ) : undefined
+          }
         />
       ) : (
         <ListSurface
@@ -297,7 +333,7 @@ export function ProductList({
                 <FilterIcon className="size-5" />
                 <span className="max-lg:sr-only">{t('common.filters')}</span>
                 {activeFilters > 0 ? (
-                  <span className="absolute -end-1 -top-1 flex size-4 items-center justify-center rounded-full bg-primary text-micro text-primary-ink lg:static lg:size-auto lg:px-1.5 lg:text-small">
+                  <span className="absolute -end-1 -top-1 flex size-5 items-center justify-center rounded-full bg-primary text-caption text-primary-ink lg:static lg:size-auto lg:px-1.5 lg:text-small">
                     {activeFilters}
                   </span>
                 ) : null}
@@ -464,7 +500,7 @@ function ListHeader({
   return (
     <div
       data-testid="products-list-header"
-      className={`hidden gap-3 border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted lg:grid ${gridCols(showCost, embedded)}`}
+      className={`hidden gap-3 border-s-2 border-b border-s-transparent border-divider bg-surface-2 px-3 py-2 text-small text-text-muted lg:grid ${gridCols(showCost, embedded)}`}
     >
       <span />
       <SortHeader
@@ -654,6 +690,7 @@ function ProductRow({
       ? t('products.not_tracked')
       : qtyWithUnit(t, row.onHand, unit);
   const cost = row.bundle ? row.bundle.cost : Number(p.avg_cost ?? 0);
+  const untracked = row.stockState === 'untracked' && !row.bundle;
   const margin = marginText(Number(p.price), cost);
   return (
     <li
@@ -667,7 +704,7 @@ function ProductRow({
           type="button"
           aria-pressed={selected}
           onClick={onToggle}
-          className={`grid h-full w-full items-center gap-x-3 border-s-2 border-b border-s-transparent border-border px-3 text-start transition-colors duration-150 hover:bg-surface-2 focus-visible:outline-offset-[-2px] ${gridCols(showCost, embedded)}`}
+          className={`grid h-full w-full items-center gap-x-3 border-s-2 border-b border-s-transparent border-divider px-3 text-start transition-colors duration-150 hover:bg-surface-2 focus-visible:outline-offset-[-2px] ${gridCols(showCost, embedded)}`}
         >
           <span
             aria-hidden="true"
@@ -687,7 +724,7 @@ function ProductRow({
                 </span>
               ) : null}
             </span>
-            <span className="block truncate text-small leading-tight! text-text-muted max-lg:text-micro">
+            <span className="block truncate text-small leading-tight! text-text-muted max-lg:text-caption">
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
             </span>
           </span>
@@ -699,21 +736,25 @@ function ProductRow({
           <span className="text-start max-lg:row-start-1 max-lg:col-start-3">
             <MoneyText paisa={Number(p.price)} />
             <span
-              className={`block text-small ${embedded ? 'hidden' : 'lg:hidden'} ${stockTone}`}
+              className={`block whitespace-nowrap text-small ${embedded ? 'hidden' : 'lg:hidden'} ${stockTone}`}
             >
               {stockText}
             </span>
           </span>
           {embedded ? (
-            <span className={`text-start ${stockTone}`}>{stockText}</span>
+            <span className={`whitespace-nowrap text-start ${stockTone}`}>
+              {stockText}
+            </span>
           ) : (
             <>
-              <span className={`hidden text-start lg:block ${stockTone}`}>
+              <span
+                className={`hidden whitespace-nowrap text-start lg:block ${stockTone}`}
+              >
                 {stockText}
               </span>
               {showCost ? (
                 <span className="hidden text-start lg:block">
-                  <MoneyText paisa={cost} />
+                  {untracked ? '—' : <MoneyText paisa={cost} />}
                 </span>
               ) : null}
               {showCost ? (
@@ -738,7 +779,7 @@ function ProductRow({
           resetScroll={false}
           onClick={rememberListScroll}
           aria-current={current ? 'page' : undefined}
-          className={`grid h-full focus-visible:outline-offset-[-2px] items-center gap-x-3 border-s-2 border-b border-border px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'} ${gridCols(showCost, embedded)}`}
+          className={`grid h-full focus-visible:outline-offset-[-2px] items-center gap-x-3 border-s-2 border-b border-divider px-3 transition-colors duration-150 hover:bg-surface-2 ${current ? 'border-s-primary bg-primary-subtle' : 'border-s-transparent'} ${gridCols(showCost, embedded)}`}
         >
           <ProductThumb
             name={String(p.name_en)}
@@ -757,7 +798,7 @@ function ProductRow({
                 </span>
               ) : null}
             </span>
-            <span className="block truncate text-small leading-tight! text-text-muted max-lg:text-micro">
+            <span className="block truncate text-small leading-tight! text-text-muted max-lg:text-caption">
               {[p.brand, p.sku].filter(Boolean).map(String).join(' · ')}
             </span>
           </span>
@@ -769,21 +810,25 @@ function ProductRow({
           <span className="text-start max-lg:row-start-1 max-lg:col-start-3">
             <MoneyText paisa={Number(p.price)} />
             <span
-              className={`block text-small ${embedded ? 'hidden' : 'lg:hidden'} ${stockTone}`}
+              className={`block whitespace-nowrap text-small ${embedded ? 'hidden' : 'lg:hidden'} ${stockTone}`}
             >
               {stockText}
             </span>
           </span>
           {embedded ? (
-            <span className={`text-start ${stockTone}`}>{stockText}</span>
+            <span className={`whitespace-nowrap text-start ${stockTone}`}>
+              {stockText}
+            </span>
           ) : (
             <>
-              <span className={`hidden text-start lg:block ${stockTone}`}>
+              <span
+                className={`hidden whitespace-nowrap text-start lg:block ${stockTone}`}
+              >
                 {stockText}
               </span>
               {showCost ? (
                 <span className="hidden text-start lg:block">
-                  <MoneyText paisa={cost} />
+                  {untracked ? '—' : <MoneyText paisa={cost} />}
                 </span>
               ) : null}
               {showCost ? (

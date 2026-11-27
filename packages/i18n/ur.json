@@ -1055,6 +1055,8 @@
     "sync_detail_synced": "آخری سنک {{ago}} · {{count}} باقی",
     "sync_detail_pending": "{{count}} تبدیلیاں باقی · آخری سنک {{ago}}",
     "sync_offline": "آف لائن",
+    "sync_pill_offline": "آف لائن · {{count}} باقی",
+    "sync_pill_pending": "{{count}} باقی",
     "sync_detail_offline": "آف لائن · {{count}} تبدیلیاں اسی ڈیوائس پر محفوظ",
     "sync_detail_error": "سنک کا مسئلہ: {{message}} · تفصیل کھولیں",
     "sync_failed_ops": "{{count}} قبول نہیں ہوئیں",

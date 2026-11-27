@@ -163,6 +163,8 @@ export function useSyncStatus() {
   };
 }
 
+export type SyncStatus = ReturnType<typeof useSyncStatus>;
+
 /** Printer status for the avatar dot and the staff-menu status row (T-020). */
 export function usePrinterStatus() {
   const { t } = useTranslation();
@@ -202,18 +204,69 @@ function syncDotClass(state: string | undefined): string {
   return 'bg-success';
 }
 
+/**
+ * A compact offline/stale state that is visible without opening the staff menu. The
+ * avatar dot alone is too easy to miss (and on the navy rail it needs a lighter amber).
+ */
+export function SyncStatusPill({
+  sync,
+  variant = 'topbar',
+}: {
+  sync: SyncStatus;
+  variant?: 'topbar' | 'rail';
+}) {
+  const { t } = useTranslation();
+  if (!sync) return null;
+  const show =
+    sync.state === 'offline' ||
+    sync.state === 'paused' ||
+    sync.state === 'quota' ||
+    sync.state === 'error' ||
+    sync.state === 'outdated' ||
+    (sync.state === 'pending' && sync.stale);
+  if (!show) return null;
+  const label =
+    sync.state === 'offline'
+      ? sync.pending > 0
+        ? t('shell.sync_pill_offline', { count: sync.pending })
+        : t('shell.sync_offline')
+      : sync.state === 'pending'
+        ? t('shell.sync_pill_pending', { count: sync.pending })
+        : sync.label;
+  return (
+    <Link
+      to="/settings/sync"
+      data-testid="sync-pill"
+      data-state={sync.state}
+      title={sync.detail}
+      className={
+        variant === 'rail'
+          ? 'flex min-h-11 w-full items-center justify-center gap-2 px-2 text-caption font-medium text-warning-rail hover:bg-rail-hover'
+          : 'inline-flex min-h-8 max-w-28 items-center gap-1.5 rounded-full border border-warning/40 bg-warning-subtle px-2 text-caption font-medium text-warning-subtle-ink'
+      }
+    >
+      <span
+        aria-hidden="true"
+        className="size-1.5 shrink-0 rounded-full bg-current"
+      />
+      <span className="truncate">{label}</span>
+    </Link>
+  );
+}
+
 /** Staff avatar, account menu, status summary and the individual status rows. */
 export function StaffMenu({
   shopName,
+  sync,
   variant = 'topbar',
 }: {
   shopName: string | null;
+  sync: SyncStatus;
   variant?: 'topbar' | 'rail';
 }) {
   const { t } = useTranslation();
   const { staff, role, support } = useCurrentStaff();
   const lock = useSession((s) => s.lock);
-  const sync = useSyncStatus();
   const printer = usePrinterStatus();
   const [open, setOpen] = useState(false);
   const menuId = useId();
@@ -240,6 +293,7 @@ export function StaffMenu({
   }, [open]);
   const name = support ? t('lock.support_profile') : String(staff?.name ?? '');
   const initial = name.slice(0, 1).toUpperCase() || '?';
+  const warningDot = variant === 'rail' ? 'bg-warning-rail' : 'bg-warning';
   const dot =
     sync?.state === 'error' || printer.state === 'failed'
       ? 'bg-danger'
@@ -247,11 +301,11 @@ export function StaffMenu({
           sync?.state === 'paused' ||
           sync?.state === 'quota' ||
           (sync?.state === 'pending' && sync.stale)
-        ? 'bg-warning'
+        ? warningDot
         : printer.state === 'none'
           ? 'bg-border-strong'
           : 'bg-success';
-  const statusLabel = `${name}. ${t('shell.staff_menu')}. ${sync?.label ?? ''}. ${printer.visible}`;
+  const statusLabel = `${initial} ${name}. ${t('shell.staff_menu')}. ${sync?.label ?? ''}. ${printer.visible}`;
   const menuPosition =
     variant === 'rail'
       ? 'bottom-0 start-full ms-3 w-80 max-h-[calc(100dvh-6rem)]'
@@ -277,11 +331,11 @@ export function StaffMenu({
         >
           <span
             aria-hidden="true"
-            className="relative flex size-8 items-center justify-center rounded-full bg-primary text-primary-ink"
+            data-initial={initial}
+            className="staff-avatar-initial relative flex size-8 items-center justify-center rounded-full bg-primary text-small font-semibold text-primary-ink"
           >
-            <UserIcon className="size-4" />
             <span
-              className={`absolute -end-0.5 -top-0.5 size-2.5 rounded-full border-2 border-rail ${dot}`}
+              className={`absolute -end-0.5 -top-0.5 size-3 rounded-full border-2 border-rail ${dot}`}
             />
           </span>
           <span className="rail-label max-w-full truncate leading-tight">
@@ -306,11 +360,11 @@ export function StaffMenu({
         >
           <span
             aria-hidden="true"
-            className="relative flex size-9 items-center justify-center rounded-full bg-primary text-small font-semibold text-primary-ink ring-2 ring-primary-subtle"
+            data-initial={initial}
+            className="staff-avatar-initial relative flex size-9 items-center justify-center rounded-full bg-primary text-small font-semibold text-primary-ink ring-2 ring-primary-subtle"
           >
-            {initial}
             <span
-              className={`absolute -end-0.5 -top-0.5 size-2.5 rounded-full border-2 border-surface ${dot}`}
+              className={`absolute -end-0.5 -top-0.5 size-3 rounded-full border-2 border-surface ${dot}`}
             />
           </span>
         </button>
@@ -318,14 +372,14 @@ export function StaffMenu({
       {open ? (
         <div
           id={menuId}
-          className={`absolute z-50 overflow-y-auto rounded-card border border-border bg-surface p-3 text-text shadow-modal ${menuPosition}`}
+          className={`absolute z-50 overflow-y-auto rounded-card border border-divider bg-surface p-3 text-text shadow-modal ${menuPosition}`}
         >
-          <div className="flex items-center gap-2 border-b border-border pb-3">
+          <div className="flex items-center gap-2 border-b border-divider pb-3">
             <span className="flex size-9 shrink-0 items-center justify-center rounded-full bg-surface-2 text-text-muted">
               <StoreIcon />
             </span>
             <div className="min-w-0">
-              <p className="text-micro font-medium uppercase tracking-[0.12em] text-text-muted">
+              <p className="text-caption font-medium uppercase tracking-[0.12em] text-text-muted">
                 {t('shell.shop')}
               </p>
               <p
@@ -351,7 +405,7 @@ export function StaffMenu({
               </p>
             </div>
           </div>
-          <div className="mt-3 flex flex-col gap-0.5 rounded-control border border-border p-1">
+          <div className="mt-3 flex flex-col gap-0.5 rounded-control border border-divider p-1">
             <Link
               to="/settings/sync"
               data-testid="sync-status"
@@ -394,7 +448,7 @@ export function StaffMenu({
             <span className="flex-1">{t('nav.settings')}</span>
             <ChevronRightIcon className="size-4 shrink-0 text-text-muted rtl:rotate-180" />
           </Link>
-          <div className="mt-2 border-y border-border py-2">
+          <div className="mt-2 border-y border-divider py-2">
             <LanguageMenu
               onPicked={() => {
                 setOpen(false);

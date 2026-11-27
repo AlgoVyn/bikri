@@ -59,7 +59,10 @@ test('operator console: overview, new shop with a one-time code, read-only and r
 
 test('operator console follows the selected device theme', async ({ page }) => {
   await openReadyShop(page, '/bikri/settings/display');
-  await page.getByLabel('Theme').selectOption('dark');
+  await page
+    .getByRole('group', { name: 'Theme' })
+    .getByRole('button', { name: 'Dark' })
+    .click();
   await expect(page.locator('html')).toHaveAttribute('data-theme', 'dark');
   await page.getByRole('button', { name: 'Save' }).click();
   await expect(page.getByText('Display settings saved.')).toBeVisible();

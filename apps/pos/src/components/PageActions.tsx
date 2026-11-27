@@ -8,6 +8,7 @@ import {
   useState,
 } from 'react';
 import { useTranslation } from 'react-i18next';
+import { useMediaQuery } from '../shell/useIsDesktop.ts';
 import { MoreIcon } from './icons.tsx';
 
 export type PageActionItem = {
@@ -15,6 +16,8 @@ export type PageActionItem = {
   disabled?: boolean;
   /** Destructive items stay in the overflow but carry the danger colour. */
   tone?: 'danger';
+  /** Show only inside the phone overflow menu, not beside a desktop action. */
+  mobileOnly?: boolean;
 } & (
   | { onSelect: () => void; to?: undefined }
   | { to: string; onSelect?: undefined }
@@ -51,6 +54,7 @@ export function PageActions({
   const itemRefs = useRef<(HTMLElement | null)[]>([]);
   const menuId = useId();
   const label = moreLabel ?? t('nav.more');
+  const mdUp = useMediaQuery('(min-width: 768px)');
 
   const focusItem = (index: number) => {
     requestAnimationFrame(() => {
@@ -83,7 +87,8 @@ export function PageActions({
 
   const onMenuKeyDown = (event: KeyboardEvent<HTMLDivElement>) => {
     const items = itemRefs.current.filter(
-      (item): item is HTMLElement => item !== null,
+      (item): item is HTMLElement =>
+        item !== null && item.getClientRects().length > 0,
     );
     if (items.length === 0) return;
     const current = items.indexOf(document.activeElement as HTMLElement);
@@ -109,6 +114,9 @@ export function PageActions({
     return null;
   }
 
+  const allMobileOnly =
+    more.length > 0 && more.every((item) => item.mobileOnly);
+  const showMore = more.length > 0 && (!allMobileOnly || !mdUp);
   return (
     <div className="relative flex w-full flex-wrap items-center gap-2 md:ms-auto md:w-auto md:justify-end">
       {primary !== undefined ? (
@@ -116,8 +124,10 @@ export function PageActions({
           {primary}
         </div>
       ) : null}
-      {secondary}
-      {more.length > 0 ? (
+      {secondary !== undefined ? (
+        <div className="hidden md:contents">{secondary}</div>
+      ) : null}
+      {showMore ? (
         <div ref={ref}>
           <button
             ref={triggerRef}
@@ -144,7 +154,7 @@ export function PageActions({
               role="toolbar"
               aria-orientation="vertical"
               aria-label={label}
-              className="bikri-menu absolute end-0 top-full z-30 mt-2 flex w-56 flex-col gap-0.5 rounded-card border border-border bg-surface p-1 shadow-modal"
+              className="bikri-menu absolute end-0 top-full z-30 mt-2 flex w-56 flex-col gap-0.5 rounded-card border border-divider bg-surface p-1 shadow-modal"
               onKeyDown={onMenuKeyDown}
             >
               {more.map((item, index) =>
@@ -155,9 +165,9 @@ export function PageActions({
                       itemRefs.current[index] = element;
                     }}
                     to={item.to as never}
-                    className={
+                    className={`${
                       item.tone === 'danger' ? dangerItemClass : itemClass
-                    }
+                    }${item.mobileOnly ? ' md:hidden' : ''}`}
                     aria-disabled={item.disabled || undefined}
                     tabIndex={item.disabled ? -1 : undefined}
                     onClick={(event) => {
@@ -178,9 +188,9 @@ export function PageActions({
                     }}
                     type="button"
                     disabled={item.disabled}
-                    className={
+                    className={`${
                       item.tone === 'danger' ? dangerItemClass : itemClass
-                    }
+                    }${item.mobileOnly ? ' md:hidden' : ''}`}
                     onClick={() => {
                       item.onSelect?.();
                       setOpen(false);

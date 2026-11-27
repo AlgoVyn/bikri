@@ -135,7 +135,7 @@ export function ReceiptPreview({
   });
   return (
     <figure
-      className="mx-auto w-fit max-w-full rounded-card border border-border bg-white p-3 text-black"
+      className="mx-auto w-fit max-w-full rounded-card border border-divider bg-white p-3 text-black"
       data-testid="receipt-preview-card"
       dir="ltr"
     >

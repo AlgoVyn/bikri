@@ -308,7 +308,7 @@ export function SupplierReturnPage({
         }
       />
 
-      <label className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3 text-small">
+      <label className="flex flex-col gap-1 rounded-card border border-divider bg-surface p-3 text-small">
         {t('office.suppliers.return_linked')}
         <select
           className={field}
@@ -329,7 +329,7 @@ export function SupplierReturnPage({
       </label>
 
       {purchase ? (
-        <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
+        <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-3">
           <h2 className="text-title font-semibold">
             {t('office.suppliers.return_delivery_lines')}
           </h2>
@@ -343,7 +343,7 @@ export function SupplierReturnPage({
               return (
                 <li
                   key={key}
-                  className="flex flex-col gap-3 rounded-control border border-border p-3"
+                  className="flex flex-col gap-3 rounded-control border border-divider p-3"
                 >
                   <div className="flex items-start justify-between gap-3">
                     <div className="min-w-0">
@@ -408,7 +408,7 @@ export function SupplierReturnPage({
           </ul>
         </section>
       ) : (
-        <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
+        <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-3">
           <label className="flex flex-col gap-1 text-small">
             {t('office.suppliers.add_product')}
             <input
@@ -497,7 +497,7 @@ export function SupplierReturnPage({
         </section>
       )}
 
-      <fieldset className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3">
+      <fieldset className="flex flex-col gap-1 rounded-card border border-divider bg-surface p-3">
         <legend className="mb-1 text-small">
           {t('office.suppliers.return_reason')}
         </legend>
@@ -524,14 +524,14 @@ export function SupplierReturnPage({
         ) : null}
       </fieldset>
 
-      <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-card border border-border bg-surface p-3">
+      <div className="flex flex-wrap items-baseline justify-between gap-2 rounded-card border border-divider bg-surface p-3">
         <span>{t('office.suppliers.return_total')}</span>
         <span className="text-title font-semibold">
           <MoneyText paisa={total} />
         </span>
       </div>
       {suggested > 0 ? (
-        <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
+        <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-3">
           <p className="text-small">
             {t('office.suppliers.return_suggested', {
               amount: money(suggested),
@@ -575,7 +575,7 @@ export function SupplierReturnPage({
         </p>
       ) : null}
 
-      <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-border bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
+      <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-divider bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
         <div className="mx-auto flex w-full max-w-[1152px] flex-wrap justify-end gap-2">
           <Link
             to="/suppliers/$supplierId"

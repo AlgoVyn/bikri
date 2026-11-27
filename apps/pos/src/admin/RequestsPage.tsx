@@ -88,7 +88,7 @@ export function RequestsPage() {
       />
       <RefreshError message={query.error} />
       <Panel bodyClassName="p-0">
-        <div className="flex flex-wrap items-end gap-3 border-b border-border p-3">
+        <div className="flex flex-wrap items-end gap-3 border-b border-divider p-3">
           <label className={`${searchWrapperClass} min-w-56 flex-1`}>
             <SearchIcon />
             <span className="sr-only">{t('admin.requests_search')}</span>
@@ -130,7 +130,7 @@ export function RequestsPage() {
           </p>
         ) : (
           <>
-            <ul className="divide-y divide-border">
+            <ul className="divide-y divide-divider">
               {pageRows.map((row) => {
                 const email =
                   row.email_verified_at !== null
@@ -164,7 +164,7 @@ export function RequestsPage() {
                 );
               })}
             </ul>
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-4 py-3">
               <p className="text-small text-text-muted tabular-nums">
                 {t('admin.requests_count', { count: rows.length })} ·{' '}
                 {t('admin.page_of', {

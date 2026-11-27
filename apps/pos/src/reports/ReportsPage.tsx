@@ -127,7 +127,7 @@ function ReportRangeControls({
   const { t } = useTranslation();
   return (
     <div className="flex flex-col gap-2">
-      <div className="flex flex-col gap-2 lg:flex-row lg:items-center lg:justify-between">
+      <div className="flex flex-col gap-2 xl:flex-row xl:items-center xl:justify-between">
         <ScrollStrip className="items-center">
           {(limited
             ? PRESETS.filter((item) => item.id === 'today')
@@ -709,8 +709,14 @@ function ReportsPageContent() {
             className="text-small text-text-muted"
             data-testid="report-range"
           >
-            {longDate(bundle.range.from, lang)} –{' '}
-            {longDate(bundle.range.to, lang)}
+            {bundle.range.from === bundle.range.to ? (
+              longDate(bundle.range.from, lang)
+            ) : (
+              <>
+                {longDate(bundle.range.from, lang)} –{' '}
+                {longDate(bundle.range.to, lang)}
+              </>
+            )}
           </span>
         }
       />
@@ -860,7 +866,7 @@ function Delta({
 
 function NoRows({ message }: { message: string }) {
   return (
-    <p className="rounded-card border border-border bg-surface p-4 text-center text-small text-text-muted">
+    <p className="rounded-card border border-divider bg-surface p-4 text-center text-small text-text-muted">
       {message}
     </p>
   );
@@ -898,10 +904,10 @@ function ReportTable<T>({
       {rows.length === 0 ? (
         <NoRows message={empty} />
       ) : (
-        <div className="overflow-x-auto rounded-card border border-border bg-surface">
+        <div className="overflow-x-auto rounded-card border border-divider bg-surface">
           <table className="w-full min-w-[36rem] border-collapse text-small">
             <thead>
-              <tr className="border-b border-border bg-surface-2 text-start">
+              <tr className="border-b border-divider bg-surface-2 text-start">
                 {headers.map((header) => (
                   <th
                     key={header}
@@ -921,7 +927,7 @@ function ReportTable<T>({
                     key={
                       rowKeys?.[page * REPORT_PAGE + index] ?? String(cells[0])
                     }
-                    className="border-b border-border last:border-0"
+                    className="border-b border-divider last:border-0"
                   >
                     {cells.map((cell, cellIndex) => (
                       <td
@@ -960,7 +966,7 @@ function KpiCard({
 }) {
   return (
     <li
-      className="min-w-0 rounded-card border border-border bg-surface p-3 shadow-card"
+      className="min-w-0 rounded-card border border-divider bg-surface p-3 shadow-card"
       data-testid={testId}
     >
       <p className="text-small text-text-muted">{label}</p>
@@ -1021,6 +1027,16 @@ function SummaryTab({
       : kpiTextLength > 16
         ? 'text-body lg:text-h2 xl:text-title'
         : 'text-h2 lg:text-title xl:text-total';
+  const secondaryCount =
+    (cost ? 3 : 0) + (bundle.taxEnabled || summary.tax !== 0 ? 1 : 0);
+  const secondaryGrid =
+    secondaryCount === 4
+      ? 'grid-cols-2 lg:grid-cols-4'
+      : secondaryCount === 3
+        ? 'grid-cols-2 lg:grid-cols-3'
+        : secondaryCount === 2
+          ? 'grid-cols-2'
+          : 'grid-cols-1';
   return (
     <>
       <ul className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -1076,7 +1092,7 @@ function SummaryTab({
       </ul>
 
       {cost || bundle.taxEnabled || summary.tax !== 0 ? (
-        <div className="grid grid-cols-2 gap-x-6 gap-y-3 lg:grid-cols-4">
+        <div className={`grid gap-x-6 gap-y-3 ${secondaryGrid}`}>
           {cost ? (
             <>
               <Metric
@@ -1141,7 +1157,7 @@ function SummaryTab({
           {singleDay && activeHours.length >= 3 ? (
             <section
               data-testid="report-chart"
-              className="rounded-card border border-border bg-surface p-3"
+              className="rounded-card border border-divider bg-surface p-3"
             >
               <h2 className="mb-2 text-title font-semibold">
                 {t('office.reports.hourly_chart')}
@@ -1162,7 +1178,7 @@ function SummaryTab({
           ) : !singleDay && activeDays > 1 ? (
             <section
               data-testid="report-chart"
-              className="rounded-card border border-border bg-surface p-3"
+              className="rounded-card border border-divider bg-surface p-3"
             >
               <h2 className="mb-2 text-title font-semibold">
                 {t('office.reports.daily_chart')}
@@ -1181,13 +1197,13 @@ function SummaryTab({
           ) : null}
 
           <div className="grid gap-3 lg:grid-cols-2">
-            <section className="rounded-card border border-border bg-surface p-3">
+            <section className="rounded-card border border-divider bg-surface p-3">
               <h2 className="mb-2 text-title font-semibold">
                 {t('office.reports.payment_mix')}
               </h2>
               <PaymentMixBar mix={summary.paymentMix} t={t} />
             </section>
-            <section className="rounded-card border border-border bg-surface p-3">
+            <section className="rounded-card border border-divider bg-surface p-3">
               <h2 className="mb-2 text-title font-semibold">
                 {t('office.reports.udhaar')}
               </h2>

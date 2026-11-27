@@ -273,7 +273,7 @@ export function EnrolPage({
 
   const card = (body: React.ReactNode) => (
     <main className="flex min-h-dvh items-center justify-center bg-bg p-4">
-      <div className="flex w-full max-w-md flex-col gap-4 rounded-card border border-border bg-surface p-6 shadow-card">
+      <div className="flex w-full max-w-md flex-col gap-4 rounded-card border border-divider bg-surface p-6 shadow-card">
         <div className="flex items-center justify-between">
           <div className="flex items-center gap-2.5">
             <BikriMark className="size-8" />
@@ -369,7 +369,7 @@ export function EnrolPage({
               {t('enrol.open', { shop: connected.shop })}
             </button>
             {confirmLeave ? (
-              <div className="flex flex-col gap-2 rounded-control border border-border p-3">
+              <div className="flex flex-col gap-2 rounded-control border border-divider p-3">
                 <p>{t('enrol.leave_confirm', { shop: connected.shop })}</p>
                 <div className="flex gap-2">
                   <button
@@ -510,7 +510,7 @@ export function EnrolPage({
           {busy ? t('enrol.connecting') : t('enrol.connect')}
         </button>
       </form>
-      <p className="border-t border-border pt-3 text-center text-small text-text-muted">
+      <p className="border-t border-divider pt-3 text-center text-small text-text-muted">
         {t('enrol.request_shop_hint')}{' '}
         <a
           className="inline-flex min-h-11 items-center text-primary underline underline-offset-2"
@@ -528,7 +528,7 @@ export function EnrolPage({
         </details>
       ) : null}
       {revoked && db ? (
-        <div className="flex flex-col gap-2 rounded-control border border-border p-3">
+        <div className="flex flex-col gap-2 rounded-control border border-divider p-3">
           <p>{t('enrol.revoked')}</p>
           <button
             type="button"

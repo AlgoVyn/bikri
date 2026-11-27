@@ -219,7 +219,7 @@ export function DayClosePage() {
     return (
       <div className={pageClass('standard')}>
         <h1 className="text-h1 font-semibold">{t('office.dayclose.title')}</h1>
-        <div className="rounded-card border border-border bg-surface p-4">
+        <div className="rounded-card border border-divider bg-surface p-4">
           <div className="flex items-start justify-between gap-3">
             <p className="text-title font-semibold" data-testid="day-closed">
               {t('office.dayclose.closed')}
@@ -321,7 +321,7 @@ export function DayClosePage() {
         } – ${period(data.periodEnd)}`}
       />
 
-      <section className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
+      <section className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-3">
         <div className="flex flex-wrap items-center gap-2">
           <h2 className="text-title font-semibold">
             {t('office.dayclose.count_cash')}
@@ -356,7 +356,7 @@ export function DayClosePage() {
                   key={values.join('-')}
                   aria-label={`${t('office.dayclose.count_cash')} ${values[0]}–${values.at(-1)}`}
                   className={
-                    index === 0 ? '' : 'sm:border-s sm:border-border sm:ps-3'
+                    index === 0 ? '' : 'sm:border-s sm:border-divider sm:ps-3'
                   }
                 >
                   <div className="grid grid-cols-[3.5rem_5rem_minmax(0,1fr)] gap-2 text-small text-text-muted">
@@ -426,14 +426,14 @@ export function DayClosePage() {
             }}
           />
         )}
-        <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-border pt-2">
+        <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-divider pt-2">
           <span className="text-small">{t('office.dayclose.counted')}</span>
           <span className="text-figure font-semibold">
             <MoneyText paisa={counted} />
           </span>
         </div>
         {data.firstClose ? (
-          <div className="border-t border-border pt-2">
+          <div className="border-t border-divider pt-2">
             <MoneyInput
               label={t('office.dayclose.opening_float')}
               value={opening}
@@ -453,7 +453,7 @@ export function DayClosePage() {
           {t('office.dayclose.next')}
         </button>
       ) : (
-        <section className="flex flex-col gap-1 rounded-card border border-border bg-surface p-3 text-small">
+        <section className="flex flex-col gap-1 rounded-card border border-divider bg-surface p-3 text-small">
           <h2 className="text-title font-semibold">
             {t('office.dayclose.check')}
           </h2>
@@ -493,7 +493,7 @@ export function DayClosePage() {
             label={`- ${t('office.dayclose.pay_outs')}`}
             value={data.components.pay_outs}
           />
-          <div className="flex justify-between border-t border-border pt-1 font-semibold">
+          <div className="flex justify-between border-t border-divider pt-1 font-semibold">
             <span>{t('office.dayclose.expected')}</span>
             <MoneyText paisa={result.expected_cash} />
           </div>
@@ -561,7 +561,7 @@ export function DayClosePage() {
         <p className="text-small text-warning">{t('office.dayclose.recent')}</p>
       ) : null}
 
-      <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-border bg-surface px-4 py-3 shadow-topbar max-lg:bottom-tabbar xl:-mx-6 xl:px-6">
+      <div className="sticky bottom-0 z-20 -mx-4 mt-2 border-t border-divider bg-surface px-4 py-3 shadow-topbar max-lg:bottom-tabbar xl:-mx-6 xl:px-6">
         <div className="flex flex-wrap items-center justify-between gap-3">
           <p className="text-small text-text-muted">
             {t('office.dayclose.difference')}:{' '}

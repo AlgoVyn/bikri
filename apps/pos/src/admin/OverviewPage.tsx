@@ -140,7 +140,7 @@ export function OverviewPage() {
             title={t('admin.usage_today')}
             description={t('admin.usage_today_hint')}
           >
-            <div className="flex flex-wrap items-end justify-between gap-2 border-b border-border pb-3">
+            <div className="flex flex-wrap items-end justify-between gap-2 border-b border-divider pb-3">
               <div>
                 <p className="text-small text-text-muted">
                   {t('admin.d1_size')}
@@ -173,7 +173,7 @@ export function OverviewPage() {
                   value: formatCount(writeShare, lang),
                 })}
               </p>
-              <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-border pt-3">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-t border-divider pt-3">
                 <p className="text-small text-text-muted">
                   {t('admin.budget_total')}
                 </p>
@@ -213,7 +213,7 @@ export function OverviewPage() {
           title={t('admin.needs_attention')}
           description={t('admin.needs_attention_hint')}
         >
-          <div className="flex flex-col divide-y divide-border">
+          <div className="flex flex-col divide-y divide-divider">
             <section
               className="flex items-start gap-3 pb-4"
               aria-labelledby="backup-row"

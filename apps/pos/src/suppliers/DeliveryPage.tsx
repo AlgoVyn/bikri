@@ -251,7 +251,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         subtitle={`${String(data.supplier.name)} · ${money(data.balance)}`}
       />
 
-      <section className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2">
+      <section className="grid gap-2 rounded-card border border-divider bg-surface p-3 sm:grid-cols-2">
         <label className="flex flex-col gap-1 text-small">
           {t('office.suppliers.supplier_invoice')}
           <input
@@ -273,7 +273,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         />
       </section>
 
-      <div className="flex flex-col gap-2 rounded-card border border-border bg-surface p-3">
+      <div className="flex flex-col gap-2 rounded-card border border-divider bg-surface p-3">
         <div className="flex items-center justify-between gap-2">
           <p className="text-small font-medium">
             {t('office.suppliers.lines')}
@@ -306,7 +306,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
             />
           </label>
           {matches.length > 0 ? (
-            <ul className="flex flex-col rounded-control border border-border">
+            <ul className="flex flex-col rounded-control border border-divider">
               {matches.map((p) => (
                 <li key={p.id}>
                   <button
@@ -351,7 +351,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
                 <li
                   key={line.key}
                   data-testid="delivery-line"
-                  className="rounded-card border border-border bg-surface p-3"
+                  className="rounded-card border border-divider bg-surface p-3"
                 >
                   <div className="flex items-start gap-2">
                     <div className="min-w-0 flex-1">
@@ -480,7 +480,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         </div>
       </div>
 
-      <section className="grid gap-2 rounded-card border border-border bg-surface p-3 sm:grid-cols-2">
+      <section className="grid gap-2 rounded-card border border-divider bg-surface p-3 sm:grid-cols-2">
         <MoneyInput
           label={t('office.suppliers.paid_now')}
           value={paidNow}
@@ -521,7 +521,7 @@ export function DeliveryPage({ supplierId }: { supplierId: string }) {
         </p>
       ) : null}
 
-      <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-border bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
+      <div className="fixed inset-x-0 bottom-tabbar z-20 border-t border-divider bg-surface px-4 py-2 shadow-topbar lg:bottom-0 lg:start-rail">
         <div className="mx-auto flex w-full max-w-[1152px] flex-wrap justify-end gap-2">
           <Link
             to="/suppliers/$supplierId"

@@ -364,7 +364,7 @@ function PeekContent({ target }: { target: PeekTarget }) {
           </div>
 
           {footer ? (
-            <div className="bikri-peek-footer flex shrink-0 justify-end border-t border-border p-3">
+            <div className="bikri-peek-footer flex shrink-0 justify-end border-t border-divider p-3">
               {footer}
             </div>
           ) : null}

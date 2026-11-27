@@ -240,7 +240,10 @@ export function AdjustDialog({
         {kind === 'in' && can('purchase.create') ? (
           <p className="text-small text-text-muted">
             {t('adjust.delivery_hint')}{' '}
-            <Link to="/suppliers" className="text-primary underline">
+            <Link
+              to="/suppliers"
+              className="inline-flex min-h-11 items-center text-primary underline"
+            >
               {t('adjust.record_delivery')}
             </Link>
           </p>

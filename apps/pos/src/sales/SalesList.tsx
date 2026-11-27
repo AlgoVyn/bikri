@@ -22,6 +22,7 @@ import { PrinterIcon, SalesIcon, SearchIcon } from '../components/icons.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
+import { PageActions } from '../components/PageActions.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { PageLoading } from '../components/PageLoading.tsx';
 import { SalesTabs } from '../components/SalesTabs.tsx';
@@ -585,28 +586,44 @@ function SalesListContent({
         headingLevel={detailOpen ? 'h2' : 'h1'}
         hideTitleOnPhone
         actions={
-          <div className="flex flex-wrap items-center gap-2">
-            {!readOnly && can('sale.backdate') ? (
-              <button
-                type="button"
-                className={buttonPrimary}
-                data-testid="record-past-sale"
-                onClick={() => setBackdateOpen(true)}
-              >
-                {t('office.sales.record_past')}
-              </button>
-            ) : null}
-            {can('export.data') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={!pageData || pageData.rowCount === 0}
-                onClick={() => void exportCsv()}
-              >
-                {t('office.sales.export_csv')}
-              </button>
-            ) : null}
-          </div>
+          <PageActions
+            primary={
+              !readOnly && can('sale.backdate') ? (
+                <button
+                  type="button"
+                  className={buttonPrimary}
+                  data-testid="record-past-sale"
+                  onClick={() => setBackdateOpen(true)}
+                >
+                  {t('office.sales.record_past')}
+                </button>
+              ) : undefined
+            }
+            secondary={
+              can('export.data') ? (
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  disabled={!pageData || pageData.rowCount === 0}
+                  onClick={() => void exportCsv()}
+                >
+                  {t('office.sales.export_csv')}
+                </button>
+              ) : null
+            }
+            more={
+              can('export.data')
+                ? [
+                    {
+                      label: t('office.sales.export_csv'),
+                      mobileOnly: true,
+                      disabled: !pageData || pageData.rowCount === 0,
+                      onSelect: () => void exportCsv(),
+                    },
+                  ]
+                : []
+            }
+          />
         }
       />
 
@@ -820,7 +837,7 @@ function SalesListContent({
           {pageData && pageData.rowCount > 0 ? (
             <div
               data-testid="sales-summary"
-              className={`grid gap-3 border-b border-border px-3 py-3 ${embedded ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}
+              className={`grid gap-3 border-b border-divider px-3 py-3 ${embedded ? 'grid-cols-2' : 'grid-cols-2 sm:grid-cols-4'}`}
             >
               <Metric
                 label={t('office.sales.summary_bills')}
@@ -853,7 +870,7 @@ function SalesListContent({
               actionLabel={
                 query || method || status || staffId || deviceId
                   ? t('common.clear_filters')
-                  : undefined
+                  : t('home.new_sale')
               }
               onAction={
                 query || method || status || staffId || deviceId
@@ -864,14 +881,14 @@ function SalesListContent({
                       setStaffId('');
                       setDeviceId('');
                     }
-                  : undefined
+                  : () => void navigate({ to: '/sell' })
               }
             />
           ) : null}
 
           {pageDays.map((day) => (
             <section key={day.date} className="flex flex-col gap-1">
-              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-border px-3 pt-3 pb-1">
+              <div className="flex flex-wrap items-baseline justify-between gap-2 border-b border-divider px-3 pt-3 pb-1">
                 <h2 className="text-title font-semibold">
                   {dayHeading(
                     t,
@@ -892,7 +909,7 @@ function SalesListContent({
               <ul className="flex flex-col">
                 <li
                   data-testid="sales-list-header"
-                  className={`${embedded ? SALE_GRID_EMBEDDED : SALE_GRID_FULL} hidden border-b border-border bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
+                  className={`${embedded ? SALE_GRID_EMBEDDED : SALE_GRID_FULL} hidden border-b border-divider bg-surface-2 px-2 py-2 pe-12 text-small text-text-muted sm:grid`}
                 >
                   <SortHeader
                     label={t('office.sales.col_time')}
@@ -959,7 +976,7 @@ function SalesListContent({
 
           {pageData && pageCount > 1 ? (
             <nav
-              className="flex items-center justify-between gap-2 border-t border-border p-3"
+              className="flex items-center justify-between gap-2 border-t border-divider p-3"
               aria-label={t('office.sales.pagination')}
             >
               <button
@@ -1020,7 +1037,7 @@ const SaleRow = memo(function SaleRow({
     businessDate(Number(sale.created_at), timeZone) !==
     String(sale.business_date);
   return (
-    <li className="relative border-b border-border [contain-intrinsic-size:auto_52px] [content-visibility:auto]">
+    <li className="relative border-b border-divider [contain-intrinsic-size:auto_52px] [content-visibility:auto]">
       <Link
         to="/sales/$id"
         params={{ id: sale.id }}
@@ -1036,7 +1053,7 @@ const SaleRow = memo(function SaleRow({
         </span>
         <span className="min-w-0">
           <span className="flex min-w-0 items-center gap-1">
-            <span className="truncate font-mono font-medium">
+            <span className="truncate font-sans tabular-nums font-medium">
               {String(sale.invoice_no)}
             </span>
             {late ? (
@@ -1071,7 +1088,7 @@ const SaleRow = memo(function SaleRow({
             {row.methods.map((m) => (
               <span
                 key={m}
-                className="rounded-full border border-border px-2 text-small text-text-muted"
+                className="rounded-full border border-divider px-2 text-small text-text-muted"
               >
                 {methodLabel(t, m)}
               </span>

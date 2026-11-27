@@ -76,7 +76,7 @@ export function TenantsPage() {
       />
 
       <Panel bodyClassName="p-0">
-        <div className="flex flex-wrap items-end gap-3 border-b border-border p-3">
+        <div className="flex flex-wrap items-end gap-3 border-b border-divider p-3">
           <label className={`${searchWrapperClass} min-w-56 flex-1`}>
             <SearchIcon />
             <span className="sr-only">{t('admin.search_shops')}</span>
@@ -141,7 +141,7 @@ export function TenantsPage() {
         ) : (
           <>
             {wide ? null : (
-              <ul className="flex flex-col divide-y divide-border">
+              <ul className="flex flex-col divide-y divide-divider">
                 {shown.map((tenant) => (
                   <li key={tenant.id}>
                     <a
@@ -189,7 +189,7 @@ export function TenantsPage() {
                     <caption className="sr-only">
                       {t('admin.tenants_title')}
                     </caption>
-                    <thead className="border-b border-border bg-surface-2 text-text-muted">
+                    <thead className="border-b border-divider bg-surface-2 text-text-muted">
                       <tr>
                         <th
                           scope="col"
@@ -234,7 +234,7 @@ export function TenantsPage() {
                         return (
                           <tr
                             key={tenant.id}
-                            className="border-b border-border last:border-b-0 hover:bg-surface-2/60"
+                            className="border-b border-divider last:border-b-0 hover:bg-surface-2/60"
                           >
                             <td className="px-4 py-3">
                               <a
@@ -296,7 +296,7 @@ export function TenantsPage() {
                 />
               </div>
             ) : null}
-            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-border px-4 py-3">
+            <div className="flex flex-wrap items-center justify-between gap-3 border-t border-divider px-4 py-3">
               <p className="text-small text-text-muted tabular-nums">
                 {t('admin.page_of', {
                   page: formatCount(current, lang),

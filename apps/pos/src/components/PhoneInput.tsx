@@ -60,7 +60,7 @@ export function PhoneInput({
         inputMode="tel"
         autoComplete="tel"
         dir="ltr"
-        className={`${fieldClass} font-mono tabular-nums`}
+        className={`${fieldClass} font-sans tabular-nums`}
         value={shown}
         aria-invalid={invalid || undefined}
         aria-describedby={invalid ? errorId : undefined}

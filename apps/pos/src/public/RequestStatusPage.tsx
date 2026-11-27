@@ -100,7 +100,7 @@ function RequestStatus() {
         <LanguageSelect />
       </header>
 
-      <section className="rounded-card border border-border bg-surface p-5 shadow-card">
+      <section className="rounded-card border border-divider bg-surface p-5 shadow-card">
         {state.kind === 'loading' ? (
           <p className="text-text-muted">{t('common.loading')}</p>
         ) : state.kind === 'missing' ? (

@@ -69,3 +69,9 @@
     scroll-snap-align: start;
   }
 }
+
+/* The avatar initial is decorative; generated content keeps it out of the accessible
+   name so the staff-menu button can pass label-content-name-mismatch. */
+.staff-avatar-initial::before {
+  content: attr(data-initial);
+}

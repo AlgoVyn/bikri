@@ -145,7 +145,7 @@ export function StockCountPage() {
             />
           }
         >
-          <section className="flex flex-col gap-4 rounded-card border border-border bg-surface p-4">
+          <section className="flex flex-col gap-4 rounded-card border border-divider bg-surface p-4">
             <fieldset className="flex flex-col gap-2">
               <legend className="mb-1 font-medium">{t('count.scope')}</legend>
               {(['all', 'category', 'low'] as const).map((k) => (
@@ -356,7 +356,7 @@ function VirtualCountRows({
   return (
     <ul
       ref={ref}
-      className="relative rounded-card border border-border bg-surface"
+      className="relative rounded-card border border-divider bg-surface"
       style={{ height: rows.length * rowPx }}
       aria-label={t('count.title')}
     >
@@ -428,7 +428,7 @@ const CountRow = memo(function CountRow({
   return (
     <li
       data-testid="count-row"
-      className="absolute inset-x-0 border-b border-border last:border-b-0"
+      className="absolute inset-x-0 border-b border-divider last:border-b-0"
       style={{ top: position * rowPx, height: rowPx }}
       aria-setsize={setSize}
       aria-posinset={position + 1}

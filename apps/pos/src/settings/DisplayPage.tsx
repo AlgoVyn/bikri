@@ -22,6 +22,42 @@ import { SettingsPageLayout } from './Layout.tsx';
 const field =
   'h-11 w-full rounded-control border border-border-strong bg-surface px-3 text-text';
 
+/** A 2–3 option device setting reads faster as a segmented control than a select. */
+function Segmented<T extends string>({
+  label,
+  value,
+  options,
+  onChange,
+}: {
+  label: string;
+  value: T;
+  options: readonly { value: T; label: string }[];
+  onChange: (value: T) => void;
+}) {
+  return (
+    <fieldset className="flex min-w-0 flex-col gap-1 text-small">
+      <legend>{label}</legend>
+      <div className="flex flex-wrap gap-1 rounded-control border border-border-strong bg-surface p-1">
+        {options.map((option) => (
+          <button
+            key={option.value}
+            type="button"
+            aria-pressed={value === option.value}
+            className={`min-h-11 rounded-md px-3 text-small font-medium transition-colors ${
+              value === option.value
+                ? 'bg-primary text-primary-ink'
+                : 'text-text-muted hover:bg-surface-2'
+            }`}
+            onClick={() => onChange(option.value)}
+          >
+            {option.label}
+          </button>
+        ))}
+      </div>
+    </fieldset>
+  );
+}
+
 /** Language, display, auto-lock and scanner test for this device (screens/17). */
 export function DisplayPage() {
   return (
@@ -86,87 +122,66 @@ function DisplayContent() {
       title={t('office.display.title')}
       icon={<DisplayIcon />}
     >
-      <section className="flex w-full flex-col gap-3 rounded-card border border-border bg-surface p-4">
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.display.language')}
-          <select
-            className={field}
-            value={i18n.language}
-            onChange={(event) =>
-              void setLanguage(event.target.value as 'en' | 'ur' | 'roman-ur')
-            }
-          >
-            <option value="en">{t('shell.lang_en')}</option>
-            <option value="ur">{t('shell.lang_ur')}</option>
-            <option value="roman-ur">{t('shell.lang_roman_ur')}</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.display.theme')}
-          <select
-            className={field}
-            value={form.theme}
-            onChange={(event) =>
-              change({ theme: event.target.value as DevicePrefs['theme'] })
-            }
-          >
-            <option value="system">{t('office.display.theme_system')}</option>
-            <option value="light">{t('office.display.theme_light')}</option>
-            <option value="dark">{t('office.display.theme_dark')}</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.display.text_size')}
-          <select
-            className={field}
-            value={form.textSize}
-            onChange={(event) =>
-              change({
-                textSize: event.target.value as DevicePrefs['textSize'],
-              })
-            }
-          >
-            <option value="100">100%</option>
-            <option value="115">115%</option>
-            <option value="130">130%</option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.display.cart_order')}
-          <select
-            className={field}
-            value={form.cartOrder}
-            onChange={(event) =>
-              change({
-                cartOrder: event.target.value as DevicePrefs['cartOrder'],
-              })
-            }
-          >
-            <option value="newest_first">
-              {t('office.display.cart_order_first')}
-            </option>
-            <option value="newest_last">
-              {t('office.display.cart_order_last')}
-            </option>
-          </select>
-        </label>
-        <label className="flex flex-col gap-1 text-small">
-          {t('office.display.keypad')}
-          <select
-            className={field}
-            value={form.keypad}
-            onChange={(event) =>
-              change({
-                keypad: event.target.value as DevicePrefs['keypad'],
-              })
-            }
-          >
-            <option value="phone">{t('office.display.keypad_phone')}</option>
-            <option value="computer">
-              {t('office.display.keypad_computer')}
-            </option>
-          </select>
-        </label>
+      <section className="flex w-full flex-col gap-3 rounded-card border border-divider bg-surface p-4">
+        <Segmented
+          label={t('office.display.language')}
+          value={i18n.language}
+          options={[
+            { value: 'en', label: t('shell.lang_en') },
+            { value: 'ur', label: t('shell.lang_ur') },
+            { value: 'roman-ur', label: t('shell.lang_roman_ur') },
+          ]}
+          onChange={(value) =>
+            void setLanguage(value as 'en' | 'ur' | 'roman-ur')
+          }
+        />
+        <Segmented
+          label={t('office.display.theme')}
+          value={form.theme}
+          options={[
+            { value: 'system', label: t('office.display.theme_system') },
+            { value: 'light', label: t('office.display.theme_light') },
+            { value: 'dark', label: t('office.display.theme_dark') },
+          ]}
+          onChange={(value) => change({ theme: value })}
+        />
+        <Segmented
+          label={t('office.display.text_size')}
+          value={form.textSize}
+          options={[
+            { value: '100', label: '100%' },
+            { value: '115', label: '115%' },
+            { value: '130', label: '130%' },
+          ]}
+          onChange={(value) => change({ textSize: value })}
+        />
+        <Segmented
+          label={t('office.display.cart_order')}
+          value={form.cartOrder}
+          options={[
+            {
+              value: 'newest_first',
+              label: t('office.display.cart_order_first'),
+            },
+            {
+              value: 'newest_last',
+              label: t('office.display.cart_order_last'),
+            },
+          ]}
+          onChange={(value) => change({ cartOrder: value })}
+        />
+        <Segmented
+          label={t('office.display.keypad')}
+          value={form.keypad}
+          options={[
+            { value: 'phone', label: t('office.display.keypad_phone') },
+            {
+              value: 'computer',
+              label: t('office.display.keypad_computer'),
+            },
+          ]}
+          onChange={(value) => change({ keypad: value })}
+        />
         <label className="flex min-h-11 items-center gap-2 text-small">
           <input
             type="checkbox"

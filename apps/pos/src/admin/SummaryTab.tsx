@@ -269,7 +269,7 @@ export function SummaryTab({
                 <span>{formatCount(maxWrite, lang)}</span>
                 <span>0</span>
               </div>
-              <ul className="flex h-36 flex-1 items-end gap-2 border-b border-border pb-2">
+              <ul className="flex h-36 flex-1 items-end gap-2 border-b border-divider pb-2">
                 {detail.usage.map((day) => (
                   <li
                     key={day.day}
@@ -317,7 +317,7 @@ export function SummaryTab({
             {t('admin.history_empty')}
           </p>
         ) : (
-          <ol className="flex flex-col divide-y divide-border">
+          <ol className="flex flex-col divide-y divide-divider">
             {detail.status_history.map((item) => (
               <li
                 key={`${item.at}-${item.to ?? ''}`}

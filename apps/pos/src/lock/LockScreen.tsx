@@ -357,7 +357,7 @@ export function LockScreen() {
                       aria-pressed={keypad === layout}
                       aria-label={label}
                       title={label}
-                      className={`min-h-10 min-w-12 rounded-control px-2 font-mono text-small ${keypad === layout ? 'bg-primary text-primary-ink' : 'text-text-muted hover:bg-surface-2'}`}
+                      className={`min-h-11 min-w-12 rounded-control px-2 font-mono text-small ${keypad === layout ? 'bg-primary text-primary-ink' : 'text-text-muted hover:bg-surface-2'}`}
                       onClick={() => {
                         void setKeypadLayout(db, layout);
                       }}

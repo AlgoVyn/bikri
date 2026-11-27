@@ -358,7 +358,7 @@ export function HeldBillsDialog({
         {held.map((h) => (
           <li
             key={h.id}
-            className="flex flex-col gap-2 rounded-card border border-border p-2"
+            className="flex flex-col gap-2 rounded-card border border-divider p-2"
             data-testid="held-bill"
           >
             <div className="flex flex-wrap items-baseline justify-between gap-2">

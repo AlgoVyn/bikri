@@ -85,7 +85,7 @@ function RequestShop() {
         <Brand />
         <section
           data-testid="register-success"
-          className="rounded-card border border-border bg-surface p-5 shadow-card"
+          className="rounded-card border border-divider bg-surface p-5 shadow-card"
         >
           <h1 className="text-h1 font-semibold">
             {t('register.success_title')}
@@ -100,7 +100,7 @@ function RequestShop() {
     <main className="mx-auto flex min-h-dvh w-full max-w-2xl flex-col gap-5 p-4 py-10">
       <Brand />
       <form
-        className="flex flex-col gap-4 rounded-card border border-border bg-surface p-5 shadow-card"
+        className="flex flex-col gap-4 rounded-card border border-divider bg-surface p-5 shadow-card"
         onSubmit={(event) => {
           event.preventDefault();
           void submit();
@@ -220,7 +220,7 @@ function RequestShop() {
           />
         </label>
         <p className="text-small text-text-muted">{t('register.privacy')}</p>
-        <div className="sticky bottom-0 z-10 -mx-5 border-t border-border bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
+        <div className="sticky bottom-0 z-10 -mx-5 border-t border-divider bg-surface px-5 pt-3 pb-[max(0.75rem,env(safe-area-inset-bottom))]">
           <button
             type="submit"
             data-testid="register-submit"

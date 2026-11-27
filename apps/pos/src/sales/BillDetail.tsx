@@ -405,35 +405,47 @@ export function BillDetail({
     setPendingApproval({ mode, approvedBy });
   };
 
-  const moreActions = billActions({
-    canRefund,
-    canVoid,
-    // A reissue writes a new bill, so it needs `sale.create` as well (UI-L5).
-    canCreate: can('sale.create'),
-  }).map((action) => {
-    if (action.kind === 'refund')
+  const moreActions = [
+    ...billActions({
+      canRefund,
+      canVoid,
+      // A reissue writes a new bill, so it needs `sale.create` as well (UI-L5).
+      canCreate: can('sale.create'),
+    }).map((action) => {
+      if (action.kind === 'refund')
+        return {
+          label: t('office.bill.refund'),
+          tone: 'danger' as const,
+          onSelect: () =>
+            void navigate({
+              to: '/sales/$id/refund',
+              params: { id: saleId },
+              state: (previous) => ({ ...previous, bikriChild: 'bill' }),
+            }),
+        };
+      if (action.kind === 'void')
+        return {
+          label: t('office.bill.void'),
+          tone: 'danger' as const,
+          onSelect: () => askVoid('void'),
+        };
       return {
-        label: t('office.bill.refund'),
+        label: t('office.bill.void_reissue'),
         tone: 'danger' as const,
-        onSelect: () =>
-          void navigate({
-            to: '/sales/$id/refund',
-            params: { id: saleId },
-            state: (previous) => ({ ...previous, bikriChild: 'bill' }),
-          }),
+        onSelect: () => askVoid('reissue'),
       };
-    if (action.kind === 'void')
-      return {
-        label: t('office.bill.void'),
-        tone: 'danger' as const,
-        onSelect: () => askVoid('void'),
-      };
-    return {
-      label: t('office.bill.void_reissue'),
-      tone: 'danger' as const,
-      onSelect: () => askVoid('reissue'),
-    };
-  });
+    }),
+    {
+      label: t('office.bill.share'),
+      mobileOnly: true,
+      onSelect: () => void share(),
+    },
+    {
+      label: t('office.bill.pdf'),
+      mobileOnly: true,
+      onSelect: () => void pdf(),
+    },
+  ];
   return (
     <div
       className={
@@ -455,7 +467,7 @@ export function BillDetail({
             <ChevronLeftIcon className="size-5 rtl:rotate-180" />
           </Link>
         ) : null}
-        <h1 className="me-auto font-mono text-h1 font-semibold">
+        <h1 className="me-auto font-sans tabular-nums text-h1 font-semibold">
           {String(sale.invoice_no)}
         </h1>
         <span
@@ -532,7 +544,7 @@ export function BillDetail({
             <Link
               to="/quotations/$id"
               params={{ id: linkedQuote.id }}
-              className="inline-flex items-center gap-1 font-medium underline underline-offset-2"
+              className="inline-flex min-h-11 items-center gap-1 font-medium underline underline-offset-2"
               onClick={(event) =>
                 openPeek(
                   event,
@@ -634,7 +646,7 @@ export function BillDetail({
       ) : null}
 
       <dl
-        className={`grid grid-cols-2 gap-2 rounded-card border border-border bg-surface p-3 text-small ${embedded ? '' : 'sm:grid-cols-4'}`}
+        className={`grid grid-cols-2 gap-2 rounded-card border border-divider bg-surface p-3 text-small ${embedded ? '' : 'sm:grid-cols-4'}`}
       >
         <Meta label={t('office.bill.date')} value={fullDate} />
         <Meta label={t('office.bill.cashier')} value={detail.staffName} />
@@ -672,10 +684,10 @@ export function BillDetail({
         />
       </dl>
 
-      <section className="rounded-card border border-border bg-surface">
+      <section className="rounded-card border border-divider bg-surface">
         <table className="w-full text-small">
           <thead>
-            <tr className="border-b border-border text-start text-text-muted">
+            <tr className="border-b border-divider text-start text-text-muted">
               <th className="p-2 text-start">{t('office.bill.col_name')}</th>
               <th className="p-2 text-start">{t('office.bill.col_qty')}</th>
               <th
@@ -735,7 +747,7 @@ export function BillDetail({
                 return (
                   <Fragment key={line.id}>
                     {firstOfGroup ? (
-                      <tr className="border-b border-border bg-surface-2">
+                      <tr className="border-b border-divider bg-surface-2">
                         <td colSpan={7} className="p-2">
                           <span className="flex flex-wrap items-center gap-2 font-medium">
                             <span>
@@ -765,14 +777,13 @@ export function BillDetail({
                         </td>
                       </tr>
                     ) : null}
-                    <tr className="border-b border-border last:border-0">
+                    <tr className="border-b border-divider last:border-0">
                       <td className={group ? 'p-2 ps-6' : 'p-2'}>
                         <ProductNameLink
                           id={product?.id ?? null}
                           name={String(line.name_snapshot)}
                           latin={isLatinName(String(line.name_snapshot))}
                           saleInvoice={String(sale.invoice_no)}
-                          className="block"
                         />
                         {note ? (
                           <span
@@ -895,7 +906,7 @@ export function BillDetail({
       ) : null}
 
       <div className="grid gap-3 sm:grid-cols-2">
-        <section className="rounded-card border border-border bg-surface p-3 text-small">
+        <section className="rounded-card border border-divider bg-surface p-3 text-small">
           <h2 className="mb-2 text-title font-semibold">
             {t('office.bill.totals')}
           </h2>
@@ -964,7 +975,7 @@ export function BillDetail({
           ) : null}
         </section>
 
-        <section className="rounded-card border border-border bg-surface p-3 text-small">
+        <section className="rounded-card border border-divider bg-surface p-3 text-small">
           <h2 className="mb-2 text-title font-semibold">
             {t('office.bill.payments')}
           </h2>
@@ -1035,7 +1046,7 @@ export function BillDetail({
       </div>
 
       {detail.refunds.length > 0 ? (
-        <section className="rounded-card border border-border bg-surface p-3 text-small">
+        <section className="rounded-card border border-divider bg-surface p-3 text-small">
           <h2 className="mb-2 text-title font-semibold">
             {t('office.bill.refunds')}
           </h2>
@@ -1043,7 +1054,7 @@ export function BillDetail({
             {detail.refunds.map(({ refund, lines, staffName }) => (
               <li
                 key={refund.id}
-                className="rounded-control border border-border p-2"
+                className="rounded-control border border-divider p-2"
               >
                 <div className="flex flex-wrap justify-between gap-2">
                   <span>
@@ -1197,7 +1208,8 @@ function ProductNameLink({
 }) {
   const { t } = useTranslation();
   const openPeek = useOpenPeek();
-  const classes = `data-name ${latin ? 'ltr-name' : ''} ${className}`.trim();
+  const classes =
+    `data-name inline-flex min-h-11 items-center ${latin ? 'ltr-name' : ''} ${className}`.trim();
   if (!id) return <span className={classes}>{name}</span>;
   return (
     <Link
@@ -1245,7 +1257,7 @@ function Row({
 }) {
   return (
     <div
-      className={`flex flex-wrap items-baseline justify-between gap-2 ${strong ? 'border-t border-border pt-1 font-semibold' : ''}`}
+      className={`flex flex-wrap items-baseline justify-between gap-2 ${strong ? 'border-t border-divider pt-1 font-semibold' : ''}`}
     >
       <span>{label}</span>
       <span>{value}</span>
@@ -1390,7 +1402,7 @@ function AuditDialog({
             .map((row) => (
               <li
                 key={row.id}
-                className="rounded-control border border-border p-2"
+                className="rounded-control border border-divider p-2"
               >
                 <div className="flex flex-wrap justify-between gap-2">
                   <span className="font-medium">{String(row.action)}</span>

@@ -143,7 +143,7 @@ export function DailyChart({
         ) : null}
       </div>
       {allZero ? (
-        <p className="rounded-card border border-border bg-surface p-6 text-center text-small text-text-muted">
+        <p className="rounded-card border border-divider bg-surface p-6 text-center text-small text-text-muted">
           {t('office.reports.no_data')}
         </p>
       ) : (

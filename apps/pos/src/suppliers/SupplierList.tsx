@@ -13,6 +13,7 @@ import { ListPager } from '../components/ListPager.tsx';
 import { ListSurface } from '../components/ListSurface.tsx';
 import { Metric } from '../components/Metric.tsx';
 import { MoneyText, useDisplayMoney } from '../components/MoneyText.tsx';
+import { PageActions } from '../components/PageActions.tsx';
 import { PageHeader } from '../components/PageHeader.tsx';
 import { SortDirectionButton, SortHeader } from '../components/SortHeader.tsx';
 import { searchInputClass, searchWrapperClass } from '../components/search.ts';
@@ -98,6 +99,10 @@ export function SupplierList({
     setSort(next);
     setDirection(defaultSupplierSortDirection(next));
   };
+  const exportCsv = () => {
+    if (!data) return;
+    downloadText('bikri-suppliers.csv', suppliersCsv(data.rows));
+  };
 
   useHotkey(plainKey('n'), () => setNewOpen(true), {
     enabled: can('party.edit') && !readOnly,
@@ -123,33 +128,46 @@ export function SupplierList({
         headingLevel={detailOpen ? 'h2' : 'h1'}
         hideTitleOnPhone
         actions={
-          <>
-            {can('export.data') ? (
-              <button
-                type="button"
-                className={buttonQuiet}
-                disabled={!data || data.rows.length === 0}
-                onClick={() =>
-                  data &&
-                  downloadText('bikri-suppliers.csv', suppliersCsv(data.rows))
-                }
-              >
-                {t('office.suppliers.export_csv')}
-              </button>
-            ) : null}
-            {can('party.edit') &&
-            !detailOpen &&
-            (Boolean(readOnly) || !data || data.rows.length > 0) ? (
-              <button
-                type="button"
-                className={`${buttonPrimary} gap-2 max-sm:order-first`}
-                disabled={readOnly}
-                onClick={() => setNewOpen(true)}
-              >
-                {t('office.suppliers.new_supplier')}
-              </button>
-            ) : null}
-          </>
+          <PageActions
+            primary={
+              can('party.edit') &&
+              !detailOpen &&
+              (Boolean(readOnly) || !data || data.rows.length > 0) ? (
+                <button
+                  type="button"
+                  className={`${buttonPrimary} gap-2`}
+                  disabled={readOnly}
+                  onClick={() => setNewOpen(true)}
+                >
+                  {t('office.suppliers.new_supplier')}
+                </button>
+              ) : undefined
+            }
+            secondary={
+              can('export.data') ? (
+                <button
+                  type="button"
+                  className={buttonQuiet}
+                  disabled={!data || data.rows.length === 0}
+                  onClick={exportCsv}
+                >
+                  {t('office.suppliers.export_csv')}
+                </button>
+              ) : null
+            }
+            more={
+              can('export.data')
+                ? [
+                    {
+                      label: t('office.suppliers.export_csv'),
+                      mobileOnly: true,
+                      disabled: !data || data.rows.length === 0,
+                      onSelect: exportCsv,
+                    },
+                  ]
+                : []
+            }
+          />
         }
       />
 
@@ -248,9 +266,9 @@ export function SupplierList({
 
         {data && data.rows.length > 0 ? (
           <>
-            <ul className="flex flex-col divide-y divide-border">
+            <ul className="flex flex-col divide-y divide-divider">
               <li
-                className={`${SUPPLIER_GRID} hidden border-s-2 border-b border-s-transparent border-border bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
+                className={`${SUPPLIER_GRID} hidden border-s-2 border-b border-s-transparent border-divider bg-surface-2 px-3 py-2 text-small text-text-muted sm:grid`}
                 data-testid="suppliers-list-header"
               >
                 <SortHeader

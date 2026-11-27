@@ -8,7 +8,7 @@ import {
 // Design layout invariants (docs/design-review-checklist.md). The screenshot matrix is
 // attached on demand with VISUAL=1; CI always checks the geometry.
 
-const WIDTHS = [390, 768, 1280, 1920] as const;
+const WIDTHS = [390, 768, 1024, 1280, 1920] as const;
 const ROUTES = [
   '/',
   '/sell',
@@ -39,7 +39,9 @@ test.describe('design layout invariants', () => {
     await page.waitForLoadState('domcontentloaded');
   });
 
-  test('no horizontal scroll at 390, 768, 1280 and 1920', async ({ page }) => {
+  test('no horizontal scroll at 390, 768, 1024, 1280 and 1920', async ({
+    page,
+  }) => {
     await seedVisualShop(page);
     for (const width of WIDTHS) {
       await page.setViewportSize({ width, height: width === 390 ? 844 : 800 });
@@ -92,6 +94,75 @@ test.describe('design layout invariants', () => {
       await page.waitForTimeout(250);
       await expectNoHorizontalScroll(page);
     }
+  });
+
+  test('phone nav, sales tabs and pay action keep their sizes', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedVisualShop(page);
+
+    const customers = page
+      .locator('nav a[href$="/udhaar"] .rail-label')
+      .first();
+    expect(
+      await customers.evaluate(
+        (element) => element.scrollWidth <= element.clientWidth,
+      ),
+    ).toBe(true);
+
+    await page.evaluate(() => window.__bikriTest?.navigate('/sales'));
+    await page.waitForTimeout(250);
+    const billsTab = page.getByRole('tab', { name: /Bills/ });
+    expect((await billsTab.boundingBox())?.height ?? 0).toBeGreaterThanOrEqual(
+      44,
+    );
+
+    await page.evaluate(() => window.__bikriTest?.navigate('/sell'));
+    await page.waitForTimeout(300);
+    await page.getByTestId('sell-tile').first().click();
+    await page.getByRole('button', { name: /View cart/ }).click();
+    await page.getByRole('button', { name: 'Take payment' }).click();
+    const done = page.getByTestId('pay-done');
+    const box = await done.boundingBox();
+    expect(box?.height ?? 0).toBeLessThan(70);
+    await expect(done).toContainText(/Done/);
+  });
+
+  test('the phone offline pill is visible and fits the top bar', async ({
+    page,
+    context,
+  }) => {
+    await page.setViewportSize({ width: 390, height: 844 });
+    await seedVisualShop(page);
+    await context.setOffline(true);
+    await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+    await expect(page.getByTestId('sync-pill')).toBeVisible();
+    await expectNoHorizontalScroll(page);
+    await context.setOffline(false);
+  });
+
+  test('reports keeps its presets together and uses three metric columns at 1024', async ({
+    page,
+  }) => {
+    await page.setViewportSize({ width: 1024, height: 768 });
+    await seedVisualShop(page);
+    await page.evaluate(() => window.__bikriTest?.navigate('/reports'));
+    await page.waitForTimeout(500);
+    const today = await page
+      .getByRole('button', { name: 'Today' })
+      .boundingBox();
+    const custom = await page
+      .getByRole('button', { name: 'Custom' })
+      .boundingBox();
+    expect(Math.abs((today?.y ?? 0) - (custom?.y ?? 1))).toBeLessThan(2);
+    const columns = await page.getByText('Average bill').evaluate((element) => {
+      const grid = element.parentElement?.parentElement;
+      return grid
+        ? getComputedStyle(grid).gridTemplateColumns.split(' ').length
+        : 0;
+    });
+    expect(columns).toBe(3);
   });
 
   test('every till control is at least 44 px on a phone', async ({ page }) => {
