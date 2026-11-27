@@ -317,7 +317,7 @@ test.describe('Sell (T-016)', () => {
     await expect(total).toHaveAttribute('dir', 'ltr');
     await expect(total).toHaveText('Rs 1,499');
     await expect(
-      page.getByRole('button', { name: /ادائیگی لیں/ }),
+      page.getByRole('button', { name: 'بیچیں', exact: true }),
     ).toBeVisible();
     await expectNoHorizontalScroll(page);
     await setLanguage(page, 'en');
