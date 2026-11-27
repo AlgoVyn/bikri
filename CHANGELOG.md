@@ -4,6 +4,9 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+### Sell action row — 2026-11-28
+- Rename the cart primary from **Take payment** to **Sell** (empty cart **Add items**, quote mode **Save quote**). The primary stays on the same row as Hold/Held/Clear/Save quote at every width; quiet actions scroll horizontally if space is tight. The Pay modal title and F8 command remain **Take payment** (D-312).
+
 ### Home header cleanup — 2026-11-28
 - Remove the redundant **Shop overview** eyebrow from the Home welcome header and its three locale keys; the greeting and business date now stand alone. The Home screen spec is updated.
 

@@ -1,6 +1,6 @@
 # 06 — Pay (modal)
 
-Opened by `Take payment` on Sell. Two steps like Dukaan ("Step 1 of 2: payment", "Step 2: done"), but with **split payments** (REQ-B08). Money rules: [07 §4](../07-money-rules.md#4-payments).
+Opened by the `Sell` button on Sell. Two steps like Dukaan ("Step 1 of 2: payment", "Step 2: done"), but with **split payments** (REQ-B08). Money rules: [07 §4](../07-money-rules.md#4-payments).
 
 ## Reference
 

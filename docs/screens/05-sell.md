@@ -26,7 +26,7 @@ There is no standalone action row below the product grid; held bills sit in the 
 2. Customer row: compact 40–44 px row with a 24 px avatar, "Walk-in customer" or chosen customer name + balance ("Owes you Rs 5,890"), and a `Change` text button (search customers by name/phone, `+ New customer`). Choosing a customer is optional except for udhaar.
 3. Cart lines (newest on top, configurable) are compact divider-separated rows: a 44 px summary shows the expand chevron, the name, `qty × unit price` and the line total, with a × to remove. Badges sit inline in the summary: `−Rs 200` discount, `Below cost` (red), `Not enough stock` (amber, informational). Tapping a line (or ↑/↓) opens its editor below the summary: one aligned row with `QtyInput` and a unit-price override, each at least 44×44 px at 390 px. A `More options` disclosure under that row reveals the line `Discount` (with the built-in 44 px `Rs/%` toggle), the optional note (e.g. serial no / IMEI, 0–60 chars) and the cost hint; a line with a discount or note shows the badge/note in the summary without opening it. **Only one line is expanded at a time**; the line just scanned/added opens automatically so qty and price stay one tap away, while the other lines stay compact.
 4. Totals block (exact labels, compact 13 px rows with a 20 px total): `Subtotal (n items)` = Σ gross, `Item discounts` (−, hidden if 0), an `Add discount` link (F3) when no bill discount is set, changing to a `Discount` row with its amount once set, `Sales tax 17%` (only if tax > 0 and `tax_mode = exclusive`), `Rounding` (only if ≠ 0), **`Total to pay`**; with `tax_mode = inclusive` a small muted line under the total: `Includes Sales tax 17%: Rs 1,700`. An `Add remarks` link sits next to `Add discount`; it opens a small popup for the optional whole-bill remark (0–120 chars). Once set, a muted `Remarks: …` row with `Edit` appears under the discount row; the text is saved in the cart and printed/shared as `Remark: …`. Figures from [07 §3](../07-money-rules.md#3-bill-totals).
-5. Actions row: compact `Hold` (Ctrl+H / F4), `Held bills (n)` (F6) and `Clear` (Esc, confirm if > 0 lines) buttons, a quiet `Save quote` (opens [21](21-quotations.md)), with a shorter **`Take payment`** (Enter / F8, primary) at the end of the same line; its amount stays in the totals block directly above, so the button does not repeat it. With an empty bill the same button reads **`Add items`** and focuses the search, so there is no separate `Add a product to take payment` row.
+5. Actions row: compact `Hold` (Ctrl+H / F4), `Held bills (n)` (F6) and `Clear` (Esc, confirm if > 0 lines) buttons, a quiet `Save quote` (opens [21](21-quotations.md)), with a shorter **`Sell`** (Enter / F8, primary) at the end of the same line; its amount stays in the totals block directly above, so the button does not repeat it. With an empty bill the same button reads **`Add items`** and focuses the search, so there is no separate `Add a product to take payment` row.
 
 ## Adding items
 
@@ -63,13 +63,13 @@ Cart limit: a bundle with N components uses N of the 60 lines; a bundle may have
 | Rule | UX |
 |---|---|
 | Qty > on hand (track_stock) | amber badge "Only 2 in stock" — sale allowed (REQ-C07) |
-| Line below cost (07 §3.2) | red badge "Below cost!"; Take payment requires `sale.below_cost` or override |
+| Line below cost (07 §3.2) | red badge "Below cost!"; Sell requires `sale.below_cost` or override |
 | Bundle group below cost | the group header shows "Below cost!" when the bundle total is below total component cost; the normal `sale.below_cost`/override applies. A profitable bundle must not show it (cost-weighted split + floor) |
-| Total discount > staff limit | Take payment opens override (07 §3.1) |
+| Total discount > staff limit | Sell opens override (07 §3.1) |
 | Price override below sale price | requires `catalog.edit` or override |
 | Bundle price | editable as one group total; below the shelf bundle price requires `catalog.edit` or an override. Component prices are derived by `priceBundle()` and are not editable individually |
 | Line discount > gross | capped, field shows red border with "Max Rs 500" |
-| Empty cart | The primary action reads `Add items` and focuses the search instead of opening payment; it becomes `Take payment` with the first line |
+| Empty cart | The primary action reads `Add items` and focuses the search instead of opening payment; it becomes `Sell` with the first line |
 | 60 lines in the cart | adding another line is blocked: "A bill can have 60 lines — take payment and start a second bill" (keeps one bill's sync ops ≤ 200, [03 §3](../03-sync.md#3-outbox)); a bundle with N components uses N lines |
 | Bundle component stock | amber `Only X in stock` on the bundle header, where X is the derived bundle availability; sale allowed (REQ-C07) |
 | Bundle edit while held | "This bundle changed — update or remove it" when the price/recipe changed and the till has seen the change |
@@ -84,7 +84,7 @@ Hold (Ctrl+H) moves the active cart into `held_bills` with an optional label (de
 
 ## Quotations (v1.2)
 
-`Save quote` turns the current cart into a customer price offer; the full flow is in [screens/21](21-quotations.md). It opens the Save quotation dialog (customer, valid until, note/terms) and writes a `quotations`/`quotation_lines` document, never a sale. Quote mode, opened from Quotations or when editing an existing quote, shows a banner above the cart tabs; `Save quote` is the primary action and `Take payment` is hidden. A saved quote can be converted to a normal sale from its detail page, which reopens this cart with the quoted prices. `Ctrl+S` saves the quote in quote mode.
+`Save quote` turns the current cart into a customer price offer; the full flow is in [screens/21](21-quotations.md). It opens the Save quotation dialog (customer, valid until, note/terms) and writes a `quotations`/`quotation_lines` document, never a sale. Quote mode, opened from Quotations or when editing an existing quote, shows a banner above the cart tabs; `Save quote` is the primary action and the `Sell` button is hidden. A saved quote can be converted to a normal sale from its detail page, which reopens this cart with the quoted prices. `Ctrl+S` saves the quote in quote mode.
 
 ## Recording a past sale
 
@@ -106,7 +106,7 @@ A cart opened from **Sales → Record past sale** shows a warning banner above t
 1. Scanning the same barcode 3 times gives one line with qty 3 and beeps 3 times.
 2. With 1,000 products, keystroke-to-results paint < 50 ms on the reference PC (REQ-B07; Playwright perf trace).
 3. Cart from vector T2 ([07 §3.3](../07-money-rules.md#33-totals-test-vectors)) shows: Subtotal (2 items) Rs 45,500 · Item discounts −Rs 2,000 · Discount −Rs 500 · Total to pay Rs 43,000.
-4. A line priced Rs 900 with avg cost Rs 1,000 shows "Below cost!" for a cashier, and Take payment opens the manager override.
+4. A line priced Rs 900 with avg cost Rs 1,000 shows "Below cost!" for a cashier, and Sell opens the manager override.
 5. Three carts can be filled independently; reload keeps all three.
 6. Hold, then resume on the same device restores lines, discounts and customer exactly.
 7. Selling more than stock shows the amber badge and completes the sale; stock goes negative.

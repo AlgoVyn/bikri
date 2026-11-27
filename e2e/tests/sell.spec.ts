@@ -162,7 +162,7 @@ test.describe('Sell (T-016)', () => {
     await page.getByLabel('Quantity of Galaxy A15').fill('2');
     await expect(page.getByTestId('badge-stock')).toHaveText('Only 1 in stock');
     await expect(
-      page.getByRole('button', { name: /Take payment/ }),
+      page.getByRole('button', { name: 'Sell', exact: true }),
     ).toBeEnabled();
   });
 
@@ -178,7 +178,7 @@ test.describe('Sell (T-016)', () => {
     await expect(page.getByTestId('badge-below-cost')).toHaveText(
       'Below cost!',
     );
-    await page.getByRole('button', { name: /Take payment/ }).click();
+    await page.getByRole('button', { name: 'Sell', exact: true }).click();
     const override = page.getByRole('dialog', { name: 'Manager PIN needed' });
     await expect(override).toContainText('below cost');
     await expect(override.getByLabel('Manager', { exact: true })).toHaveValue(

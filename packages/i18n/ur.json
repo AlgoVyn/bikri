@@ -888,6 +888,7 @@
     "search_placeholder": "تلاش یا اسکین — نام، بارکوڈ، SKU",
     "subtotal": "ذیلی کل ({{count}} اشیاء)",
     "subtotal_one": "ذیلی کل (1 چیز)",
+    "sell": "بیچیں",
     "take_payment": "ادائیگی لیں",
     "tax": "{{label}} {{rate}}%",
     "total_to_pay": "کل ادائیگی",
