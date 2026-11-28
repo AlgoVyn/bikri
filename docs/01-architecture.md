@@ -172,7 +172,7 @@ bikri/
 │           ├─ platform/  tenants, tenant_usage, operator console handlers
 │           ├─ routes/    health, devices, sync (push, pull, snapshot), files, shop (shop admin), admin (operator)
 │           ├─ sync/      applyOps, pull, snapshot, avgCost recompute
-│           └─ cron/      prune.ts (scheduled(): per-tenant change_log floors, applied_ops retention, tenant deletion, 03 §4.4)
+│           └─ cron/      prune.ts (scheduled(): per-tenant change_log floors, applied_tx retention, tenant deletion, 03 §4.4)
 │   └─ print-agent/       Go companion service: loopback HTTP, Windows spooler/CUPS, raw ESC/POS + driver image (14-print-agent)
 ├─ packages/
 │   ├─ core/              money.ts, totals.ts, refunds.ts, cost.ts, dayClose.ts, ledger.ts, stock.ts, schemas/ (op/table metadata)
@@ -249,7 +249,7 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
     { "binding": "BACKUPS", "bucket_name": "bikri-backups" }  // operator API only
   ],
   "vars": {
-    "APP_VERSION": "1.2.3",
+    "APP_VERSION": "1.2.4",
     "SCHEMA_VERSION": "10",
     "MIN_CLIENT_SCHEMA": "1",            // oldest till schema the push accepts (03 §4.1)
     "MAINTENANCE": "0",

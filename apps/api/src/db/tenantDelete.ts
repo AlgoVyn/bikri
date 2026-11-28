@@ -10,8 +10,8 @@
 
 /**
  * The tenant-leading key of each table deleted by the purge/tenant-delete loops. Most
- * tenant tables use `(tenant_id, id)`; `change_log` has a global `seq`, `applied_ops` an
- * `op_id`, `applied_tx` a `tx_id`, `change_log_watermarks` a `day`,
+ * tenant tables use `(tenant_id, id)`; `change_log` has a global `seq`, `applied_tx` a
+ * `tx_id`, `change_log_watermarks` a `day`,
  * `branch_device_codes` a composite `(branch_id, device_code)`, and `enrolment_codes`
  * has no tenant-leading primary key (its `code_hash` is global), so it pages on the
  * `(tenant_id, expires_at)` index.
@@ -19,7 +19,6 @@
 const DELETE_KEYS: Readonly<Record<string, readonly string[]>> = {
   change_log: ['seq'],
   change_log_watermarks: ['day'],
-  applied_ops: ['op_id'],
   applied_tx: ['tx_id'],
   branch_device_codes: ['branch_id', 'device_code'],
   enrolment_codes: ['expires_at'],

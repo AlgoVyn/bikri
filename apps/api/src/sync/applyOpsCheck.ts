@@ -272,7 +272,7 @@ export function checkOp(
   )
     throw new Reject('CONSTRAINT_FAILED');
   if (op.kind === 'insert') {
-    // A restore-recovery replay (fresh op id) or an op older than the applied_ops
+    // A restore-recovery replay (fresh op id) or an op older than the applied_tx
     // retention window targets a row D1 already has. It cannot change anything, so
     // skip the document checks that count stored companion rows; planOp marks it
     // `existingInsert` and the group-level check rejects a mixed replay.

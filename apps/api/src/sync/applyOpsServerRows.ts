@@ -38,30 +38,27 @@ export {
   writableColumns,
 } from './applyOpsShared.ts';
 
-/** A prepared insert that is skipped when this transaction or op was already applied. */
+/** A prepared insert that is skipped when this transaction was already applied. */
 function guardedInsert(
   ctx: ApplyContext,
   table: TenantTable,
   row: Record<string, unknown>,
-  opId: string,
   txId: string,
 ): D1PreparedStatement {
-  const [sql, params] = insertIfNotAppliedSql(table, row as Row, opId, txId);
+  const [sql, params] = insertIfNotAppliedSql(table, row as Row, txId);
   return ctx.db.prepare(sql, ...params);
 }
 
-/** Appends the transaction/legacy-op guard to an UPDATE; `params` are already bound. */
+/** Appends the transaction guard to an UPDATE; `params` are already bound. */
 function guardedUpdate(
   ctx: ApplyContext,
   sql: string,
   params: (string | number | null)[],
-  opId: string,
   txId: string,
 ): D1PreparedStatement {
   return ctx.db.prepare(
-    `${sql} AND NOT EXISTS (SELECT 1 FROM applied_tx WHERE tenant_id = ?1 AND tx_id = ?${params.length + 3} AND result = 'applied') AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?${params.length + 2})`,
+    `${sql} AND ${notAppliedSql('?1', `?${params.length + 2}`)}`,
     ...params,
-    opId,
     txId,
   );
 }
@@ -73,7 +70,6 @@ export function sideEffects(
   row: Record<string, unknown>,
   avg: CostMap,
   group: PushOp[],
-  opId: string,
   txId: string,
 ): D1PreparedStatement[] {
   const { db, now } = ctx;
@@ -95,7 +91,6 @@ export function sideEffects(
          ELSE 'paid' END
        WHERE tenant_id = ?1 AND id = ?2`,
       [saleId],
-      opId,
       txId,
     ),
     changeLog(db, 'sales', saleId, 'upsert', null, now, true),
@@ -110,12 +105,11 @@ export function sideEffects(
     const conflictId = newId(now);
     out.push(
       db.prepare(
-        `INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) SELECT ?1, ?2, '', 'refunds', ?3, 'refund_after_void', json_object('sale_id', ?4, 'row_ids', json_array(?3), 'excess_milli', 0), 'needs_owner', ?5 WHERE EXISTS (SELECT 1 FROM sale_voids WHERE tenant_id = ?1 AND sale_id = ?4) AND ${notAppliedSql('?1', '?7', '?6')}`,
+        `INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) SELECT ?1, ?2, '', 'refunds', ?3, 'refund_after_void', json_object('sale_id', ?4, 'row_ids', json_array(?3), 'excess_milli', 0), 'needs_owner', ?5 WHERE EXISTS (SELECT 1 FROM sale_voids WHERE tenant_id = ?1 AND sale_id = ?4) AND ${notAppliedSql('?1', '?6')}`,
         conflictId,
         String(row.id),
         String(row.sale_id),
         now,
-        opId,
         txId,
       ),
     );
@@ -127,12 +121,11 @@ export function sideEffects(
     const conflictId = newId(now);
     out.push(
       db.prepare(
-        `INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) SELECT ?1, ?2, '', 'sale_voids', ?3, 'refund_after_void', json_object('sale_id', ?4, 'row_ids', json_array(?3), 'excess_milli', 0), 'needs_owner', ?5 WHERE EXISTS (SELECT 1 FROM refunds WHERE tenant_id = ?1 AND sale_id = ?4) AND ${notAppliedSql('?1', '?7', '?6')}`,
+        `INSERT INTO sync_conflicts (tenant_id, id, op_id, tbl, row_id, kind, fields_json, resolution, at) SELECT ?1, ?2, '', 'sale_voids', ?3, 'refund_after_void', json_object('sale_id', ?4, 'row_ids', json_array(?3), 'excess_milli', 0), 'needs_owner', ?5 WHERE EXISTS (SELECT 1 FROM refunds WHERE tenant_id = ?1 AND sale_id = ?4) AND ${notAppliedSql('?1', '?6')}`,
         conflictId,
         String(row.id),
         String(row.sale_id),
         now,
-        opId,
         txId,
       ),
     );
@@ -149,13 +142,12 @@ export function sideEffects(
            'needs_owner', ?6
          FROM sales s WHERE s.tenant_id = ?1 AND s.id = ?4
            AND ?5 > (s.paid_total - COALESCE((SELECT SUM(r2.amount) FROM refunds r2 WHERE r2.tenant_id = ?1 AND r2.sale_id = ?4 AND r2.id <> ?3), 0))
-           AND ${notAppliedSql('?1', '?8', '?7')}`,
+           AND ${notAppliedSql('?1', '?7')}`,
         conflictId,
         String(row.id),
         String(row.sale_id),
         Number(row.amount ?? 0),
         now,
-        opId,
         txId,
       ),
     );
@@ -173,12 +165,11 @@ export function sideEffects(
            'needs_owner', ?5
          FROM sale_lines sl WHERE sl.tenant_id = ?1 AND sl.id = ?4
            AND (SELECT SUM(rl2.qty_milli) FROM refund_lines rl2 WHERE rl2.tenant_id = ?1 AND rl2.sale_line_id = ?4) > sl.qty_milli
-           AND ${notAppliedSql('?1', '?7', '?6')}`,
+           AND ${notAppliedSql('?1', '?6')}`,
         conflictId,
         String(row.id),
         String(row.sale_line_id),
         now,
-        opId,
         txId,
       ),
     );
@@ -212,12 +203,11 @@ export function sideEffects(
            'needs_owner', ?5
          FROM purchase_lines pl WHERE pl.tenant_id = ?1 AND pl.id = ?4
            AND (SELECT SUM(r2.qty_milli) FROM supplier_return_lines r2 WHERE r2.tenant_id = ?1 AND r2.purchase_line_id = ?4) > pl.qty_milli
-           AND ${notAppliedSql('?1', '?7', '?6')}`,
+           AND ${notAppliedSql('?1', '?6')}`,
         conflictId,
         String(row.id),
         row.purchase_line_id,
         now,
-        opId,
         txId,
       ),
     );
@@ -263,7 +253,6 @@ export function sideEffects(
               ? 'UPDATE products SET avg_cost = ?2, last_cost = ?4 WHERE tenant_id = ?1 AND id = ?3 AND (avg_cost <> ?2 OR last_cost <> ?4)'
               : 'UPDATE products SET avg_cost = ?2, last_cost = ?4, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?3 AND (avg_cost <> ?2 OR last_cost <> ?4)',
             [state.avg_cost, String(row.product_id), Number(row.unit_cost)],
-            opId,
             txId,
           ),
         );
@@ -294,7 +283,6 @@ export function moneyAuditStatements(
   group: PushOp[],
   tbl: string,
   row: Record<string, unknown>,
-  opId: string,
   txId: string,
 ): D1PreparedStatement[] {
   const n = (value: unknown): number => Number(value ?? 0);
@@ -423,7 +411,7 @@ export function moneyAuditStatements(
     created_at: n(row.created_at),
   };
   return [
-    guardedInsert(ctx, 'audit_log', auditRow, opId, txId),
+    guardedInsert(ctx, 'audit_log', auditRow, txId),
     changeLog(
       ctx.db,
       'audit_log',
@@ -448,7 +436,6 @@ export function stockRepairStatements(
   tbl: string,
   row: Record<string, unknown>,
   avg: CostMap,
-  opId: string,
   txId: string,
 ): D1PreparedStatement[] {
   const out: D1PreparedStatement[] = [];
@@ -496,7 +483,7 @@ export function stockRepairStatements(
       created_at: createdAt,
     };
     out.push(
-      guardedInsert(ctx, 'stock_movements', movement, opId, txId),
+      guardedInsert(ctx, 'stock_movements', movement, txId),
       changeLog(
         ctx.db,
         'stock_movements',
@@ -514,15 +501,7 @@ export function stockRepairStatements(
       Number.isSafeInteger(unitCost)
     )
       out.push(
-        ...sideEffects(
-          ctx,
-          'stock_movements',
-          movement,
-          avg,
-          group,
-          opId,
-          txId,
-        ),
+        ...sideEffects(ctx, 'stock_movements', movement, avg, group, txId),
       );
     else {
       // A non-costed repair still moves stock. Later costed movements in the same push

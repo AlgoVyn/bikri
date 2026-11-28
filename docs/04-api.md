@@ -63,7 +63,7 @@ Every device-authenticated endpoint acts on **the caller's tenant only** (from t
 - **Auth header (device):** `Authorization: Bearer <device_token>` where the token is 43 base64url chars (32 random bytes).
 - **Auth (shop admin):** device token of an admin device plus `X-Bikri-Staff: <owner staff id>` ([05 §3](05-auth-and-roles.md#3-shop-admin-on-admin-devices)) plus `X-Bikri-Owner-Session: <token>` from the owner email sign-in ([05 §3.2](05-auth-and-roles.md#32-owner-email-sign-in-d-082)), except where the table above says otherwise.
 - **Auth (operator):** Cloudflare Access adds `Cf-Access-Jwt-Assertion`; the Worker verifies it ([05 §3.1](05-auth-and-roles.md#31-platform-operator-via-cloudflare-access)).
-- **Version headers:** the till sends `X-Bikri-App: 1.2.3` and `X-Bikri-Schema: 10` on every request.
+- **Version headers:** the till sends `X-Bikri-App: 1.2.4` and `X-Bikri-Schema: 10` on every request.
 - **Times** are epoch ms. **Money** is paisa integers.
 - **Error shape** (all non-2xx):
 
@@ -110,13 +110,13 @@ Per-op errors inside a push response use `error_code`: `CONSTRAINT_FAILED`, `UNI
 
 ### 3.1 `GET /api/health`
 ```json
-200 { "ok": true, "app_version": "1.2.3", "schema_version": 10, "min_client_schema": 1, "db": "ok", "time": 1793050000000 }
+200 { "ok": true, "app_version": "1.2.4", "schema_version": 10, "min_client_schema": 1, "db": "ok", "time": 1793050000000 }
 ```
 
 ### 3.2 `POST /api/devices/enrol`
 Request:
 ```json
-{ "code": "K7Q2-M9XD", "user_agent": "Mozilla/5.0 ...", "app_version": "1.2.3", "device_name": "Counter 2" }
+{ "code": "K7Q2-M9XD", "user_agent": "Mozilla/5.0 ...", "app_version": "1.2.4", "device_name": "Counter 2" }
 ```
 `device_name` is optional (≤ 40); without it the device gets the name on the code (D-107). The response also carries `tenant_status`, `support` and `poll_after_ms` (D-105).
 

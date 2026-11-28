@@ -319,7 +319,7 @@ export type OutboxEntry = {
    * left by a reload, a closed tab or a stopped engine, and later ops must not overtake it. */
   sending_at?: number;
   /** When this op was first sent to the server. Such an op is never coalesced: its old op id
-   * may already be in `applied_ops`, so only a fresh op id can safely carry a newer edit. */
+   * may already be in `applied_tx`, so only a fresh op id can safely carry a newer edit. */
   sent_at?: number;
   /** Token of the tab/claim that owns this sending row; a late response must match it. */
   claim_token?: string;

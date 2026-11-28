@@ -159,7 +159,7 @@ async function pushAllUnlocked(
   // is not just a delay: pending ops behind them would be sent without their
   // prerequisites (a product before its owner staff row is a real example), so the server
   // would reject them. A second push of the same op is safe: the server answers from
-  // `applied_ops`, and this tab then settles the row itself.
+  // `applied_tx`, and this tab then settles the row itself.
   // Two indexed counts keep an idle poll out of a readwrite transaction: with nothing
   // pending or sending there is nothing to reclaim and nothing to send.
   const [pendingCount, sendingCount] = await Promise.all([
@@ -529,7 +529,7 @@ export async function retryFailed(db: BikriDb, seqs: number[]): Promise<void> {
     await db.outbox.bulkPut(
       entries.map((entry) => ({
         ...entry,
-        // The server caches rejected op ids in applied_ops; a new id makes Retry meaningful.
+        // The server caches rejected transaction results in applied_tx; a new id makes Retry meaningful.
         op_id: newId(),
         status: 'pending' as const,
         attempts: 0,

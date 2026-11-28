@@ -1079,7 +1079,7 @@ function main() {
       pending_ops: 0,
       oldest_pending_at: null,
       user_agent: 'perf-seed',
-      app_version: '1.2.3',
+      app_version: '1.2.4',
       created_at: start,
       updated_at: now - 3_600_000,
       device_code_history: '',
