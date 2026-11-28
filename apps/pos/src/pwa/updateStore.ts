@@ -26,6 +26,11 @@ export function setUpdateReady(ready: boolean, apply?: ApplyUpdate): void {
   }
 }
 
+/** Stores the apply function as soon as the worker is registered, before an update waits. */
+export function setApplyUpdate(apply: ApplyUpdate): void {
+  snapshot = { ...snapshot, applyUpdate: apply };
+}
+
 export function subscribeUpdate(listener: () => void): () => void {
   listeners.add(listener);
   return () => {

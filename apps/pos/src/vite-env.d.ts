@@ -7,4 +7,9 @@ interface ImportMetaEnv {
   readonly VITE_LOCAL_TENANT?: string;
 }
 
+declare global {
+  /** Short commit SHA injected by Vite, or `dev` for a local build. */
+  const __BUILD_ID__: string;
+}
+
 export {};

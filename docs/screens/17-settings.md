@@ -111,7 +111,7 @@ Audit log viewer: filters action, staff, device, date; rows show time, staff, ac
 
 ## About
 
-Version, build hash, check for update, a "Terms of use" card ([09 §6.1](../09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)) and a separate "Privacy" card with the no-analytics/no-tracking note.
+Version and build hash, **Check for updates** with truthful states (checking, latest, update ready, offline, no registration, error), a **Restart to update** action when a new worker is waiting, a "Terms of use" card ([09 §6.1](../09-backups-and-ops.md#61-terms-and-privacy-notes-for-shop-owners)) and a separate "Privacy" card with the no-analytics/no-tracking note. The check waits for the new service worker to install; **Restart to update** is disabled while any cart has lines, so a sale cannot be lost. The same waiting state feeds the rail/phone Update pill.
 
 ## Acceptance criteria
 
@@ -128,3 +128,4 @@ Version, build hash, check for update, a "Terms of use" card ([09 §6.1](../09-b
 11. Device actions and `Download from server` need a fresh email code after Lock; a manager or a non-admin device never sees them.
 12. In a read-only shop, every section still shows its data; only local device settings (printer, scanner, display, language) can be changed.
 13. Unchecking **Show logo on receipts** hides the logo from the preview and from printed receipts while keeping it uploaded; rechecking restores it without a new upload.
+14. About shows the running version and build hash; **Check for updates** reports latest, offline or ready; when a new worker is waiting, **Restart to update** applies it and the reloaded app shows the new build; with a non-empty cart the restart is disabled with "Finish the current sale before restarting."
