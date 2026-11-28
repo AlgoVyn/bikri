@@ -142,7 +142,7 @@ Setup (`apps/api/test/helpers/fixtures.ts`): two tenants **A** and **B** from `s
 | I2 | B pushes an upsert of a product whose id exists in A | B's row created/updated; A's row byte-identical afterwards |
 | I3 | B pushes ledger rows referencing A-only ids (customer, sale, product, branch, staff, supplier, purchase line) | `rejected` / `FOREIGN_KEY` for each; nothing written |
 | I4 | B pushes rows with `tenant_id: "<A>"` inside `row` | key ignored; rows land in B |
-| I5 | Same `op_id` used by A and B | both applied (applied_tx keyed by tenant) |
+| I5 | Same `op_id` used by A and B | both applied (receipts are tenant-scoped) |
 | I6 | Same SKU / barcode / bill prefix / `INV-A-1` in A and B | all accepted; uniqueness still enforced inside each tenant |
 | I7 | Files: B GETs A's relative key `products/<A id>/<sha>.webp` | `404` (B's prefix only); upload by B lands under `t/<B>/` |
 | I8 | B's admin device: list/revoke/rename A's device id, import ops of A's revoked device, acknowledge A's conflict, cancel A's enrolment code | `404 NOT_FOUND` each; A unchanged |
