@@ -20,6 +20,7 @@ export const PLATFORM_TABLES = [
 export const TENANT_TABLES = [
   'change_log',
   'applied_ops',
+  'applied_tx',
   'sync_conflicts',
   'devices',
   'branch_device_codes',
@@ -332,20 +333,24 @@ export function insertSql(table: TenantTable, row: Row): [string, SqlValue[]] {
 }
 
 /**
- * INSERT that is skipped when `op_id` is already in `applied_ops`. Server-authored
- * side effects (stock movements, audit rows, conflict rows) use this so a retried
- * push that races the first request cannot write them twice.
+ * INSERT that is skipped when the transaction or op has already been applied.
+ * Server-authored side effects (stock movements, audit rows, conflict rows) use this so
+ * a retried push that races the first request cannot write them twice. The legacy
+ * `applied_ops` check stays until its 90-day receipts age out (D-315).
  */
 export function insertIfNotAppliedSql(
   table: TenantTable,
   row: Row,
   opId: string,
+  txId: string,
 ): [string, SqlValue[]] {
   assertTable(table);
   const cols = columnsOf(row);
   const placeholders = cols.map((_, i) => `?${i + 2}`);
-  const sql = `INSERT INTO ${table} (tenant_id${cols.map((c) => `, ${c}`).join('')}) SELECT ?1${placeholders.map((p) => `, ${p}`).join('')} WHERE NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?${cols.length + 2})`;
-  return [sql, [...cols.map((c) => row[c] ?? null), opId]];
+  const txParam = cols.length + 2;
+  const opParam = cols.length + 3;
+  const sql = `INSERT INTO ${table} (tenant_id${cols.map((c) => `, ${c}`).join('')}) SELECT ?1${placeholders.map((p) => `, ${p}`).join('')} WHERE NOT EXISTS (SELECT 1 FROM applied_tx WHERE tenant_id = ?1 AND tx_id = ?${txParam} AND result = 'applied') AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?${opParam})`;
+  return [sql, [...cols.map((c) => row[c] ?? null), txId, opId]];
 }
 
 /** Upsert keyed by `(tenant_id, id)`: insert, or overwrite every given column. */

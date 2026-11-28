@@ -705,6 +705,14 @@ export const TABLE_COLUMNS = {
     'rev',
     'updated_by',
   ],
+  applied_tx: [
+    'tenant_id',
+    'tx_id',
+    'device_id',
+    'applied_at',
+    'result',
+    'results_json',
+  ],
 } as const satisfies Record<string, readonly string[]>;
 
 export type D1Table = keyof typeof TABLE_COLUMNS;

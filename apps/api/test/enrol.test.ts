@@ -28,7 +28,7 @@ type EnrolResponse = {
 const enrolBody = (code: string) => ({
   code,
   user_agent: 'test',
-  app_version: '1.2.2',
+  app_version: '1.2.3',
 });
 
 beforeEach(() => resetEnrolLimit());

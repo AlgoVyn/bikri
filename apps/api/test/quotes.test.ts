@@ -295,6 +295,7 @@ describe('quotations (D-305)', () => {
       op('quotation_lines', 'upsert', base.line, { tx_id: tx, base_rev: 0 }),
       op('quotation_lines', 'upsert', line2, { tx_id: tx, base_rev: 0 }),
     ]);
+    const editTx = newId();
     const after = await pushOk(shop.till, [
       op(
         'quotations',
@@ -308,7 +309,7 @@ describe('quotations (D-305)', () => {
           total: 150000,
         },
         {
-          tx_id: tx,
+          tx_id: editTx,
           base_rev: 1,
           changed_fields: [
             'line_count',
@@ -323,7 +324,7 @@ describe('quotations (D-305)', () => {
         'quotation_lines',
         'delete',
         { id: line2.id },
-        { tx_id: tx, base_rev: 1 },
+        { tx_id: editTx, base_rev: 1 },
       ),
     ]);
     expect(after.results.map((row) => row.result)).toEqual([

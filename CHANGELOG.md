@@ -4,6 +4,11 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+## [1.2.3] — 2026-11-28
+
+### Sync write amplification
+- Migration `0040` adds `applied_tx`: one idempotency receipt per outbox transaction with the per-op results, replacing one `applied_ops` row per op for new pushes. The legacy table stays read-only for 90 days, so pre-deploy replays keep working; a rejected receipt still allows a Retry with fresh op ids. The 3-line reference bill drops from 84 to ~60 `rows_written`, with no client wire change or schema-version bump (D-315).
+
 ## [1.2.2] — 2026-11-28
 
 ### Shell

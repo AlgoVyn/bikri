@@ -2948,7 +2948,7 @@ describe('API-L3: a replayed create-then-delete logs one delete', () => {
           // before the delete op's own UPDATE runs.
           const racedStatements = [...statements];
           racedStatements.splice(
-            4,
+            3,
             0,
             env.DB.prepare(
               'UPDATE products SET deleted_at = 777 WHERE tenant_id = ?1 AND id = ?2',

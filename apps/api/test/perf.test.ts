@@ -172,6 +172,13 @@ const HOT_QUERIES: Array<{
     noTempBTree: true,
   },
   {
+    name: 'already applied tx',
+    sql: 'SELECT tx_id, result, results_json FROM applied_tx WHERE tenant_id = ?1 AND tx_id IN (?)',
+    args: ['t', 'tx'],
+    index: 'sqlite_autoindex_applied_tx_1',
+    noTempBTree: true,
+  },
+  {
     name: 'latest change seq',
     sql: 'SELECT MAX(seq) AS seq FROM change_log WHERE tenant_id = ?1',
     args: ['t'],
@@ -496,6 +503,12 @@ describe('T-062 performance', () => {
         tenantEquality: '(tenant_id=? AND op_id=?)',
       },
       {
+        tbl: 'applied_tx',
+        where: '1 = 1',
+        index: 'sqlite_autoindex_applied_tx_1',
+        tenantEquality: '(tenant_id=? AND tx_id=?)',
+      },
+      {
         tbl: 'change_log_watermarks',
         where: '1 = 1',
         index: 'sqlite_autoindex_change_log_watermarks_1',
@@ -558,12 +571,11 @@ describe('T-062 performance', () => {
         .first<{ rows_written: number }>();
       // 150 reference bills incl. indexes and change_log must fit daily_write_budget (D-076).
       expect(usage, shop.slug).toBeDefined();
-      // T-062 measured ~127 rows/bill including the D-225 stock-cache trigger.
-      // D-231 dropped 16 indexes no server query uses and added 4 hot-path ones;
-      // the reference bill is now ~97 rows. The default budget is 19,500, so a
-      // regression above 130 rows/bill must fail here.
-      expect(Number(usage?.rows_written ?? 0)).toBeGreaterThan(12_000);
-      expect(Number(usage?.rows_written ?? 0)).toBeLessThanOrEqual(19_500);
+      // The reference bill is 60 rows after the per-tx receipt (D-315): 150 bills
+      // is 9,000. The default budget is 19,500; a regression above 80 rows/bill
+      // must fail here.
+      expect(Number(usage?.rows_written ?? 0)).toBeGreaterThan(8_000);
+      expect(Number(usage?.rows_written ?? 0)).toBeLessThanOrEqual(12_000);
     }
   }, 60_000);
 

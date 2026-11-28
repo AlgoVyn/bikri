@@ -139,6 +139,16 @@ function validRows(t: TenantFixture): ReadonlyArray<readonly [string, Row]> {
       { op_id: 'op1', device_id: 'dev1', applied_at: T, result: 'applied' },
     ],
     [
+      'applied_tx',
+      {
+        tx_id: 'tx1',
+        device_id: 'dev1',
+        applied_at: T,
+        result: 'applied',
+        results_json: '[]',
+      },
+    ],
+    [
       'sync_conflicts',
       {
         id: 'sc1',
@@ -644,6 +654,10 @@ describe('D1 migrations (T-008, multi-tenant)', () => {
       );
       await expectRejected(
         insert('applied_ops', validFor(A, 'applied_ops')),
+        /UNIQUE constraint failed/,
+      );
+      await expectRejected(
+        insert('applied_tx', validFor(A, 'applied_tx')),
         /UNIQUE constraint failed/,
       );
     });

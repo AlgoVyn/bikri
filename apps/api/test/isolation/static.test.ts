@@ -100,6 +100,7 @@ describe('I19 static check', () => {
       /^DELETE FROM enrolment_codes WHERE expires_at < \?1$/u,
       /^DELETE FROM owner_email_codes WHERE expires_at < \?1$/u,
       /^DELETE FROM applied_ops WHERE rowid IN \(SELECT rowid FROM applied_ops WHERE applied_at < \?1 LIMIT \?2\)$/u,
+      /^DELETE FROM applied_tx WHERE rowid IN \(SELECT rowid FROM applied_tx WHERE applied_at < \?1 LIMIT \?2\)$/u,
     ];
     const tenantRef = new RegExp(
       `\\b(?:FROM|JOIN|INTO|UPDATE)\\s+\\(?\\s*"?(?:${TENANT_TABLES.join('|')})"?\\b`,

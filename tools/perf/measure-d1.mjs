@@ -243,16 +243,10 @@ function writeBill(db, tenant, bill, products, customer, day) {
       `d-${tenant}`,
       day,
     );
-    db.prepare(
-      'INSERT INTO applied_ops (tenant_id, op_id, device_id, applied_at, result, error_code) VALUES (?, ?, ?, ?, ?, NULL)',
-    ).run(
-      tenant,
-      `op-${tenant}-${bill}-${table}-${row.id}`,
-      `d-${tenant}`,
-      day,
-      'applied',
-    );
   }
+  db.prepare(
+    'INSERT INTO applied_tx (tenant_id, tx_id, device_id, applied_at, result, results_json) VALUES (?, ?, ?, ?, ?, ?)',
+  ).run(tenant, `tx-${tenant}-${bill}`, `d-${tenant}`, day, 'applied', '[]');
 }
 
 export function measure({ bills = 20_000, days = 120 } = {}) {
@@ -304,15 +298,15 @@ export function measure({ bills = 20_000, days = 120 } = {}) {
       }
     }
     db.exec('COMMIT');
-    // Same retention as the nightly prune: change_log 30 days, applied_ops 90.
+    // Same retention as the nightly prune: change_log 30 days, applied_tx 90.
     db.prepare('DELETE FROM change_log WHERE at < ?').run(NOW - 30 * DAY);
-    db.prepare('DELETE FROM applied_ops WHERE applied_at < ?').run(
+    db.prepare('DELETE FROM applied_tx WHERE applied_at < ?').run(
       NOW - 90 * DAY,
     );
     db.exec('VACUUM');
     const retainedFinal = bytes(db);
     // Separate the unbounded ledger tables from the retention-limited sync tables.
-    db.exec('DELETE FROM change_log; DELETE FROM applied_ops; VACUUM');
+    db.exec('DELETE FROM change_log; DELETE FROM applied_tx; VACUUM');
     const unboundedFinal = bytes(db);
     const baselinePerShop = baseline / tenants.length;
     const unboundedPerShop = (unboundedFinal - baseline) / tenants.length;
@@ -336,7 +330,7 @@ export function measure({ bills = 20_000, days = 120 } = {}) {
       bytesPerBill: Math.round(bytesPerBill),
       bytesPerShopYear: Math.round(bytesPerShopYear),
       bytesPerShopDay: Math.round(bytesPerShopYear / 365),
-      logicalRowsPerBill: 27,
+      logicalRowsPerBill: 19,
     };
   } finally {
     db.close();

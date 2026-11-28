@@ -527,22 +527,37 @@ export function changeLog(
   );
 }
 
-export function appliedOp(
+/** The guard shared by every write: this transaction or this legacy op is not applied yet. */
+export function notAppliedSql(tenant: string, tx: string, op: string): string {
+  return `NOT EXISTS (SELECT 1 FROM applied_tx WHERE tenant_id = ${tenant} AND tx_id = ${tx} AND result = 'applied') AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ${tenant} AND op_id = ${op})`;
+}
+
+/**
+ * One idempotency receipt per outbox transaction (D-315). `results` is the per-op push
+ * answer stored as JSON so a lost response can return exactly the same results.
+ */
+export function appliedTx(
   db: TenantDb,
-  op: PushOp,
+  txId: string,
   deviceId: string,
   now: number,
-  result: OpResult['result'],
-  errorCode: string | null,
-  onlyIfChanged: boolean,
+  result: 'applied' | 'rejected',
+  results: OpResult[],
 ): D1PreparedStatement {
   return db.prepare(
-    `INSERT INTO applied_ops (tenant_id, op_id, device_id, applied_at, result, error_code) SELECT ?1, ?2, ?3, ?4, ?5, ?6${onlyIfChanged ? ' WHERE changes() = 1' : ''} ON CONFLICT (tenant_id, op_id) DO NOTHING`,
-    op.op_id,
+    `INSERT INTO applied_tx (tenant_id, tx_id, device_id, applied_at, result, results_json)
+     VALUES (?1, ?2, ?3, ?4, ?5, ?6)
+     ON CONFLICT (tenant_id, tx_id) DO UPDATE SET
+       device_id = excluded.device_id,
+       applied_at = excluded.applied_at,
+       result = excluded.result,
+       results_json = excluded.results_json
+     WHERE applied_tx.result = 'rejected'`,
+    txId,
     deviceId,
     now,
     result,
-    errorCode,
+    JSON.stringify(results),
   );
 }
 

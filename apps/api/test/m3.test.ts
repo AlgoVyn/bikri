@@ -376,7 +376,7 @@ describe('M3 server rules', () => {
       result: 'applied',
       server_rev: 2,
     });
-    // The old op is still in applied_ops; a replay must report the *current* row revision
+    // The old op is still in applied_tx; a replay must report the *current* row revision
     // so a till that never saw the first answer can adopt it instead of keeping rev 0.
     const stale = await pushOk(shop.till, [create]);
     expect(stale.results[0]).toMatchObject({

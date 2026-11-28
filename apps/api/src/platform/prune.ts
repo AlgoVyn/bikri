@@ -14,8 +14,8 @@ const LOG_CHUNK = 5_000;
 const LOG_MAX_PER_RUN = 50_000;
 const DELETE_CHUNK = 2_000;
 const DELETE_MAX_PER_RUN = 20_000;
-/** At 10 reference shops ~13,500 applied_ops age out per day; the old 5,000 could never keep 90 days. */
-const APPLIED_OPS_MAX_PER_RUN = 20_000;
+/** 90-day retention, capped per table per run; applied_tx is one row per document. */
+const APPLIED_MAX_PER_RUN = 20_000;
 /** Stay below the Free plan's 100k daily rows-written cap, leaving headroom for shops. */
 const ACCOUNT_WRITE_BUDGET = 90_000;
 const APPLIED_OPS_CHUNK = 5_000;
@@ -33,6 +33,7 @@ export const DELETE_ORDER = [
   'owner_email_codes',
   'enrolment_codes',
   'applied_ops',
+  'applied_tx',
   'sync_conflicts',
   'change_log',
   'change_log_watermarks',
@@ -46,6 +47,7 @@ export type PruneReport = {
   rows_written: number;
   change_log: Record<string, number>;
   applied_ops: number;
+  applied_tx: number;
   deleted_rows: Record<string, number>;
   deleted_tenants: string[];
   support_ended: string[];
@@ -101,6 +103,7 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     rows_written: 0,
     change_log: {},
     applied_ops: 0,
+    applied_tx: 0,
     deleted_rows: {},
     deleted_tenants: [],
     support_ended: [],
@@ -307,28 +310,33 @@ export async function pruneAll(env: Env, now: number): Promise<PruneReport> {
     );
   }
 
-  // 3–4. applied_ops (90 days), expired codes, old usage rows.
+  // 3–4. applied_tx/applied_ops (90 days), expired codes, old usage rows.
   const cleanupLimit = calls.used + CLEANUP_PHASE_CALLS;
-  if (calls.used < cleanupLimit && calls.hasWrites(3)) {
-    let appliedLeft = APPLIED_OPS_MAX_PER_RUN;
-    while (appliedLeft > 0 && calls.used < cleanupLimit && calls.hasWrites(3)) {
+  if (calls.used < cleanupLimit && calls.hasWrites(6)) {
+    let appliedLeft = APPLIED_MAX_PER_RUN;
+    while (appliedLeft > 0 && calls.used < cleanupLimit && calls.hasWrites(6)) {
       const limit = Math.min(
         APPLIED_OPS_CHUNK,
         appliedLeft,
-        Math.floor(calls.writesLeft() / 3),
+        Math.floor(calls.writesLeft() / 6),
       );
       if (limit <= 0) break;
       const res = await calls.run(() =>
-        DB.prepare(
-          'DELETE FROM applied_ops WHERE rowid IN (SELECT rowid FROM applied_ops WHERE applied_at < ?1 LIMIT ?2)',
-        )
-          .bind(now - 90 * DAY, limit)
-          .run(),
+        DB.batch([
+          DB.prepare(
+            'DELETE FROM applied_tx WHERE rowid IN (SELECT rowid FROM applied_tx WHERE applied_at < ?1 LIMIT ?2)',
+          ).bind(now - 90 * DAY, limit),
+          DB.prepare(
+            'DELETE FROM applied_ops WHERE rowid IN (SELECT rowid FROM applied_ops WHERE applied_at < ?1 LIMIT ?2)',
+          ).bind(now - 90 * DAY, limit),
+        ]),
       );
-      const n = res.meta.changes ?? 0;
-      report.applied_ops += n;
-      appliedLeft -= n;
-      if (n < limit) break;
+      const txN = res[0]?.meta.changes ?? 0;
+      const opN = res[1]?.meta.changes ?? 0;
+      report.applied_tx += txN;
+      report.applied_ops += opN;
+      appliedLeft -= Math.max(txN, opN);
+      if (txN < limit && opN < limit) break;
     }
     if (calls.used < cleanupLimit && calls.hasWrites(100)) {
       const day90 = new Date(now - 90 * DAY).toISOString().slice(0, 10);

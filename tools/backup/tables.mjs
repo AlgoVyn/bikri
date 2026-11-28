@@ -14,6 +14,7 @@ export const BACKUP_TABLES = [
   'change_log',
   'change_log_watermarks',
   'applied_ops',
+  'applied_tx',
   'sync_conflicts',
   'devices',
   'branch_device_codes',

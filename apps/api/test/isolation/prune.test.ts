@@ -25,7 +25,7 @@ const n = async (sql: string, ...p: unknown[]) =>
   );
 
 describe('prune cron (03 §4.4; 16, I12, I16)', () => {
-  it('16 / I12: per-tenant floors, applied_ops 90 days, second run deletes nothing, B never 410 for A', async () => {
+  it('16 / I12: per-tenant floors, applied_tx 90 days, second run deletes nothing, B never 410 for A', async () => {
     const a = await seedShop('Prune A');
     const b = await seedShop('Prune B');
     await pushOk(a.till, saleOps(a, a.till, 1));
@@ -55,7 +55,7 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
       .bind(b.tenantId, now - 40 * DAY, bMin)
       .run();
     await env.DB.prepare(
-      'UPDATE applied_ops SET applied_at = ?2 WHERE tenant_id = ?1',
+      'UPDATE applied_tx SET applied_at = ?2 WHERE tenant_id = ?1',
     )
       .bind(a.tenantId, now - 100 * DAY)
       .run();
@@ -92,13 +92,13 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
     ).toBe(bMin);
     expect(
       await n(
-        'SELECT COUNT(*) AS n FROM applied_ops WHERE tenant_id = ?1',
+        'SELECT COUNT(*) AS n FROM applied_tx WHERE tenant_id = ?1',
         a.tenantId,
       ),
     ).toBe(0);
     expect(
       await n(
-        'SELECT COUNT(*) AS n FROM applied_ops WHERE tenant_id = ?1',
+        'SELECT COUNT(*) AS n FROM applied_tx WHERE tenant_id = ?1',
         b.tenantId,
       ),
     ).toBeGreaterThan(0);
@@ -131,7 +131,35 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
     expect(snap.snapshot_seq).toBe(aMax);
   });
 
-  it('prunes more than 5,000 applied_ops so 90-day retention can be met', async () => {
+  it('prunes old applied_tx receipts', async () => {
+    const shop = await seedShop('Prune tx');
+    const old = Date.now() - 100 * DAY;
+    for (let batch = 0; batch < 2; batch += 1) {
+      await env.DB.prepare(
+        `WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 1000)
+         INSERT INTO applied_tx (tenant_id, tx_id, device_id, applied_at, result, results_json)
+         SELECT ?1, 'old-tx-' || ?2 || '-' || x, ?3, ?4, 'applied', '[]' FROM c`,
+      )
+        .bind(shop.tenantId, batch, shop.till.id, old)
+        .run();
+    }
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM applied_tx WHERE tenant_id = ?1',
+        shop.tenantId,
+      ),
+    ).toBe(2_000);
+    const report = await pruneAll(env, Date.now());
+    expect(report.applied_tx).toBeGreaterThanOrEqual(2_000);
+    expect(
+      await n(
+        'SELECT COUNT(*) AS n FROM applied_tx WHERE tenant_id = ?1',
+        shop.tenantId,
+      ),
+    ).toBe(0);
+  });
+
+  it('prunes more than 5,000 applied_ops so legacy 90-day retention can be met', async () => {
     const shop = await seedShop('Prune many');
     const old = Date.now() - 100 * DAY;
     for (let batch = 0; batch < 6; batch += 1) {

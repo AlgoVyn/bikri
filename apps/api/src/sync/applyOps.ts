@@ -21,7 +21,7 @@ import type { QuoteInfo, QuoteLineInfo } from './applyOpsShared.ts';
 import {
   type ApplyContext,
   type ApplyOutcome,
-  appliedOp,
+  appliedTx,
   type CostMap,
   type CostState,
   changeLog,
@@ -32,6 +32,7 @@ import {
   isGuardAssertion,
   key,
   type Lookups,
+  notAppliedSql,
   opRowKey,
   ownersAddedInGroup,
   type Planned,
@@ -133,16 +134,15 @@ function planOp(
           op,
           stmts: [
             db.prepare(
-              `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?5)`,
+              `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND deleted_at IS NULL AND ${notAppliedSql('?1', '?6', '?5')}`,
               now,
               op.updated_by ?? null,
               id,
               op.op_id,
+              op.tx_id,
             ),
-            // `changeLog`'s `onlyIfChanged` guard reads the UPDATE's `changes()`, so it
-            // must run before `appliedOp` (which always writes a row) (API-L3).
+            // `changeLog`'s `onlyIfChanged` guard reads the UPDATE's `changes()`.
             changeLog(db, tbl, id, 'delete', deviceId, now, true),
-            appliedOp(db, op, deviceId, now, 'applied', null, false),
           ],
           result: { op_id: op.op_id, result: 'applied' },
           guard: null,
@@ -150,7 +150,7 @@ function planOp(
       }
       return {
         op,
-        stmts: [appliedOp(db, op, deviceId, now, 'applied', null, false)],
+        stmts: [],
         result: { op_id: op.op_id, result: 'applied' },
         guard: null,
       };
@@ -159,15 +159,15 @@ function planOp(
       op,
       stmts: [
         db.prepare(
-          `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND rev = ?5 AND deleted_at IS NULL AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?6)${ownerGuard}`,
+          `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND rev = ?5 AND deleted_at IS NULL AND ${notAppliedSql('?1', '?7', '?6')}${ownerGuard}`,
           now,
           op.updated_by ?? null,
           id,
           cur.rev,
           op.op_id,
+          op.tx_id,
         ),
         guardAssert(db),
-        appliedOp(db, op, deviceId, now, 'applied', null, true),
         changeLog(db, tbl, id, 'delete', deviceId, now, true),
       ],
       result: { op_id: op.op_id, result: 'applied', server_rev: cur.rev + 1 },
@@ -211,13 +211,13 @@ function planOp(
       );
       // A second void for the same sale must never be half-accepted: its payment,
       // ledger and stock rows would be applied even though the void header is unique.
-      // `applied_ops` handles a replay of the same op id; a fresh op id is allowed only
-      // when it is the same stored void row (restore recovery / pruned applied_ops).
+      // `applied_tx` handles a replay of the same transaction; a fresh op id is allowed
+      // only when it is the same stored void row (restore recovery / pruned receipts).
       const replay = look.existingLedger.has(key('sale_voids', id));
       if (!replay && (look.existingVoids.has(saleId) || duplicateInGroup))
         throw new Reject('CONSTRAINT_FAILED');
     }
-    // A replay with a fresh op id (restore recovery or a pruned applied_ops row) must
+    // A replay with a fresh op id (restore recovery or a pruned receipt) must
     // not re-run side effects such as the weighted-average update. If this transaction
     // also introduces new companion rows, the group-level check rejects it instead of
     // attaching them to the stored document.
@@ -227,7 +227,7 @@ function planOp(
     ) {
       return {
         op,
-        stmts: [appliedOp(db, op, deviceId, now, 'applied', null, false)],
+        stmts: [],
         result: { op_id: op.op_id, result: 'applied' },
         guard: null,
         existingInsert: true,
@@ -253,7 +253,7 @@ function planOp(
       // runs (API-H4).
       guardAssert(db),
       changeLog(db, tbl, id, 'upsert', deviceId, now, true),
-      ...sideEffects(ctx, tbl, row, avg, group, op.op_id),
+      ...sideEffects(ctx, tbl, row, avg, group, op.op_id, op.tx_id),
     ];
     if (
       tbl === 'sales' ||
@@ -263,7 +263,16 @@ function planOp(
       tbl === 'sale_voids'
     )
       stmts.push(
-        ...stockRepairStatements(ctx, look, group, tbl, row, avg, op.op_id),
+        ...stockRepairStatements(
+          ctx,
+          look,
+          group,
+          tbl,
+          row,
+          avg,
+          op.op_id,
+          op.tx_id,
+        ),
       );
     if (
       tbl === 'refunds' ||
@@ -271,10 +280,9 @@ function planOp(
       tbl === 'supplier_returns' ||
       tbl === 'day_closes'
     )
-      stmts.push(...moneyAuditStatements(ctx, group, tbl, row, op.op_id));
-    // Last: the guards above look for a missing `applied_ops` row. Writing it first
-    // would make every side effect skip itself in the request that is applying the op.
-    stmts.push(appliedOp(db, op, deviceId, now, 'applied', null, false));
+      stmts.push(
+        ...moneyAuditStatements(ctx, group, tbl, row, op.op_id, op.tx_id),
+      );
     return {
       op,
       stmts,
@@ -304,7 +312,6 @@ function planOp(
           ...insertValues,
         ),
         guardAssert(db),
-        appliedOp(db, op, deviceId, now, 'applied', null, true),
         changeLog(db, tbl, id, 'upsert', deviceId, now, true),
       ],
       result: { op_id: op.op_id, result: 'applied', server_rev: 1 },
@@ -339,11 +346,12 @@ function planOp(
       : '';
   const stmts: D1PreparedStatement[] = [
     db.prepare(
-      `UPDATE ${tbl} SET ${assignments} WHERE tenant_id = ?1 AND id = ?2 AND rev = ?3 AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ?1 AND op_id = ?${guardParam})${ownerGuard}`,
+      `UPDATE ${tbl} SET ${assignments} WHERE tenant_id = ?1 AND id = ?2 AND rev = ?3 AND ${notAppliedSql('?1', `?${guardParam + 1}`, `?${guardParam}`)}${ownerGuard}`,
       id,
       cur.rev,
       ...set.map((c) => sqlValue(row[c])),
       op.op_id,
+      op.tx_id,
     ),
     guardAssert(db),
   ];
@@ -373,18 +381,7 @@ function planOp(
       ),
     );
   }
-  stmts.push(
-    appliedOp(
-      db,
-      op,
-      deviceId,
-      now,
-      merge ? 'conflict_merged' : 'applied',
-      null,
-      true,
-    ),
-    changeLog(db, tbl, id, 'upsert', deviceId, now, true),
-  );
+  stmts.push(changeLog(db, tbl, id, 'upsert', deviceId, now, true));
   return {
     op,
     stmts,
@@ -397,13 +394,28 @@ function planOp(
   };
 }
 
-/** `applied_ops` answers for op ids already seen (chunks of 100 bound parameters). */
+/**
+ * Answers ops already applied by a transaction receipt (`applied_tx`) or, during the
+ * 90-day transition, a legacy per-op receipt (`applied_ops`). Chunks keep D1 under 100
+ * bound parameters.
+ */
 async function alreadyApplied(
   ctx: ApplyContext,
   ops: PushOp[],
 ): Promise<{ seen: Map<string, OpResult>; rowsRead: number }> {
+  const txIds = [...new Set(ops.map((o) => o.tx_id))];
   const ids = ops.map((o) => o.op_id);
   const stmts: D1PreparedStatement[] = [];
+  for (let i = 0; i < txIds.length; i += 99) {
+    const chunk = txIds.slice(i, i + 99);
+    stmts.push(
+      ctx.db.prepare(
+        `SELECT tx_id, result, results_json FROM applied_tx WHERE tenant_id = ?1 AND tx_id IN (${chunk.map((_, j) => `?${j + 2}`).join(', ')})`,
+        ...chunk,
+      ),
+    );
+  }
+  const txStatements = stmts.length;
   for (let i = 0; i < ids.length; i += 99) {
     const chunk = ids.slice(i, i + 99);
     stmts.push(
@@ -419,19 +431,52 @@ async function alreadyApplied(
     (sum, result) => sum + (result.meta.rows_read ?? 0),
     0,
   );
+  const wanted = new Set(ids);
+  const txSeen = new Set<string>();
   const out = new Map<string, OpResult>();
-  for (const r of res) {
-    for (const row of (r.results ?? []) as Array<{
+  for (let i = 0; i < txStatements; i += 1) {
+    for (const row of (res[i]?.results ?? []) as Array<{
+      tx_id: string;
+      result: 'applied' | 'rejected';
+      results_json: string;
+    }>) {
+      // A rejected receipt answers the ops it names (a lost response or a retry with
+      // the same ids), but a new op id under the same tx is a Retry after a fix and
+      // must be allowed to re-plan. Only an applied tx blocks new ids.
+      if (row.result === 'applied') txSeen.add(row.tx_id);
+      try {
+        for (const result of JSON.parse(row.results_json) as OpResult[]) {
+          if (wanted.has(result.op_id)) out.set(result.op_id, result);
+        }
+      } catch {
+        // A malformed receipt must not re-apply the transaction; the txSeen check
+        // below answers its requested ops as rejected instead.
+      }
+    }
+  }
+  for (let i = txStatements; i < res.length; i += 1) {
+    for (const row of (res[i]?.results ?? []) as Array<{
       op_id: string;
       result: OpResult['result'];
       error_code: string | null;
     }>) {
+      if (out.has(row.op_id)) continue;
       out.set(row.op_id, {
         op_id: row.op_id,
         result: row.result,
         ...(row.error_code ? { error_code: row.error_code } : {}),
       });
     }
+  }
+  // A receipt exists for the transaction but this op is not in it (a malformed or
+  // unexpectedly partial receipt). Reject rather than re-apply and duplicate its rows.
+  for (const op of ops) {
+    if (!out.has(op.op_id) && txSeen.has(op.tx_id))
+      out.set(op.op_id, {
+        op_id: op.op_id,
+        result: 'rejected',
+        error_code: 'CONSTRAINT_FAILED',
+      });
   }
   // A replayed `applied` op is what a till gets after a lost response. It must still learn
   // the row's current revision: otherwise it keeps `base_rev = 0`, and a later rejected edit
@@ -925,9 +970,9 @@ export async function applyOps(
     if (ctx.budget.used >= ctx.budget.max - 2) break;
     if (round > 0) {
       // A previous round lost a guarded write. The most likely cause is a concurrent
-      // retry of the same op: it may have committed between our first `applied_ops`
-      // read and the batch. Re-read before planning again, so a replay is answered
-      // from `applied_ops` instead of being merged a second time.
+      // retry of the same transaction: it may have committed between our first
+      // `applied_tx`/`applied_ops` read and the batch. Re-read before planning again,
+      // so a replay is answered from the receipt instead of being merged a second time.
       const again = await alreadyApplied(ctx, pending.flat());
       rowsRead += again.rowsRead;
       for (const [id, result] of again.seen) final.set(id, result);
@@ -1038,7 +1083,23 @@ export async function applyOps(
               applyRank(x.p.op.tbl) - applyRank(y.p.op.tbl) || x.i - y.i,
           )
           .map((x) => x.p);
-        const res = await db.batch(ordered.flatMap((p) => p.stmts));
+        // The receipt is appended after every business/side-effect statement of the
+        // batch. It must never precede the guards: a receipt written first would make
+        // the group skip itself in the request that is applying it.
+        const receipts = list.map((g) =>
+          appliedTx(
+            db,
+            g.txId,
+            ctx.device.id,
+            ctx.now,
+            'applied',
+            g.planned.map((p) => p.result),
+          ),
+        );
+        const res = await db.batch([
+          ...ordered.flatMap((p) => p.stmts),
+          ...receipts,
+        ]);
         const start = new Map<Planned, number>();
         let at = 0;
         for (const p of ordered) {
@@ -1143,8 +1204,26 @@ export async function applyOps(
   }
 
   // Rejections are recorded so they are not retried (03 §4.1 step 5); usage ends the request.
-  const tail: D1PreparedStatement[] = rejected.map(({ op, code }) =>
-    appliedOp(db, op, ctx.device.id, ctx.now, 'rejected', code, false),
+  // A rejected transaction is all-or-nothing at planning time, so one receipt per tx.
+  const rejectedByTx = new Map<string, { op: PushOp; code: string }[]>();
+  for (const entry of rejected) {
+    const list = rejectedByTx.get(entry.op.tx_id) ?? [];
+    list.push(entry);
+    rejectedByTx.set(entry.op.tx_id, list);
+  }
+  const tail: D1PreparedStatement[] = [...rejectedByTx].map(([txId, entries]) =>
+    appliedTx(
+      db,
+      txId,
+      ctx.device.id,
+      ctx.now,
+      'rejected',
+      entries.map(({ op, code }) => ({
+        op_id: op.op_id,
+        result: 'rejected' as const,
+        error_code: code,
+      })),
+    ),
   );
   for (const { op, code } of rejected) {
     final.set(op.op_id, {
