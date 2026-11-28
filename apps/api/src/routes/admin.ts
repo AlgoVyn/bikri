@@ -921,6 +921,8 @@ function assertMaintenance(tenant: TenantRow): void {
 export const PURGE_ORDER = [
   'change_log',
   'change_log_watermarks',
+  // Legacy rows must be purged until the follow-up migration drops the table.
+  'applied_ops',
   'applied_tx',
   'sync_conflicts',
   'owner_email_codes',

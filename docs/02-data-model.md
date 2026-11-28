@@ -25,7 +25,7 @@ This document is the **source of truth** for table and column names. D1 (server)
 |---|---|---|
 | **Master** (mutable) | `shop`, `branches`, `staff`, `categories`, `products`, `bundle_items`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises`, `quotations`, `quotation_lines` | Have `created_at`, `updated_at`, `deleted_at`, `rev`, `updated_by`. Updated by `upsert` ops with optimistic `base_rev` ([03-sync §5](03-sync.md#5-conflict-rules)). Soft delete only. |
 | **Ledger** (append-only) | `sales`, `sale_lines`, `payments`, `refunds`, `refund_lines`, `sale_voids`, `ledger_entries`, `stock_movements`, `purchases`, `purchase_lines`, `supplier_returns`, `supplier_return_lines`, `expenses`, `cash_moves`, `day_closes`, `audit_log` | Insert only. Never updated or deleted, except the **derived cache** column `sales.status` which both sides recompute ([§4](#4-derived-values)). Migration `0010` enforces this with `BEFORE UPDATE`/`BEFORE DELETE` triggers; deletes are allowed only while the tenant is in `maintenance` (restore purge) or `deleting` (tenant deletion). |
-| **Server-owned** (tenant-scoped) | `devices`, `branch_device_codes`, `enrolment_codes`, `owner_email_codes`, `change_log`, `change_log_watermarks`, `applied_ops` (legacy, unused), `applied_tx`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills (`devices` without `token_hash` and `enrolled_by`); `owner_email_codes` and `branch_device_codes` are never pulled or exported. |
+| **Server-owned** (tenant-scoped) | `devices`, `branch_device_codes`, `enrolment_codes`, `owner_email_codes`, `change_log`, `change_log_watermarks`, `applied_ops` (legacy; no request reads or writes it, rows still purge with the tenant until the follow-up drop), `applied_tx`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills (`devices` without `token_hash` and `enrolled_by`); `owner_email_codes` and `branch_device_codes` are never pulled or exported. |
 | **Platform** (not tenant-scoped) | `tenants`, `tenant_usage`, `expense_category_templates`, `meta`, `shop_requests`, `operator_audit` | Primary database only; written by the Worker and the operator console; never pulled by tills ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)). |
 | **Local-only** (Dexie) | `outbox`, `kv`, `carts`, `held_bills`, `file_queue`, `print_jobs`, `stock_levels`, `party_balances`, `pull_shadow` | Never synced. |
 
@@ -2934,7 +2934,7 @@ Purge and tenant deletion still use the H8 tenant-leading pagination keys (`id`,
 
 ### 2.39 Applied transaction receipts (migration `0040_applied_tx.sql`)
 
-One idempotency receipt per outbox transaction instead of one per op (D-315). `v1.2.4` removes every code reference to the legacy `applied_ops` table; the table itself is dropped in the following release, once the previous Worker no longer reads it (D-316). Server-only: no client wire change and `SCHEMA_VERSION` stays 10.
+One idempotency receipt per outbox transaction instead of one per op (D-315). `v1.2.4` removes every apply-path reference to the legacy `applied_ops` table; the table itself is dropped in the following release, once the previous Worker no longer reads it (D-316). Server-only: no client wire change and `SCHEMA_VERSION` stays 10.
 
 ```sql
 CREATE TABLE applied_tx (
@@ -2951,7 +2951,7 @@ CREATE INDEX applied_tx_at ON applied_tx (applied_at);
 
 ### 2.40 Legacy per-op receipts (code removal, `v1.2.4`)
 
-`applied_ops` was replaced by `applied_tx` in v1.2.3. `v1.2.4` removes every code reference to the old table, but leaves it in place for one release so the previous Worker can still serve during the deploy. A follow-up destructive migration drops the table after `v1.2.4` is live and no Worker reads it (D-316).
+`applied_ops` was replaced by `applied_tx` in v1.2.3. `v1.2.4` removes every apply-path reference to the old table, including retention pruning, but leaves it in place for one release so the previous Worker can still serve during the deploy. Tenant deletion and operator purge still include it because it may hold old rows. A follow-up destructive migration drops the table after `v1.2.4` is live and no Worker reads it (D-316).
 
 ## 3. Dexie schema (till)
 

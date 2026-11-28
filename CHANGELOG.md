@@ -7,7 +7,7 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 ## [1.2.4] — 2026-11-28
 
 ### Sync cleanup
-- Remove every code reference to the legacy `applied_ops` table. `applied_tx` is now the only idempotency receipt, so the push path no longer reads two tables or adds a second `NOT EXISTS` to every guarded write. The empty table is left in place for one release so the previous Worker keeps serving during the deploy; a follow-up migration drops it once `v1.2.4` is live (D-316).
+- Remove every apply-path reference to the legacy `applied_ops` table. `applied_tx` is now the only idempotency receipt, so the push path no longer reads two tables or adds a second `NOT EXISTS` to every guarded write. The table is left in place for one release so the previous Worker keeps serving during the deploy; because it may still hold old rows, tenant deletion and operator purge still remove it until the follow-up migration drops it (D-316).
 
 ## [1.2.3] — 2026-11-28
 
