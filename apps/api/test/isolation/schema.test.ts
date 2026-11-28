@@ -11,7 +11,6 @@ const db = env.DB;
 const PK_EXCEPTIONS: Record<string, string[]> = {
   change_log: ['seq'], // AUTOINCREMENT stream per database; readers filter by (tenant_id, seq)
   enrolment_codes: ['code_hash'], // the code itself identifies the tenant (D-072)
-  applied_ops: ['tenant_id', 'op_id'],
   applied_tx: ['tenant_id', 'tx_id'],
   branch_device_codes: ['tenant_id', 'branch_id', 'device_code'],
   tenant_usage: ['tenant_id', 'day'],
@@ -19,7 +18,6 @@ const PK_EXCEPTIONS: Record<string, string[]> = {
 };
 /** Cross-tenant indexes allowed by 10 §8 I20, plus globally unique secrets. */
 const INDEX_EXCEPTIONS = new Set([
-  'applied_ops_at',
   'applied_tx_at',
   // Platform cron sums all tenants for one UTC day.
   'tenant_usage_day',

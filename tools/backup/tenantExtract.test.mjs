@@ -34,7 +34,6 @@ describe('tenant extraction', () => {
     for (const operational of [
       'tenant_usage',
       'change_log',
-      'applied_ops',
       'applied_tx',
       'enrolment_codes',
       'owner_email_codes',

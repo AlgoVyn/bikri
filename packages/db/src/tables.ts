@@ -46,14 +46,6 @@ export const TABLE_COLUMNS = {
     'device_id',
     'at',
   ],
-  applied_ops: [
-    'tenant_id',
-    'op_id',
-    'device_id',
-    'applied_at',
-    'result',
-    'error_code',
-  ],
   sync_conflicts: [
     'tenant_id',
     'id',

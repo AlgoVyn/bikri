@@ -25,13 +25,13 @@ This document is the **source of truth** for table and column names. D1 (server)
 |---|---|---|
 | **Master** (mutable) | `shop`, `branches`, `staff`, `categories`, `products`, `bundle_items`, `product_barcodes`, `customers`, `suppliers`, `expense_categories`, `promises`, `quotations`, `quotation_lines` | Have `created_at`, `updated_at`, `deleted_at`, `rev`, `updated_by`. Updated by `upsert` ops with optimistic `base_rev` ([03-sync §5](03-sync.md#5-conflict-rules)). Soft delete only. |
 | **Ledger** (append-only) | `sales`, `sale_lines`, `payments`, `refunds`, `refund_lines`, `sale_voids`, `ledger_entries`, `stock_movements`, `purchases`, `purchase_lines`, `supplier_returns`, `supplier_return_lines`, `expenses`, `cash_moves`, `day_closes`, `audit_log` | Insert only. Never updated or deleted, except the **derived cache** column `sales.status` which both sides recompute ([§4](#4-derived-values)). Migration `0010` enforces this with `BEFORE UPDATE`/`BEFORE DELETE` triggers; deletes are allowed only while the tenant is in `maintenance` (restore purge) or `deleting` (tenant deletion). |
-| **Server-owned** (tenant-scoped) | `devices`, `branch_device_codes`, `enrolment_codes`, `owner_email_codes`, `change_log`, `change_log_watermarks`, `applied_ops` (legacy; no sync request reads or writes it; tenant purge/deletion only remove its rows until the follow-up drop), `applied_tx`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills (`devices` without `token_hash` and `enrolled_by`); `owner_email_codes` and `branch_device_codes` are never pulled or exported. |
+| **Server-owned** (tenant-scoped) | `devices`, `branch_device_codes`, `enrolment_codes`, `owner_email_codes`, `change_log`, `change_log_watermarks`, `applied_tx`, `sync_conflicts` | Written only by the Worker, always with the caller's `tenant_id`. `devices` and `sync_conflicts` are pulled read-only by tills (`devices` without `token_hash` and `enrolled_by`); `owner_email_codes` and `branch_device_codes` are never pulled or exported. |
 | **Platform** (not tenant-scoped) | `tenants`, `tenant_usage`, `expense_category_templates`, `meta`, `shop_requests`, `operator_audit` | Primary database only; written by the Worker and the operator console; never pulled by tills ([13 §5](13-multi-tenancy.md#5-tenant-scoping-rules-for-implementers)). |
 | **Local-only** (Dexie) | `outbox`, `kv`, `carts`, `held_bills`, `file_queue`, `print_jobs`, `stock_levels`, `party_balances`, `pull_shadow` | Never synced. |
 
 Common columns on every synced row: `id`, `created_at` (plus `tenant_id` in D1 only). Ledger rows also carry `device_id`, `staff_id`, `branch_id`, `business_date` where listed.
 
-**Primary-key exceptions:** `change_log` is keyed by its global `seq`, `applied_ops` by `(tenant_id, op_id)` (legacy until the follow-up drop), `applied_tx` by `(tenant_id, tx_id)`, and the enrolment/owner-email code tables by their unique hash keys; these are the exceptions listed in [10 §8 I20](10-testing.md#8-cross-tenant-isolation-suite-mandatory).
+**Primary-key exceptions:** `change_log` is keyed by its global `seq`, `applied_tx` by `(tenant_id, tx_id)`, and the enrolment/owner-email code tables by their unique hash keys; these are the exceptions listed in [10 §8 I20](10-testing.md#8-cross-tenant-isolation-suite-mandatory).
 
 `shop.timezone` is an IANA zone. The setup wizard writes the default `Asia/Karachi`, and v1 has no per-shop picker; the Worker validates the value on push and import and the client falls back to the default if a stored value is unknown, so a typo cannot block selling (D-218).
 
@@ -2930,11 +2930,11 @@ BEGIN
 END;
 ```
 
-Purge and tenant deletion still use the H8 tenant-leading pagination keys (`id`, `change_log.seq`, `applied_ops.op_id`, `applied_tx.tx_id`, `change_log_watermarks.day`, `branch_device_codes(branch_id, device_code)`, `enrolment_codes.expires_at`) and no longer sort the tenant's remaining rows per chunk. The nightly prune reads `change_log_floor` with the tenant list, skips the watermark upsert when `MAX(seq)` has not advanced, and reserves D1 calls for the applied-tx, expiry and deletion phases.
+Purge and tenant deletion still use the H8 tenant-leading pagination keys (`id`, `change_log.seq`, `applied_tx.tx_id`, `change_log_watermarks.day`, `branch_device_codes(branch_id, device_code)`, `enrolment_codes.expires_at`) and no longer sort the tenant's remaining rows per chunk. The nightly prune reads `change_log_floor` with the tenant list, skips the watermark upsert when `MAX(seq)` has not advanced, and reserves D1 calls for the applied-tx, expiry and deletion phases.
 
 ### 2.39 Applied transaction receipts (migration `0040_applied_tx.sql`)
 
-One idempotency receipt per outbox transaction instead of one per op (D-315). `v1.2.4` removes every apply-path reference to the legacy `applied_ops` table; the table itself is dropped in the following release, once the previous Worker no longer reads it (D-316). Server-only: no client wire change and `SCHEMA_VERSION` stays 10.
+One idempotency receipt per outbox transaction instead of one per op (D-315). `v1.2.4` removed every apply-path reference to the legacy `applied_ops` table; `v1.2.5` drops the table with migration `0041` (D-317). Server-only: no client wire change and `SCHEMA_VERSION` stays 10.
 
 ```sql
 CREATE TABLE applied_tx (
@@ -2951,7 +2951,22 @@ CREATE INDEX applied_tx_at ON applied_tx (applied_at);
 
 ### 2.40 Legacy per-op receipts (code removal, `v1.2.4`)
 
-`applied_ops` was replaced by `applied_tx` in v1.2.3. `v1.2.4` removes every apply-path reference to the old table, including retention pruning, but leaves it in place for one release so the previous Worker can still serve during the deploy. Tenant deletion and operator purge still include it because it may hold old rows; the drop release removes those references in the same deploy (D-316). A follow-up destructive migration drops the table after `v1.2.4` is live and no Worker reads it.
+`applied_ops` was replaced by `applied_tx` in v1.2.3. `v1.2.4` removed every apply-path reference to the old table, including retention pruning, but left it in place for one release so the previous Worker could serve during the deploy. Tenant deletion and operator purge kept including it because it could hold old rows; `v1.2.5` removed those references and drops the table in `0041` (see 2.41 and D-317).
+
+### 2.41 Drop the legacy per-op receipts (migration `0041_drop_applied_ops.sql`)
+
+`applied_ops` had been unused since v1.2.3 and unreferenced since v1.2.4. The owner confirmed no pre-v1.2.3 transaction remained to replay; production's newest legacy receipt was 2026-11-26 15:34 UTC, before the v1.2.3 deploy. The drop also removes the `applied_ops_at` index and is a reviewed destructive exception to the additive rule (D-317).
+
+```sql
+-- bikri:allow-destructive
+-- D-317: applied_tx has been the only idempotency receipt since v1.2.3. The
+-- owner confirmed no pre-v1.2.3 transaction remains to replay, and production
+-- had no legacy row newer than 2026-11-26 15:34 UTC (37 hours before the v1.2.3
+-- deploy). v1.2.4 stopped reading and writing this table.
+DROP TABLE applied_ops;
+```
+
+After the drop, rolling back to a Worker ≤ 1.2.3 is unsafe because those versions query the table. Old nightly backups still contain it and restore into a new database; the current Worker ignores it.
 
 ## 3. Dexie schema (till)
 
