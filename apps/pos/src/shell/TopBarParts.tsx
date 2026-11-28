@@ -205,16 +205,10 @@ function syncDotClass(state: string | undefined): string {
 }
 
 /**
- * A compact offline/stale state that is visible without opening the staff menu. The
- * avatar dot alone is too easy to miss (and on the navy rail it needs a lighter amber).
+ * The compact offline/stale state in the phone top bar. The desktop rail uses the
+ * staff avatar dot instead; the staff menu still spells the state out in words.
  */
-export function SyncStatusPill({
-  sync,
-  variant = 'topbar',
-}: {
-  sync: SyncStatus;
-  variant?: 'topbar' | 'rail';
-}) {
+export function SyncStatusPill({ sync }: { sync: SyncStatus }) {
   const { t } = useTranslation();
   if (!sync) return null;
   const show =
@@ -239,11 +233,7 @@ export function SyncStatusPill({
       data-testid="sync-pill"
       data-state={sync.state}
       title={sync.detail}
-      className={
-        variant === 'rail'
-          ? 'flex min-h-11 w-full items-center justify-center gap-2 px-2 text-caption font-medium text-warning-rail hover:bg-rail-hover'
-          : 'inline-flex min-h-8 max-w-28 items-center gap-1.5 rounded-full border border-warning/40 bg-warning-subtle px-2 text-caption font-medium text-warning-subtle-ink'
-      }
+      className="inline-flex min-h-8 max-w-28 items-center gap-1.5 rounded-full border border-warning/40 bg-warning-subtle px-2 text-caption font-medium text-warning-subtle-ink"
     >
       <span
         aria-hidden="true"

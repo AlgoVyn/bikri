@@ -509,7 +509,6 @@ function AppShellInner({ children }: { children: ReactNode }) {
         ) : null}
         {desktop ? (
           <div className="hidden w-full shrink-0 flex-col border-t border-rail-border lg:flex">
-            <SyncStatusPill sync={sync} variant="rail" />
             <GlobalSearchTrigger variant="rail" />
             {updateReady ? (
               <button

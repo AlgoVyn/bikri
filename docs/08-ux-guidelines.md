@@ -63,7 +63,7 @@ Bikri uses the **Algovyn brand colours** (Bikri is an Algovyn product), not a pa
 | `--color-danger` | `#B91C1C` | `#E89090` | Below cost, refunds, destructive | red-700 (site scale; red-600 fails 4.5:1 on the slate-100 page) / calmer Graphite red (D-217) |
 | `--color-danger-subtle` / ink | `#FEE2E2` / `#991B1B` | `#3A1414` / `#F5C8C8` | Error banners | derived (Tailwind red) / Graphite (D-217) |
 | `--color-warning` | `#B45309` | `#D9AE4A` | Low stock, over limit, short | derived (amber-700; site's `#f59e0b` fails text contrast on white) / Graphite amber (D-217) |
-| `--color-warning-rail` | `#D9AE4A` | `#D9AE4A` | Rail offline dot/pill (6.47:1 on the navy rail) | D-311 |
+| `--color-warning-rail` | `#D9AE4A` | `#D9AE4A` | Rail offline dot on the staff avatar (6.47:1 on the navy rail) | D-311, D-314 |
 | `--color-warning-subtle` / ink | `#FEF3C7` / `#92400E` | `#2A2108` / `#F3E0A8` | Warning banners | site notice colours / Graphite (D-217) |
 | `--color-success` | `#047857` | `#4BC2BF` | Synced, drawer correct | emerald-700 (site) / brand turquoise (D-217) |
 | `--color-success-subtle` / ink | `#D1FAE5` / `#065F46` | `#0C2E2D` / `#B7EBE9` | Success banners | emerald-100 (site) / turquoise tint (D-217) |
