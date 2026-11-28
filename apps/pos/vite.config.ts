@@ -68,6 +68,10 @@ function localePreload(): Plugin {
 
 export default defineConfig({
   base: `${BASE_PATH}/`,
+  // Shown in Settings → About so support can tell two deploys of the same app version apart.
+  define: {
+    __BUILD_ID__: JSON.stringify(process.env.GITHUB_SHA?.slice(0, 7) ?? 'dev'),
+  },
   // Parse locale catalogs with JSON.parse instead of shipping a multi-megabyte JS
   // object literal; V8 parses JSON faster and the startup catalog is the largest one.
   json: { stringify: true },

@@ -4,6 +4,11 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+## [1.2.1] — 2026-11-28
+
+### In-app manual update
+- Settings → About now performs a real update check: it waits for the new service worker to install, reports latest/offline/error truthfully, shows the build hash, and offers **Restart to update** when a new version is waiting. The restart is blocked while a cart has lines so a sale cannot be lost; the About action and the rail/phone Update pill share the same waiting state (D-313).
+
 ## [1.2.0] — 2026-11-28
 
 ### Release

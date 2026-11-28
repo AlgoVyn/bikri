@@ -446,6 +446,7 @@ test.describe('Settings (T-050)', () => {
     await openReadyShop(page, '/bikri/settings/about');
     await expect(page.getByRole('heading', { name: 'About' })).toBeVisible();
     await expect(page.getByText(/^Version:/u)).toBeVisible();
+    await expect(page.getByText(/^Build:/u)).toBeVisible();
     await expect(page.getByRole('link', { name: 'Source code' })).toHaveCount(
       0,
     );
@@ -457,6 +458,15 @@ test.describe('Settings (T-050)', () => {
     await expect(
       page.getByRole('heading', { name: 'Keyboard shortcuts' }),
     ).toHaveCount(0);
+
+    // The manual check now reports the real result instead of a blanket "checked".
+    await page.evaluate(async () => {
+      await navigator.serviceWorker.ready;
+    });
+    await page.getByRole('button', { name: 'Check for updates' }).click();
+    await expect(page.getByText("You're on the latest version.")).toBeVisible({
+      timeout: 15_000,
+    });
   });
 
   test('device language, theme and text size apply immediately', async ({

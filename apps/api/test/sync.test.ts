@@ -461,7 +461,7 @@ describe('push (03 §4.1, §9)', () => {
       json: {
         device_id: shop.admin.id,
         schema_version: 1,
-        app_version: '1.2.0',
+        app_version: '1.2.1',
         ops: saleOps(shop, shop.till, 10),
       },
     });
@@ -547,7 +547,7 @@ describe('push (03 §4.1, §9)', () => {
       body: JSON.stringify({
         device_id: shop.till.id,
         schema_version: 2,
-        app_version: '1.2.0',
+        app_version: '1.2.1',
         ops: [],
         padding: 'x'.repeat(1_050_000),
       }),
