@@ -11,7 +11,8 @@
 /**
  * The tenant-leading key of each table deleted by the purge/tenant-delete loops. Most
  * tenant tables use `(tenant_id, id)`; `change_log` has a global `seq`, `applied_ops` an
- * `op_id`, `applied_tx` a `tx_id`, `change_log_watermarks` a `day`,
+ * `op_id` (legacy until the follow-up drop), `applied_tx` a `tx_id`,
+ * `change_log_watermarks` a `day`,
  * `branch_device_codes` a composite `(branch_id, device_code)`, and `enrolment_codes`
  * has no tenant-leading primary key (its `code_hash` is global), so it pages on the
  * `(tenant_id, expires_at)` index.

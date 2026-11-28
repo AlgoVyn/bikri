@@ -134,11 +134,10 @@ function planOp(
           op,
           stmts: [
             db.prepare(
-              `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND deleted_at IS NULL AND ${notAppliedSql('?1', '?6', '?5')}`,
+              `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND deleted_at IS NULL AND ${notAppliedSql('?1', '?5')}`,
               now,
               op.updated_by ?? null,
               id,
-              op.op_id,
               op.tx_id,
             ),
             // `changeLog`'s `onlyIfChanged` guard reads the UPDATE's `changes()`.
@@ -159,12 +158,11 @@ function planOp(
       op,
       stmts: [
         db.prepare(
-          `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND rev = ?5 AND deleted_at IS NULL AND ${notAppliedSql('?1', '?7', '?6')}${ownerGuard}`,
+          `UPDATE ${tbl} SET deleted_at = ?2, updated_at = ?2, updated_by = ?3, rev = rev + 1 WHERE tenant_id = ?1 AND id = ?4 AND rev = ?5 AND deleted_at IS NULL AND ${notAppliedSql('?1', '?6')}${ownerGuard}`,
           now,
           op.updated_by ?? null,
           id,
           cur.rev,
-          op.op_id,
           op.tx_id,
         ),
         guardAssert(db),
@@ -253,7 +251,7 @@ function planOp(
       // runs (API-H4).
       guardAssert(db),
       changeLog(db, tbl, id, 'upsert', deviceId, now, true),
-      ...sideEffects(ctx, tbl, row, avg, group, op.op_id, op.tx_id),
+      ...sideEffects(ctx, tbl, row, avg, group, op.tx_id),
     ];
     if (
       tbl === 'sales' ||
@@ -263,16 +261,7 @@ function planOp(
       tbl === 'sale_voids'
     )
       stmts.push(
-        ...stockRepairStatements(
-          ctx,
-          look,
-          group,
-          tbl,
-          row,
-          avg,
-          op.op_id,
-          op.tx_id,
-        ),
+        ...stockRepairStatements(ctx, look, group, tbl, row, avg, op.tx_id),
       );
     if (
       tbl === 'refunds' ||
@@ -280,9 +269,7 @@ function planOp(
       tbl === 'supplier_returns' ||
       tbl === 'day_closes'
     )
-      stmts.push(
-        ...moneyAuditStatements(ctx, group, tbl, row, op.op_id, op.tx_id),
-      );
+      stmts.push(...moneyAuditStatements(ctx, group, tbl, row, op.tx_id));
     return {
       op,
       stmts,
@@ -346,11 +333,10 @@ function planOp(
       : '';
   const stmts: D1PreparedStatement[] = [
     db.prepare(
-      `UPDATE ${tbl} SET ${assignments} WHERE tenant_id = ?1 AND id = ?2 AND rev = ?3 AND ${notAppliedSql('?1', `?${guardParam + 1}`, `?${guardParam}`)}${ownerGuard}`,
+      `UPDATE ${tbl} SET ${assignments} WHERE tenant_id = ?1 AND id = ?2 AND rev = ?3 AND ${notAppliedSql('?1', `?${guardParam}`)}${ownerGuard}`,
       id,
       cur.rev,
       ...set.map((c) => sqlValue(row[c])),
-      op.op_id,
       op.tx_id,
     ),
     guardAssert(db),
@@ -395,9 +381,8 @@ function planOp(
 }
 
 /**
- * Answers ops already applied by a transaction receipt (`applied_tx`) or, during the
- * 90-day transition, a legacy per-op receipt (`applied_ops`). Chunks keep D1 under 100
- * bound parameters.
+ * Answers ops already applied by a transaction receipt (`applied_tx`). Chunks keep D1
+ * under 100 bound parameters.
  */
 async function alreadyApplied(
   ctx: ApplyContext,
@@ -415,16 +400,6 @@ async function alreadyApplied(
       ),
     );
   }
-  const txStatements = stmts.length;
-  for (let i = 0; i < ids.length; i += 99) {
-    const chunk = ids.slice(i, i + 99);
-    stmts.push(
-      ctx.db.prepare(
-        `SELECT op_id, result, error_code FROM applied_ops WHERE tenant_id = ?1 AND op_id IN (${chunk.map((_, j) => `?${j + 2}`).join(', ')})`,
-        ...chunk,
-      ),
-    );
-  }
   ctx.budget.take();
   const res = await ctx.db.batch(stmts);
   let rowsRead = res.reduce(
@@ -434,8 +409,8 @@ async function alreadyApplied(
   const wanted = new Set(ids);
   const txSeen = new Set<string>();
   const out = new Map<string, OpResult>();
-  for (let i = 0; i < txStatements; i += 1) {
-    for (const row of (res[i]?.results ?? []) as Array<{
+  for (const r of res) {
+    for (const row of (r.results ?? []) as Array<{
       tx_id: string;
       result: 'applied' | 'rejected';
       results_json: string;
@@ -452,20 +427,6 @@ async function alreadyApplied(
         // A malformed receipt must not re-apply the transaction; the txSeen check
         // below answers its requested ops as rejected instead.
       }
-    }
-  }
-  for (let i = txStatements; i < res.length; i += 1) {
-    for (const row of (res[i]?.results ?? []) as Array<{
-      op_id: string;
-      result: OpResult['result'];
-      error_code: string | null;
-    }>) {
-      if (out.has(row.op_id)) continue;
-      out.set(row.op_id, {
-        op_id: row.op_id,
-        result: row.result,
-        ...(row.error_code ? { error_code: row.error_code } : {}),
-      });
     }
   }
   // A receipt exists for the transaction but this op is not in it (a malformed or
@@ -971,7 +932,7 @@ export async function applyOps(
     if (round > 0) {
       // A previous round lost a guarded write. The most likely cause is a concurrent
       // retry of the same transaction: it may have committed between our first
-      // `applied_tx`/`applied_ops` read and the batch. Re-read before planning again,
+      // `applied_tx` read and the batch. Re-read before planning again,
       // so a replay is answered from the receipt instead of being merged a second time.
       const again = await alreadyApplied(ctx, pending.flat());
       rowsRead += again.rowsRead;

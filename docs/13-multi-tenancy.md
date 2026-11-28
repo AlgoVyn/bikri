@@ -215,7 +215,7 @@ M0 (PRs #1 and #2) was merged but **never deployed**: `DEPLOY_ENABLED` is unset,
 | global uniques: `bill_prefix`, `sku`, `barcode`, `expense_categories.code`, `sales.invoice_no` | per tenant (§3.2) |
 | global `meta` (schema_version, restore_epoch, restore_point_at, writes_today/date, change_log_floor) | `meta` keeps `schema_version` and gains `last_prune_at`, `prune_cursor`; `restore_epoch`, `restore_point_at`, `change_log_floor` move to `tenants`; usage moves to `tenant_usage` |
 | `0002_seed` system expense categories without tenant | seeded into `expense_category_templates`; copied per tenant at creation |
-| one global `change_log.seq` stream; `applied_ops`, `sync_conflicts` unscoped | `seq` stays one stream per database (cursors are per tenant: `WHERE tenant_id = ? AND seq > ?`, gaps are fine); `change_log`, `applied_ops`, `sync_conflicts` get `tenant_id`, keys `(tenant_id, …)` |
+| one global `change_log.seq` stream; `applied_tx`, `sync_conflicts` unscoped | `seq` stays one stream per database (cursors are per tenant: `WHERE tenant_id = ? AND seq > ?`, gaps are fine); `change_log`, `applied_tx`, `sync_conflicts` get `tenant_id`, keys `(tenant_id, …)` |
 | `devices`, `enrolment_codes` linked only to a branch | `tenant_id` + composite FK to the branch; `token_hash` and `code_hash` stay globally unique (they identify the tenant); `is_admin`, `grants_admin` added |
 | cron `prune.ts` deployment-wide | still one cron (no extra trigger), but floors are per tenant and it also runs tenant deletion ([03 §4.4](03-sync.md#44-retention-pruning-and-stale-tills)) |
 | one `DB` binding used directly | `tenantDb(env, tenant)` resolves `tenants.db_shard` (v1 always `DB`) |

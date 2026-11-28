@@ -165,13 +165,6 @@ const HOT_QUERIES: Array<{
     tenantLeading: false,
   },
   {
-    name: 'already applied ops',
-    sql: 'SELECT op_id, result, error_code FROM applied_ops WHERE tenant_id = ?1 AND op_id IN (?)',
-    args: ['t', 'o'],
-    index: 'sqlite_autoindex_applied_ops_1',
-    noTempBTree: true,
-  },
-  {
     name: 'already applied tx',
     sql: 'SELECT tx_id, result, results_json FROM applied_tx WHERE tenant_id = ?1 AND tx_id IN (?)',
     args: ['t', 'tx'],
@@ -495,12 +488,6 @@ describe('T-062 performance', () => {
         where: '1 = 1',
         index: 'change_log_tenant_seq',
         tenantEquality: '(tenant_id=? AND seq=?)',
-      },
-      {
-        tbl: 'applied_ops',
-        where: '1 = 1',
-        index: 'sqlite_autoindex_applied_ops_1',
-        tenantEquality: '(tenant_id=? AND op_id=?)',
       },
       {
         tbl: 'applied_tx',

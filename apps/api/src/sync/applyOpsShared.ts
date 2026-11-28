@@ -527,14 +527,14 @@ export function changeLog(
   );
 }
 
-/** The guard shared by every write: this transaction or this legacy op is not applied yet. */
-export function notAppliedSql(tenant: string, tx: string, op: string): string {
-  return `NOT EXISTS (SELECT 1 FROM applied_tx WHERE tenant_id = ${tenant} AND tx_id = ${tx} AND result = 'applied') AND NOT EXISTS (SELECT 1 FROM applied_ops WHERE tenant_id = ${tenant} AND op_id = ${op})`;
+/** The guard shared by every write: this transaction is not applied yet. */
+export function notAppliedSql(tenant: string, tx: string): string {
+  return `NOT EXISTS (SELECT 1 FROM applied_tx WHERE tenant_id = ${tenant} AND tx_id = ${tx} AND result = 'applied')`;
 }
 
 /**
- * One idempotency receipt per outbox transaction (D-315). `results` is the per-op push
- * answer stored as JSON so a lost response can return exactly the same results.
+ * One idempotency receipt per outbox transaction. `results` is the per-op push answer
+ * stored as JSON so a lost response can return exactly the same results (D-315).
  */
 export function appliedTx(
   db: TenantDb,

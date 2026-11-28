@@ -1,3 +1,3 @@
 /** Versions the till sends with every push (03 §4.1). Bump with column/wire migrations; index-only ones do not need it. */
-export const APP_VERSION = '1.2.3';
+export const APP_VERSION = '1.2.4';
 export const CLIENT_SCHEMA_VERSION = 10;
