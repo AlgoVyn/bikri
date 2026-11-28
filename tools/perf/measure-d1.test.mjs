@@ -12,7 +12,7 @@ describe('T-062 D1 size measurement', () => {
     // room for additive columns but catches an index/bloat regression.
     expect(result.bytesPerBill).toBeLessThan(2_000);
     expect(result.bytesPerShopYear).toBeGreaterThan(result.bytesPerBill);
-    expect(result.logicalRowsPerBill).toBe(27);
+    expect(result.logicalRowsPerBill).toBe(19);
     expect(result.billsPerDay).toBeCloseTo(4);
     // Replaying all 32 migrations in a scratch SQLite file usually takes ~10-20 s;
     // 30 s timed out on a loaded CI runner and cost a deploy, so leave real headroom.

@@ -922,6 +922,7 @@ export const PURGE_ORDER = [
   'change_log',
   'change_log_watermarks',
   'applied_ops',
+  'applied_tx',
   'sync_conflicts',
   'owner_email_codes',
   ...[...APPLY_ORDER]

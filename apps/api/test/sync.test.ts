@@ -89,7 +89,8 @@ describe('push (03 §4.1, §9)', () => {
       ['sale_lines', 1],
       ['payments', 1],
       ['stock_movements', 1],
-      ['applied_ops', 3],
+      ['applied_tx', 1],
+      ['applied_ops', 0],
     ] as const) {
       expect(
         await count(
@@ -306,16 +307,50 @@ describe('push (03 §4.1, §9)', () => {
     ).toBe(198);
     expect(
       await count(
-        "SELECT COUNT(*) AS n FROM applied_ops WHERE tenant_id = ?1 AND result = 'rejected'",
+        "SELECT COUNT(*) AS n FROM applied_tx WHERE tenant_id = ?1 AND result = 'rejected'",
         shop.tenantId,
       ),
     ).toBe(2);
-    // a rejected op is answered from applied_ops when sent again
+    // a rejected op is answered from its transaction receipt when sent again
     const again = await pushOk(shop.admin, [ops[17] as (typeof ops)[number]]);
     expect(again.results[0]).toMatchObject({
       result: 'rejected',
       error_code: 'CONSTRAINT_FAILED',
     });
+  });
+
+  it('1d: a legacy applied_ops receipt still answers its op', async () => {
+    const shop = await seedShop('Legacy receipt');
+    const product = productRow(newId());
+    const create = op('products', 'upsert', product);
+    await env.DB.prepare(
+      'INSERT INTO applied_ops (tenant_id, op_id, device_id, applied_at, result, error_code) VALUES (?1, ?2, ?3, ?4, ?5, NULL)',
+    )
+      .bind(shop.tenantId, create.op_id, shop.till.id, Date.now(), 'applied')
+      .run();
+    const res = await pushOk(shop.till, [create]);
+    expect(res.results[0]).toMatchObject({ result: 'applied' });
+    expect(
+      await count(
+        'SELECT COUNT(*) AS n FROM products WHERE tenant_id = ?1 AND id = ?2',
+        shop.tenantId,
+        product.id,
+      ),
+    ).toBe(0);
+  });
+
+  it('1e: a subset of an applied transaction is answered from its receipt', async () => {
+    const shop = await seedShop('Partial receipt');
+    const ops = saleOps(shop, shop.till, 1);
+    await pushOk(shop.till, ops);
+    const res = await pushOk(shop.till, [ops[0] as PushOpLike]);
+    expect(res.results[0]).toMatchObject({ result: 'applied' });
+    expect(
+      await count(
+        'SELECT COUNT(*) AS n FROM applied_tx WHERE tenant_id = ?1',
+        shop.tenantId,
+      ),
+    ).toBe(1);
   });
 
   it('7: schema_version below MIN_CLIENT_SCHEMA → 409', async () => {
@@ -461,7 +496,7 @@ describe('push (03 §4.1, §9)', () => {
       json: {
         device_id: shop.admin.id,
         schema_version: 1,
-        app_version: '1.2.2',
+        app_version: '1.2.3',
         ops: saleOps(shop, shop.till, 10),
       },
     });
@@ -547,7 +582,7 @@ describe('push (03 §4.1, §9)', () => {
       body: JSON.stringify({
         device_id: shop.till.id,
         schema_version: 2,
-        app_version: '1.2.2',
+        app_version: '1.2.3',
         ops: [],
         padding: 'x'.repeat(1_050_000),
       }),
