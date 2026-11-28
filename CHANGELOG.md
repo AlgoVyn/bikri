@@ -4,6 +4,11 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+## [1.2.2] — 2026-11-28
+
+### Shell
+- Remove the desktop rail's offline/sync text pill. The staff avatar's status dot is the rail summary and the staff menu still spells the state out; the phone top bar keeps the compact `Offline · N waiting` pill (D-314).
+
 ## [1.2.1] — 2026-11-28
 
 ### In-app manual update

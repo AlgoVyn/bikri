@@ -142,6 +142,22 @@ test.describe('design layout invariants', () => {
     await context.setOffline(false);
   });
 
+  test('the desktop rail uses the avatar dot instead of a sync text pill', async ({
+    page,
+    context,
+  }) => {
+    await page.setViewportSize({ width: 1280, height: 800 });
+    await seedVisualShop(page);
+    await context.setOffline(true);
+    await page.evaluate(() => window.dispatchEvent(new Event('offline')));
+    await expect(page.getByTestId('sync-pill')).toHaveCount(0);
+    await expect(page.getByTestId('staff-menu')).toHaveAttribute(
+      'data-sync-state',
+      'offline',
+    );
+    await context.setOffline(false);
+  });
+
   test('reports keeps its presets together and uses three metric columns at 1024', async ({
     page,
   }) => {
