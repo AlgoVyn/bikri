@@ -49,7 +49,7 @@ Request:
 {
   "device_id": "01JC0Z8K3V7R1M2Q4S6T8V0X2Y",
   "schema_version": 10,
-  "app_version": "1.1.0",
+  "app_version": "1.2.0",
   "ops": [
     { "op_id": "01JC1A...", "tbl": "sales", "kind": "insert", "row": { "id": "01JC1A...", "invoice_no": "INV-A-1042", "...": "..." } },
     { "op_id": "01JC1B...", "tbl": "products", "kind": "upsert", "base_rev": 3, "changed_fields": ["price"], "row": { "id": "01J9...", "price": 155000, "...": "..." } }

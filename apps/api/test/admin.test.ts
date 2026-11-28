@@ -216,7 +216,7 @@ describe('operator tenants (04 §3.7, screens/19)', () => {
       json: {
         code: body.owner_code.code,
         user_agent: 'test',
-        app_version: '1.1.0',
+        app_version: '1.2.0',
       },
     });
     expect(enrol.status).toBe(201);

@@ -101,7 +101,7 @@ describe('Worker coverage gaps', () => {
             },
           }),
         },
-        APP_VERSION: '1.1.0',
+        APP_VERSION: '1.2.0',
         SCHEMA_VERSION: '10',
         MIN_CLIENT_SCHEMA: '1',
       },

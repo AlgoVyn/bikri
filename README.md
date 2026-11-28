@@ -27,7 +27,7 @@ React + Vite PWA · Hono on Cloudflare Workers · D1 · R2 · Dexie · TypeScrip
 
 ## Status
 
-v1.1.0. See [CHANGELOG.md](CHANGELOG.md) and the [roadmap](docs/11-roadmap.md). The specification lives in [`docs/`](docs/00-overview.md); coding agents start at [`AGENTS.md`](AGENTS.md).
+v1.2.0. See [CHANGELOG.md](CHANGELOG.md) and the [roadmap](docs/11-roadmap.md). The specification lives in [`docs/`](docs/00-overview.md); coding agents start at [`AGENTS.md`](AGENTS.md).
 
 ## Quick start
 

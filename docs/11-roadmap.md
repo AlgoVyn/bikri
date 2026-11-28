@@ -165,7 +165,9 @@ The feature is specified in [screens/21](screens/21-quotations.md), [02 §2.35](
 
 **T-121 Quotations list, detail and share — implemented.** Sales `Bills | Quotations` tabs, `/quotations` and `/quotations/:id`, master–detail, filters/summary/status/expiry, detail with bundle grouping and totals, convert/duplicate/cancel dialogs, converted-sale link, print/share/PDF and empty/read-only states, i18n in en/ur/roman-ur. AC: screens/21 AC 4–9, 10, 12–16; Playwright EN/UR at 1280×800 and 390×844; offline create/convert.
 
-**T-122 Quotation printing, share and export — implemented (release tasks remain).** `buildQuotationReceipt` in `packages/printer`, `print_jobs.quotation_id`/kind, 58/80 mm + HTML/raster, Web Share text, full export/restore tables, docs/decisions/owner guide, E2E journey 28 and release. AC: screens/21 AC 5, 11, 14; quotation receipt unit tests; the suite in [10 §5](10-testing.md#5-e2e-journeys-each-in-en-and-ur-desktop-1280800-and-phone-390844) passes in EN and UR.
+**T-122 Quotation printing, share and export — implemented; released in v1.2.0.** `buildQuotationReceipt` in `packages/printer`, `print_jobs.quotation_id`/kind, 58/80 mm + HTML/raster, Web Share text, full export/restore tables, docs/decisions/owner guide, E2E journey 28 and release. AC: screens/21 AC 5, 11, 14; quotation receipt unit tests; the suite in [10 §5](10-testing.md#5-e2e-journeys-each-in-en-and-ur-desktop-1280800-and-phone-390844) passes in EN and UR.
+
+**v1.2.0 released 2026-11-28.** `APP_VERSION` 1.2.0, changelog cut and `pnpm versions:check` added to CI so the app version cannot drift from the Worker, generated types, docs, README, changelog or perf seed.
 
 ## v2 backlog (ordered by value)
 
