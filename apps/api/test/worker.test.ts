@@ -1,6 +1,6 @@
 import { SELF } from 'cloudflare:test';
 import { env } from 'cloudflare:workers';
-import { SECURITY_HEADERS } from '@bikri/core';
+import { APP_VERSION, SECURITY_HEADERS } from '@bikri/core';
 import { describe, expect, it } from 'vitest';
 import { z } from 'zod';
 import { ApiError } from '../src/errors.ts';
@@ -44,7 +44,7 @@ describe('worker', () => {
     const body: unknown = await response.json();
     expect(body).toMatchObject({
       ok: true,
-      app_version: '1.1.0',
+      app_version: APP_VERSION,
       schema_version: 10,
       min_client_schema: 1,
       db: 'ok',

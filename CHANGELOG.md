@@ -4,6 +4,12 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+## [1.2.0] — 2026-11-28
+
+### Release
+- `APP_VERSION` is **1.2.0**; `SCHEMA_VERSION` and `CLIENT_SCHEMA_VERSION` stay **10**. `pnpm versions:check` now fails CI when the till, Worker config, generated types, architecture doc, README, changelog heading or perf seed disagree, so the next release cannot ship with a stale app version.
+- Quotations (v1.2) and the 25–27 Nov review remediation below are included in this release; T-122 is closed.
+
 ### Sell action row — 2026-11-28
 - Rename the cart primary from **Take payment** to **Sell** (empty cart **Add items**, quote mode **Save quote**). The primary stays on the same row as Hold/Held/Clear/Save quote at every width; quiet actions scroll horizontally if space is tight. The Pay modal title and F8 command remain **Take payment** (D-312).
 
@@ -579,4 +585,4 @@ _Cumulative feature record; 1.1.0 additions are summarized in the release sectio
 - [Operator guide](docs/operator-guide.md), [owner guide](docs/owner-guide.md), specification in [`docs/`](docs/00-overview.md) and decisions log in [docs/decisions.md](docs/decisions.md).
 
 ### v1.0.0 release
-- Shipped on 2026-11-02 after the live backup/restore drills and the hardware checklist; v1.1.0 followed on 2026-11-16.
+- Shipped on 2026-11-02 after the live backup/restore drills and the hardware checklist; v1.1.0 followed on 2026-11-16 and v1.2.0 on 2026-11-28.

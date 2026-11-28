@@ -19,6 +19,7 @@
     "contrast:check": "node tools/contrast-check.ts",
     "docs:check": "node tools/check-docs.mjs",
     "size": "node tools/check-bundle-size.mjs",
+    "versions:check": "node tools/check-versions.mjs",
     "website:check": "node tools/check-website.mjs"
   },
   "devDependencies": {

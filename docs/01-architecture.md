@@ -182,6 +182,7 @@ bikri/
 ├─ tools/backup/           export.mjs, files.mjs, retention.mjs, tenant-extract.mjs, zip.mjs (09 §2–§3.4), README.md
 ├─ tools/check-website.mjs  go-live gate: no third-party scripts, no service worker on algovyn.com (§5.5)
 ├─ tools/check-docs.mjs    links, anchors, schema/doc sync
+├─ tools/check-versions.mjs  APP_VERSION/schema parity across code, docs and changelog
 ├─ tools/check-migrations-safe.mjs  destructive-D1 guard
 ├─ e2e/                   Playwright tests + fixtures
 └─ docs/                  this specification
@@ -248,7 +249,7 @@ CPU budget: the free plan allows **10 ms CPU per request**. Rules: no bcrypt/scr
     { "binding": "BACKUPS", "bucket_name": "bikri-backups" }  // operator API only
   ],
   "vars": {
-    "APP_VERSION": "1.1.0",
+    "APP_VERSION": "1.2.0",
     "SCHEMA_VERSION": "10",
     "MIN_CLIENT_SCHEMA": "1",            // oldest till schema the push accepts (03 §4.1)
     "MAINTENANCE": "0",

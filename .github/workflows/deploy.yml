@@ -74,6 +74,8 @@ jobs:
           node-version-file: .nvmrc
           cache: pnpm
       - run: pnpm install --frozen-lockfile
+      - name: Release version parity
+        run: pnpm versions:check
       - name: Refuse the placeholder D1 database_id
         run: |
           if grep -q '00000000-0000-0000-0000-000000000000' apps/api/wrangler.jsonc; then
