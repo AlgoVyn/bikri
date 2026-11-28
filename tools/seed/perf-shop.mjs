@@ -291,7 +291,6 @@ const TENANT_TABLES = [
   'sync_conflicts',
   'change_log',
   'change_log_watermarks',
-  'applied_ops',
   'applied_tx',
   'branch_device_codes',
   'owner_email_codes',
@@ -317,12 +316,7 @@ function wipeTenant(db, id) {
 function countByTenant(db, id) {
   const out = {};
   for (const table of TENANT_TABLES) {
-    if (
-      table === 'change_log' ||
-      table === 'applied_ops' ||
-      table === 'applied_tx'
-    )
-      continue;
+    if (table === 'change_log' || table === 'applied_tx') continue;
     out[table] = Number(
       db
         .prepare(`SELECT COUNT(*) AS n FROM "${table}" WHERE tenant_id = ?1`)
@@ -1079,7 +1073,7 @@ function main() {
       pending_ops: 0,
       oldest_pending_at: null,
       user_agent: 'perf-seed',
-      app_version: '1.2.4',
+      app_version: '1.2.5',
       created_at: start,
       updated_at: now - 3_600_000,
       device_code_history: '',

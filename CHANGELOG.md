@@ -4,6 +4,11 @@ All notable changes to Bikri. The version is the deployed `APP_VERSION`; migrati
 
 ## [Unreleased]
 
+## [1.2.5] — 2026-11-29
+
+### Sync cleanup
+- Migration `0041` drops the legacy `applied_ops` table and its index. `applied_tx` is now the only idempotency receipt; tenant deletion, operator purge, backups, the seed and the schema tests no longer reference the table. Production held 5,153 legacy rows, newest 2026-11-26 15:34 UTC — before the v1.2.3 deploy — so no pre-switch transaction was left to replay (D-317). Rolling back to a Worker ≤ 1.2.3 is no longer supported after this migration.
+
 ## [1.2.4] — 2026-11-28
 
 ### Sync cleanup

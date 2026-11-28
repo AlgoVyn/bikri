@@ -387,7 +387,7 @@ export async function push(dev: Dev, ops: PushOp[], schemaVersion = 2) {
     json: {
       device_id: dev.id,
       schema_version: schemaVersion,
-      app_version: '1.2.4',
+      app_version: '1.2.5',
       ops,
     },
   });

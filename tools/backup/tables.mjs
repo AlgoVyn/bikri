@@ -13,8 +13,6 @@ export const BACKUP_TABLES = [
   'tenant_usage',
   'change_log',
   'change_log_watermarks',
-  // Legacy until the follow-up drop; remove with the migration (D-316).
-  'applied_ops',
   'applied_tx',
   'sync_conflicts',
   'devices',

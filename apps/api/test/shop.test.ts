@@ -688,7 +688,7 @@ describe('CORE-M1: a branch keeps the code of a device that moved away', () => {
         json: {
           code: created.code,
           user_agent: 'test',
-          app_version: '1.2.4',
+          app_version: '1.2.5',
         },
       }),
     );

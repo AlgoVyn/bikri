@@ -207,16 +207,6 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
     )
       .bind(d.tenantId, d.branchId, 'Z')
       .run();
-    // The legacy applied_ops table still exists in v1.2.4; deleting a tenant must purge
-    // its rows or the tenants FK delete fails. Another tenant's legacy row must stay.
-    for (const shop of [a, d]) {
-      await env.DB.prepare(
-        `INSERT INTO applied_ops (tenant_id, op_id, device_id, applied_at, result)
-         VALUES (?1, ?2, ?3, ?4, 'applied')`,
-      )
-        .bind(shop.tenantId, `${shop.tenantId}-legacy-op`, shop.till.id, now)
-        .run();
-    }
     await env.DB.prepare(
       `INSERT INTO shop_requests (id, shop_name, owner_name, email, status, tenant_id, created_at, updated_at)
        VALUES ('del-request', 'Del D', 'Owner', 'del-d@example.com', 'approved', ?1, ?2, ?2)`,
@@ -265,12 +255,6 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
         a.tenantId,
       ),
     ).toBe(aBefore);
-    expect(
-      await n(
-        'SELECT COUNT(*) AS n FROM applied_ops WHERE tenant_id = ?1',
-        a.tenantId,
-      ),
-    ).toBe(1);
     expect(await env.FILES.head(`t/${d.tenantId}/shop/logo-x.png`)).toBeNull();
     expect(
       await env.FILES.head(`t/${a.tenantId}/shop/logo-x.png`),

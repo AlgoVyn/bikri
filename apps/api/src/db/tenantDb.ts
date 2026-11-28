@@ -19,7 +19,6 @@ export const PLATFORM_TABLES = [
 /** Every tenant-scoped D1 table (02 §1.1: server-owned, master, ledger). */
 export const TENANT_TABLES = [
   'change_log',
-  'applied_ops',
   'applied_tx',
   'sync_conflicts',
   'devices',

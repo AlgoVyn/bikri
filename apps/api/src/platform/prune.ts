@@ -32,10 +32,6 @@ const DELETION_RESERVE = 8;
 export const DELETE_ORDER = [
   'owner_email_codes',
   'enrolment_codes',
-  // The legacy table is dropped in the release after v1.2.4; until then its rows must
-  // still be deleted with the tenant or the `tenants` FK delete fails. Remove this entry
-  // in the same release as the drop migration (D-316).
-  'applied_ops',
   'applied_tx',
   'sync_conflicts',
   'change_log',
