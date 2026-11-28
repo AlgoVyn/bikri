@@ -131,10 +131,10 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
     expect(snap.snapshot_seq).toBe(aMax);
   });
 
-  it('prunes old applied_tx receipts', async () => {
+  it('prunes more than 5,000 old applied_tx receipts', async () => {
     const shop = await seedShop('Prune tx');
     const old = Date.now() - 100 * DAY;
-    for (let batch = 0; batch < 2; batch += 1) {
+    for (let batch = 0; batch < 6; batch += 1) {
       await env.DB.prepare(
         `WITH RECURSIVE c(x) AS (SELECT 1 UNION ALL SELECT x + 1 FROM c WHERE x < 1000)
          INSERT INTO applied_tx (tenant_id, tx_id, device_id, applied_at, result, results_json)
@@ -148,9 +148,9 @@ describe('prune cron (03 §4.4; 16, I12, I16)', () => {
         'SELECT COUNT(*) AS n FROM applied_tx WHERE tenant_id = ?1',
         shop.tenantId,
       ),
-    ).toBe(2_000);
+    ).toBe(6_000);
     const report = await pruneAll(env, Date.now());
-    expect(report.applied_tx).toBeGreaterThanOrEqual(2_000);
+    expect(report.applied_tx).toBeGreaterThanOrEqual(6_000);
     expect(
       await n(
         'SELECT COUNT(*) AS n FROM applied_tx WHERE tenant_id = ?1',
